@@ -1,0 +1,41 @@
+/* @tailwind base;
+@tailwind components;
+@tailwind utilities; */
+
+@import "tailwindcss";
+@config "../tailwind.config.js";
+/* This links your config file */
+
+/* Custom layer for base styles */
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    /* Ensures the background from tailwind.config.js is applied */
+    @apply bg-background text-neutral-100 antialiased overflow-x-hidden;
+    margin: 0;
+    min-height: 100vh;
+    font-feature-settings: "ss01", "ss02", "cv01";
+  }
+}
+
+/* Custom scrollbar for HUD aesthetic */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-black;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-neutral-800 rounded-full hover:bg-architect transition-colors;
+}
+
+/* Global transitions for interactive elements */
+button,
+a {
+  @apply transition-all duration-200;
+}
