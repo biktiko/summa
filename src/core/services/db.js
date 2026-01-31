@@ -1,13 +1,29 @@
+import { db as firestore } from './firebase';
+import { 
+    collection, 
+    doc, 
+    getDoc, 
+    getDocs, 
+    setDoc, 
+    addDoc, 
+    updateDoc, 
+    deleteDoc, 
+    query, 
+    where, 
+    writeBatch,
+    limit
+} from 'firebase/firestore';
+
 /**
- * Mock Database Service
+ * Mock Database Service (Legacy / Offline Fallback)
  * Simulates a relational database structure (PostgreSQL ready)
- * Persists to localStorage for now.
+ * Persists to localStorage.
  */
 
 const DB_KEY = 'life_os_db_v10';
 
-// Initial Seed Data
-const SEED_DATA = {
+// Initial Seed Data (Preserved for migration/testing)
+export const SEED_DATA = {
     users: [
         {
             id: 'u1',
@@ -164,8 +180,6 @@ export class MockDatabase {
         localStorage.setItem(DB_KEY, JSON.stringify(data));
     }
 
-    // --- Generic Helpers ---
-
     async getUserData(userId) {
         const db = this._getDb();
         const user = db.users.find(u => u.id === userId);
@@ -201,14 +215,12 @@ export class MockDatabase {
         return null;
     }
 
-    // --- Generic CRUD Helper ---
     async _addItem(collection, userId, itemData) {
         const db = this._getDb();
         if (!db[collection]) db[collection] = [];
 
         let newItemId;
         if (collection === 'tasks') {
-            // Find max numeric ID
             const maxId = db[collection].reduce((max, item) => {
                 const numId = parseInt(item.id);
                 return !isNaN(numId) && numId > max ? numId : max;
@@ -244,75 +256,62 @@ export class MockDatabase {
         return true;
     }
 
-    // --- Specific Methods (Wrappers) ---
-
-    // Skills
+    // --- Specific Methods (Mock wraps generic) ---
     async addSkill(userId, data) { return this._addItem('skills', userId, data); }
     async updateSkill(id, data) { return this._updateItem('skills', id, data); }
     async deleteSkill(id) { return this._deleteItem('skills', id); }
 
-    // Projects
     async addProject(userId, data) { return this._addItem('projects', userId, data); }
     async updateProject(id, data) { return this._updateItem('projects', id, data); }
     async deleteProject(id) { return this._deleteItem('projects', id); }
 
-    // Services
     async addService(userId, data) { return this._addItem('services', userId, data); }
     async updateService(id, data) { return this._updateItem('services', id, data); }
     async deleteService(id) { return this._deleteItem('services', id); }
 
-    // Languages
     async addLanguage(userId, data) { return this._addItem('languages', userId, data); }
     async updateLanguage(id, data) { return this._updateItem('languages', id, data); }
     async deleteLanguage(id) { return this._deleteItem('languages', id); }
 
-    // Education
     async addEducation(userId, data) { return this._addItem('education', userId, data); }
     async updateEducation(id, data) { return this._updateItem('education', id, data); }
     async deleteEducation(id) { return this._deleteItem('education', id); }
 
-    // Experience
     async addExperience(userId, data) { return this._addItem('experience', userId, data); }
     async updateExperience(id, data) { return this._updateItem('experience', id, data); }
     async deleteExperience(id) { return this._deleteItem('experience', id); }
 
-    // Achievements
     async addAchievement(userId, data) { return this._addItem('achievements', userId, data); }
     async updateAchievement(id, data) { return this._updateItem('achievements', id, data); }
     async deleteAchievement(id) { return this._deleteItem('achievements', id); }
 
-    // Tasks
     async addTask(userId, data) { return this._addItem('tasks', userId, data); }
     async updateTask(id, data) { return this._updateItem('tasks', id, data); }
     async deleteTask(id) { return this._deleteItem('tasks', id); }
 
-    // Goals
     async addGoal(userId, data) { return this._addItem('goals', userId, data); }
     async updateGoal(id, data) { return this._updateItem('goals', id, data); }
     async deleteGoal(id) { return this._deleteItem('goals', id); }
 
-    // Notes
     async addNote(userId, data) { return this._addItem('notes', userId, data); }
     async updateNote(id, data) { return this._updateItem('notes', id, data); }
     async deleteNote(id) { return this._deleteItem('notes', id); }
 
-    // Protocols
     async addProtocol(userId, data) { return this._addItem('protocols', userId, data); }
     async updateProtocol(id, data) { return this._updateItem('protocols', id, data); }
     async deleteProtocol(id) { return this._deleteItem('protocols', id); }
 
-    // Biometrics
     async addBiometric(userId, data) { return this._addItem('biometrics', userId, data); }
     async updateBiometric(id, data) {
-        const db = this._getDb();
+         // Logic duplicating the history check for localStorage
+         const db = this._getDb();
         const index = db.biometrics.findIndex(b => b.id === id);
         if (index !== -1) {
             const oldItem = db.biometrics[index];
-            // Create history entry if value changed
             if (data.value !== undefined && data.value !== oldItem.value) {
                 const historyEntry = {
                     date: new Date().toISOString().split('T')[0],
-                    value: oldItem.value // Save old value
+                    value: oldItem.value
                 };
                 data.history = [...(oldItem.history || []), historyEntry];
             }
@@ -322,45 +321,28 @@ export class MockDatabase {
     }
     async deleteBiometric(id) { return this._deleteItem('biometrics', id); }
 
-    // Supplements
     async addSupplement(userId, data) { return this._addItem('supplements', userId, data); }
     async updateSupplement(id, data) { return this._updateItem('supplements', id, data); }
     async deleteSupplement(id) { return this._deleteItem('supplements', id); }
 
-
-    // --- Auth ---
-
     async authenticateUser(email, password) {
         const db = this._getDb();
-        const user = db.users.find(u => u.email === email && u.password === password);
-        return user || null;
+        return db.users.find(u => u.email === email && u.password === password) || null;
     }
 
     async createUser(email, password, name) {
         const db = this._getDb();
-
-        // Check if exists
-        if (db.users.find(u => u.email === email)) {
+         if (db.users.find(u => u.email === email)) {
             throw new Error('User already exists');
         }
-
         const newUser = {
             id: 'u' + Date.now(),
-            email,
-            password,
-            name,
-            role: 'user',
-            energy: 100,
-            balance: 0,
-            xp: 0
+            email, password, name, role: 'user', energy: 100, balance: 0, xp: 0
         };
-
         db.users.push(newUser);
         this._saveDb(db);
         return newUser;
     }
-
-    // --- Generic XP / Tasks ---
 
     async addXP(userId, amount) {
         const db = this._getDb();
@@ -374,4 +356,323 @@ export class MockDatabase {
     }
 }
 
-export const db = new MockDatabase();
+/**
+ * Real Firestore Database Service
+ * Implements the same interface as MockDatabase
+ */
+export class FirestoreDatabase {
+    constructor() {
+        // Init happens via firebase.js
+        this.checkAutoMigrate();
+    }
+
+    async checkAutoMigrate() {
+        try {
+            // Check if DB is empty
+            const usersRef = collection(firestore, 'users');
+            const q = query(usersRef, limit(1));
+            const snap = await getDocs(q);
+            
+            if (snap.empty) {
+                const rawLocal = localStorage.getItem(DB_KEY);
+                // Also check if we have data to migrate
+                if (rawLocal) {
+                    console.log("🚀 Firestore is empty. Auto-migrating local data...");
+                    const data = JSON.parse(rawLocal);
+                    await this.migrateFromLocalStorage(data);
+                    console.log("✅ Auto-migration complete. Reloading...");
+                    window.location.reload();
+                }
+            }
+        } catch (e) {
+            console.warn("Auto-migration check skipped or failed:", e);
+            if (e.code === 'permission-denied') {
+                alert("⚠️ DATABASE ACCESS DENIED\n\nYou need to update your Firestore Security Rules to 'Allow Public Access'.\n\nSee the AI chat for the link and instructions.");
+            }
+        }
+    }
+    
+    // --- Generic CRUD ---
+
+    async _addItem(collectionName, userId, itemData) {
+        // Auto-ID:
+        // const ref = doc(collection(firestore, collectionName));
+        // const id = ref.id;
+        
+        // OR let addDoc do it. But we want to include `id` in the doc for easy frontend access.
+        // We can just addDoc and then update it, or use doc() to mint ID then setDoc.
+        
+        // We'll trust Firestore auto IDs mostly, simplified ID generation:
+        const colRef = collection(firestore, collectionName);
+        const docRef = await addDoc(colRef, {
+             userId,
+             ...itemData,
+             // We'll override 'id' field with the document ID after creation, 
+             // OR usually it's better to rely on doc.id. 
+             // But existing frontend expects `item.id`.
+        });
+        
+        // Add the ID field to the document itself for consistency with frontend
+        await updateDoc(docRef, { id: docRef.id });
+
+        return { id: docRef.id, userId, ...itemData };
+    }
+
+    async _updateItem(collectionName, itemId, updates) {
+        try {
+            const ref = doc(firestore, collectionName, itemId);
+            await updateDoc(ref, updates);
+            // Return updated data?
+            // Expensive to refetch. Just merge.
+            return { id: itemId, ...updates }; // Partial return, frontend usually replaces state
+        } catch (e) {
+            console.error(`Error updating ${collectionName}/${itemId}`, e);
+            return null;
+        }
+    }
+
+    async _deleteItem(collectionName, itemId) {
+        try {
+            await deleteDoc(doc(firestore, collectionName, itemId));
+            return true;
+        } catch (e) {
+            console.error(`Error deleting ${collectionName}/${itemId}`, e);
+            return false;
+        }
+    }
+
+    // --- Users ---
+
+    async getUserData(userId) {
+        // 1. Get User Doc
+        // We perform a query because 'id' field might differ from doc ID if we manually set 'u1' for migration
+        // Or we just query by the 'id' field we store.
+        
+        // We will query ALL collections by userId.
+        // This is heavy but mirrors the MockDB behavior.
+        
+        // User Profile
+        let user = null;
+        const usersRef = collection(firestore, 'users');
+        const userQ = query(usersRef, where('id', '==', userId));
+        const userSnap = await getDocs(userQ);
+        
+        if (!userSnap.empty) {
+            user = userSnap.docs[0].data();
+        } else {
+            return null; 
+        }
+
+        const collectionsToFetch = [
+            'skills', 'languages', 'projects', 'services', 'education', 
+            'experience', 'achievements', 'tasks', 'goals', 'backlog', 
+            'notes', 'protocols', 'biometrics', 'supplements',
+            'transactions', 'categories'
+        ];
+
+        const data = { ...user };
+
+        // Fetch all in parallel
+        await Promise.all(collectionsToFetch.map(async (colName) => {
+            const q = query(collection(firestore, colName), where('userId', '==', userId));
+            const snapshot = await getDocs(q);
+            data[colName] = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+        }));
+
+        return data; 
+    }
+
+    async updateUser(userId, updates) {
+        // Find doc via query first since we don't know the auto-generated doc ID if it differs from 'id'
+        const usersRef = collection(firestore, 'users');
+        const q = query(usersRef, where('id', '==', userId));
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+            const docRef = snapshot.docs[0].ref;
+            await updateDoc(docRef, updates);
+            return { ...snapshot.docs[0].data(), ...updates };
+        }
+        return null;
+    }
+
+    // --- Wrappers ---
+    // Repetitive... could be dynamic but explicit is safer for now.
+    
+    async addSkill(userId, data) { return this._addItem('skills', userId, data); }
+    async updateSkill(id, data) { return this._updateItem('skills', id, data); }
+    async deleteSkill(id) { return this._deleteItem('skills', id); }
+
+    async addProject(userId, data) { return this._addItem('projects', userId, data); }
+    async updateProject(id, data) { return this._updateItem('projects', id, data); }
+    async deleteProject(id) { return this._deleteItem('projects', id); }
+
+    async addService(userId, data) { return this._addItem('services', userId, data); }
+    async updateService(id, data) { return this._updateItem('services', id, data); }
+    async deleteService(id) { return this._deleteItem('services', id); }
+
+    async addLanguage(userId, data) { return this._addItem('languages', userId, data); }
+    async updateLanguage(id, data) { return this._updateItem('languages', id, data); }
+    async deleteLanguage(id) { return this._deleteItem('languages', id); }
+
+    async addEducation(userId, data) { return this._addItem('education', userId, data); }
+    async updateEducation(id, data) { return this._updateItem('education', id, data); }
+    async deleteEducation(id) { return this._deleteItem('education', id); }
+
+    async addExperience(userId, data) { return this._addItem('experience', userId, data); }
+    async updateExperience(id, data) { return this._updateItem('experience', id, data); }
+    async deleteExperience(id) { return this._deleteItem('experience', id); }
+
+    async addAchievement(userId, data) { return this._addItem('achievements', userId, data); }
+    async updateAchievement(id, data) { return this._updateItem('achievements', id, data); }
+    async deleteAchievement(id) { return this._deleteItem('achievements', id); }
+
+    async addTask(userId, data) { return this._addItem('tasks', userId, data); }
+    async updateTask(id, data) { return this._updateItem('tasks', id, data); }
+    async deleteTask(id) { return this._deleteItem('tasks', id); }
+
+    async addGoal(userId, data) { return this._addItem('goals', userId, data); }
+    async updateGoal(id, data) { return this._updateItem('goals', id, data); }
+    async deleteGoal(id) { return this._deleteItem('goals', id); }
+
+    async addNote(userId, data) { return this._addItem('notes', userId, data); }
+    async updateNote(id, data) { return this._updateItem('notes', id, data); }
+    async deleteNote(id) { return this._deleteItem('notes', id); }
+
+    async addProtocol(userId, data) { return this._addItem('protocols', userId, data); }
+    async updateProtocol(id, data) { return this._updateItem('protocols', id, data); }
+    async deleteProtocol(id) { return this._deleteItem('protocols', id); }
+
+    async addBiometric(userId, data) { return this._addItem('biometrics', userId, data); }
+    // Logic for history needs to be fetched first? Or just done on client? 
+    // The Client usually passes the data. But MockDB had embedded logic. 
+    // Let's replicate the logic: Fetch -> Check -> Update.
+    async updateBiometric(id, data) {
+        const ref = doc(firestore, 'biometrics', id);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+            const oldItem = snap.data();
+            let finalUpdates = { ...data };
+            if (data.value !== undefined && data.value !== oldItem.value) {
+                 const historyEntry = {
+                    date: new Date().toISOString().split('T')[0],
+                    value: oldItem.value
+                };
+                finalUpdates.history = [...(oldItem.history || []), historyEntry];
+            }
+            await updateDoc(ref, finalUpdates);
+            return { ...oldItem, ...finalUpdates };
+        }
+        return null;
+    }
+    async deleteBiometric(id) { return this._deleteItem('biometrics', id); }
+
+    async addSupplement(userId, data) { return this._addItem('supplements', userId, data); }
+    async updateSupplement(id, data) { return this._updateItem('supplements', id, data); }
+    async deleteSupplement(id) { return this._deleteItem('supplements', id); }
+
+
+    // --- Auth (Custom on top of Firestore) ---
+
+    async authenticateUser(email, password) {
+        const q = query(collection(firestore, 'users'), where('email', '==', email));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+            const user = snapshot.docs[0].data();
+            // In a real app, verify hash. Here we check plain text matching typical legacy seed.
+            if (user.password === password) {
+                return { ...user, id: user.id || snapshot.docs[0].id };
+            }
+        }
+        return null;
+    }
+
+    async createUser(email, password, name) {
+        // Check exist
+        const q = query(collection(firestore, 'users'), where('email', '==', email));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) throw new Error('User already exists');
+        
+        const newItem = {
+            id: 'u' + Date.now(), // Create custom ID similar to legacy
+            email, password, name, role: 'user', energy: 100, balance: 0, xp: 0
+        };
+        
+        // We use setDoc with a custom ID if we want, or addDoc. 
+        // Let's use addDoc but store the 'id' field as well.
+        const ref = await addDoc(collection(firestore, 'users'), newItem);
+        
+        // Ensure the ID in the doc matches the one generated? 
+        // Or strictly use the field 'id'.
+        // Frontend uses `.id`.
+        // Let's sync them.
+        await updateDoc(ref, { firestoreId: ref.id }); // Optional debug
+        
+        return newItem;
+    }
+
+    async addXP(userId, amount) {
+        // Fetch user, increment, update
+        const usersRef = collection(firestore, 'users');
+        const q = query(usersRef, where('id', '==', userId));
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+            const docRef = snapshot.docs[0].ref;
+            const currentXp = snapshot.docs[0].data().xp || 0;
+            const newXp = currentXp + amount;
+            await updateDoc(docRef, { xp: newXp });
+            return newXp;
+        }
+        return 0;
+    }
+
+    // --- Migration Tool ---
+    
+    async migrateFromLocalStorage(legacyDb) {
+        // legacyDb is the JSON object from localStorage
+        // We iterate and upload.
+        console.log("Starting Migration to Firestore...");
+        
+        const batchSize = 400; // Firestore batch limit is 500
+        let batch = writeBatch(firestore);
+        let count = 0;
+        
+        const collections = [
+            'users', 'skills', 'languages', 'projects', 'services', 'education', 
+            'experience', 'achievements', 'tasks', 'goals', 'backlog', 
+            'notes', 'protocols', 'biometrics', 'supplements',
+            'transactions', 'categories'
+        ];
+
+        const commitBatch = async () => {
+             if (count > 0) {
+                 await batch.commit();
+                 batch = writeBatch(firestore);
+                 count = 0;
+             }
+        };
+
+        for (const colName of collections) {
+            if (legacyDb[colName] && Array.isArray(legacyDb[colName])) {
+                for (const item of legacyDb[colName]) {
+                    // Use item.id as document ID for stability? yes.
+                    const ref = doc(firestore, colName, item.id); 
+                    batch.set(ref, item);
+                    count++;
+                    if (count >= batchSize) await commitBatch();
+                }
+            }
+        }
+        await commitBatch();
+        console.log("Migration Complete!");
+        alert("Data successfully migrated to Firebase!");
+    }
+}
+
+// Switcher: change this to 'new MockDatabase()' to revert.
+export const db = new FirestoreDatabase();
+
+// To migrate manually, you can run:
+// import { db, SEED_DATA } from './core/services/db';
+// db.migrateFromLocalStorage(JSON.parse(localStorage.getItem('life_os_db_v10') || JSON.stringify(SEED_DATA)));

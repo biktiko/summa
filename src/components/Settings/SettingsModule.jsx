@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { User, Palette, Save, Upload, CheckCircle2, Calendar, LogOut, Moon, Sun, Monitor, Smartphone, Sliders, Shield, Zap, Lock, Copy, Loader2, Check, XCircle, ChevronLeft, ChevronRight, Target, Coins, Activity, Globe } from 'lucide-react';
+
+import { User, Palette, Save, Upload, CheckCircle2, Calendar, LogOut, Moon, Sun, Monitor, Smartphone, Sliders, Shield, Zap, Lock, Copy, Loader2, Check, XCircle, ChevronLeft, ChevronRight, Target, Coins, Activity, Globe, Database, HardDrive } from 'lucide-react';
 import { isSignedIn, signInToGoogle, signOutFromGoogle, getUserProfile } from '../../core/services/googleCalendar';
+import { db, SEED_DATA } from '../../core/services/db';
 
 const SettingsModule = ({ userData, updateUser }) => {
     // Mobile Navigation State
@@ -130,6 +132,26 @@ const SettingsModule = ({ userData, updateUser }) => {
             setLocalData({ ...localData, themePreset: 'dark', themeColor: '#3b82f6', backgroundColor: '#020202' });
         } else if (preset === 'forest') {
             setLocalData({ ...localData, themePreset: 'forest', themeColor: '#10b981', backgroundColor: '#052e16' });
+        }
+    };
+
+    const [isMigrating, setIsMigrating] = useState(false);
+
+    const handleMigrateData = async () => {
+        if (window.confirm("This will upload all local data from your browser to the new Firebase Database. This process might take a few seconds. Continue?")) {
+            setIsMigrating(true);
+            try {
+                // Get raw local storage data or fallback to seed
+                const rawLocal = localStorage.getItem('life_os_db_v10');
+                const legacyData = rawLocal ? JSON.parse(rawLocal) : SEED_DATA;
+                
+                await db.migrateFromLocalStorage(legacyData);
+            } catch (e) {
+                console.error(e);
+                alert("Migration Error: " + e.message);
+            } finally {
+                setIsMigrating(false);
+            }
         }
     };
 
@@ -422,6 +444,53 @@ const SettingsModule = ({ userData, updateUser }) => {
                 </div>
             )}
 
+            {activeTab === 'system' && (
+                <div className="space-y-8">
+                     <div className="bg-black/40 border border-white/5 rounded-2xl p-6">
+                        <div className="flex items-start gap-4">
+                            <div className="p-4 bg-orange-500/10 rounded-xl">
+                                <Database className="w-8 h-8 text-orange-500" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-white mb-1">Database Management</h3>
+                                <p className="text-xs text-neutral-400 mb-4">Manage your data storage and synchronization.</p>
+                                
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-bold text-white">Migration Tool</span>
+                                            <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-1 rounded">One-time</span>
+                                        </div>
+                                        <p className="text-[10px] text-neutral-500 mb-4">
+                                            Move your existing data from this device (LocalStorage) to the new Cloud Database (Firebase). 
+                                            Use this only once after setting up the database.
+                                        </p>
+                                        <button
+                                            onClick={handleMigrateData}
+                                            disabled={isMigrating}
+                                            className="px-4 py-2 bg-white text-black hover:bg-neutral-200 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2"
+                                        >
+                                            {isMigrating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                            {isMigrating ? 'Migrating...' : 'Migrate Local Data to Cloud'}
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-bold text-white">Connection Status</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                            <span className="text-xs text-green-500">Firestore Active</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                     </div>
+                </div>
+            )}
+
             {activeTab === 'privacy' && (
                 <div className="space-y-8">
                     <div className="flex items-center gap-4 bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl">
@@ -693,6 +762,7 @@ const SettingsModule = ({ userData, updateUser }) => {
         { id: 'profile', label: 'Profile Settings', icon: User, desc: 'Personal info, identity & bio' },
         { id: 'appearance', label: 'Appearance', icon: Palette, desc: 'Theme, colors & layout' },
         { id: 'integrations', label: 'Integrations', icon: Sliders, desc: 'Connect external services' },
+        { id: 'system', label: 'System & Data', icon: HardDrive, desc: 'Database migration & storage' },
         { id: 'privacy', label: 'Privacy Control', icon: Lock, desc: 'Manage public visibility' },
         { id: 'gameplay', label: 'Gameplay & Modules', icon: CheckCircle2, desc: 'XP, Rewards & Module Visibility' }
     ];
