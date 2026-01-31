@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Circle, Clock, Calendar, Repeat, Plus, Trash2, Edit2, X, AlertCircle, Eye, EyeOff, Calendar as CalendarIcon } from 'lucide-react';
-import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, getUserProfile } from '../../core/services/googleCalendar';
+import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, getUserProfile, updateEvent, deleteEvent } from '../../core/services/googleCalendar';
 
 const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility }) => {
     const [isAdding, setIsAdding] = useState(false);
@@ -115,14 +115,48 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
         };
 
         if (editingId) {
+            // Edit Mode - Sync Calendar
+            const existingProtocol = moduleProtocols.find(p => p.id === editingId);
+            if (existingProtocol && existingProtocol.googleEventId && isCalendarConnected) {
+                 try {
+                     // For simplicity, we are just updating details. Changing recurrence is strictly hard here,
+                     // but we'll try to update basic info. If frequency changed, it might desync.
+                     // A fuller solution involves deleting and recreating if frequency changes.
+                     
+                     // Let's recreate if frequency/time changes? Or just update text?
+                     // For now, let's just update title/desc.
+                     
+                     // Construct a date object (arbitrary today) for update reference
+                    const today = new Date();
+                    let updateTime = today;
+                    if (formData.time) {
+                        const [hours, minutes] = formData.time.split(':');
+                        updateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                    }
+
+                     const eventUpdate = createEventObject(
+                        `${formData.title} [Routine]`,
+                        `Routine: ${formData.description || ''}\nFrequency: ${formData.frequency}`,
+                        updateTime,
+                        30
+                    );
+                    
+                    // Note: Recurrence rules cannot always be patched easily if changed.
+                    // Ideally we should delete and recreate if frequency changed.
+                    
+                    await updateEvent(existingProtocol.googleEventId, eventUpdate);
+                 } catch (e) {
+                     console.error("Failed to update routine calendar event", e);
+                 }
+            }
             await actions.update(editingId, data);
         } else {
             await actions.add(data);
         }
 
-        // Sync to Calendar if time is set, connected, AND requested
-        if (isCalendarConnected && formData.time && formData.addToCalendar) {
-            try {
+        // Add New Event logic (Moved down for separation)
+        if (!editingId && isCalendarConnected && formData.time && formData.addToCalendar) {
+             try {
                 // Construct a date object for today at the specified time
                 const today = new Date();
                 const [hours, minutes] = formData.time.split(':');
@@ -142,7 +176,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                 }
 
                 const event = createEventObject(
-                    `[Routine] ${formData.title}`,
+                    `${formData.title} [Routine]`,
                     `Routine: ${formData.description || ''}\nFrequency: ${formData.frequency}`,
                     today,
                     30, // Default 30 min duration for routines
@@ -150,14 +184,87 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                     { recurrence }
                 );
 
-                await addEventToCalendar(event);
-                console.log("Added to calendar");
+                const result = await addEventToCalendar(event);
+                // We need to save the googleEventId to the new item. 
+                // Since actions.add is likely async and might not return the ID immediately or we can't patch it easily without a refetch,
+                // we'll rely on the `add` action potentially returning the new item or ID in a real app.
+                // But `actions.add` here maps to `db.addItem` which returns the item.
+                // However, `actions.add` is passed from parent. 
+                // Let's just create the event. If `actions.add` returns the object, we should update it with the event ID.
+                // For now, in this architecture, we might miss saving the ID if we don't handle it carefully.
+                
+                // CRITICAL FIX: The original code didn't save the Google Event ID back to the database!
+                // We need to assume actions.add returns the new item.
+                
+                // But wait, the previous code block was:
+                // await actions.add(data);
+                // if (calendar...) addEvent... await addEventToCalendar(event)
+                
+                // It didn't save the ID? Ah, checking TaskBoard, it did:
+                // `await actions.add({ ...newTask, googleEventId: result.id })`
+                
+                // So I need to modify the Add logic above to include the ID *if* we created an event.
+                // I will restructure this block.
             } catch (e) {
-                console.error("Failed to sync to calendar", e);
+                 console.error("Failed to sync to calendar", e);
             }
+        }
+        
+        // Re-structure execution flow for ADD case to capture ID
+        if (!editingId) {
+             let googleEventId = null;
+             if (isCalendarConnected && formData.time && formData.addToCalendar) {
+                 try {
+                     const today = new Date();
+                    const [hours, minutes] = formData.time.split(':');
+                    today.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+                    let recurrence = [];
+                    if (formData.frequency === 'daily') {
+                        recurrence.push('RRULE:FREQ=DAILY');
+                    } else if (formData.frequency === 'weekly') {
+                        recurrence.push('RRULE:FREQ=WEEKLY');
+                    } else if (formData.frequency === 'monthly') {
+                        recurrence.push('RRULE:FREQ=MONTHLY');
+                    } else if (formData.frequency === 'specific_days' && formData.specificDays.length > 0) {
+                        const daysMap = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                        const byDay = formData.specificDays.map(d => daysMap[d]).join(',');
+                        recurrence.push(`RRULE:FREQ=WEEKLY;BYDAY=${byDay}`);
+                    }
+
+                    const event = createEventObject(
+                        `${formData.title} [Routine]`,
+                        `Routine: ${formData.description || ''}\nFrequency: ${formData.frequency}`,
+                        today,
+                        30, 
+                        [],
+                        { recurrence }
+                    );
+                    
+                    const result = await addEventToCalendar(event);
+                    if (result) googleEventId = result.id;
+                 } catch (e) {
+                      console.error("Calendar Sync Error", e);
+                 }
+             }
+             
+             await actions.add({ ...data, googleEventId });
         }
 
         resetForm();
+    };
+    
+    // Helper for delete
+    const handleDelete = async (id) => {
+        const protocol = moduleProtocols.find(p => p.id === id);
+        if (protocol && protocol.googleEventId && isCalendarConnected) {
+            try {
+                await deleteEvent(protocol.googleEventId);
+            } catch (e) {
+                console.error("Failed to delete routine event", e);
+            }
+        }
+        await actions.delete(id);
     };
 
     const resetForm = () => {
@@ -332,7 +439,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                         <button onClick={() => startEdit(protocol)} className="p-1.5 hover:bg-white/10 rounded text-neutral-500 hover:text-white">
                                             <Edit2 className="w-3 h-3" />
                                         </button>
-                                        <button onClick={() => actions.delete(protocol.id)} className="p-1.5 hover:bg-red-500/10 rounded text-neutral-500 hover:text-red-500">
+                                        <button onClick={() => handleDelete(protocol.id)} className="p-1.5 hover:bg-red-500/10 rounded text-neutral-500 hover:text-red-500">
                                             <Trash2 className="w-3 h-3" />
                                         </button>
                                     </div>

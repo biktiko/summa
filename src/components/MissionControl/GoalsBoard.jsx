@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Target, CheckCircle2, Circle, Trash2, Edit2, X, Eye, EyeOff, Calendar, TrendingUp, Save, Link as LinkIcon, ListChecks, Zap, Coins, CheckSquare, Filter, ChevronDown, Calendar as CalendarIcon } from 'lucide-react';
-import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar } from '../../core/services/googleCalendar';
+import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, updateEvent, deleteEvent } from '../../core/services/googleCalendar';
 
 const TAG_COLORS = [
     { name: 'Red', value: 'bg-red-500 text-white' },
@@ -18,7 +18,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
     const [newGoal, setNewGoal] = useState({
         title: '', description: '', type: 'numeric', target: 100, current: 0, unit: '%',
         deadline: '', status: 'active', isHidden: false,
-        linkedTaskIds: [], link: '', linkName: '',
+        linkedTaskIds: [], linkedTaskIdsString: '', link: '', linkName: '',
         xpReward: 50, coinReward: 20, tags: [], moduleId: moduleId || 'architect'
     });
     const [editingId, setEditingId] = useState(null);
@@ -80,7 +80,14 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
 
     const handleAdd = async () => {
         if (!newGoal.title) return;
-        await actions.add(newGoal);
+
+        const goalToAdd = {
+            ...newGoal,
+            linkedTaskIds: (newGoal.linkedTaskIdsString || '').split(',').map(s => s.trim()).filter(Boolean)
+        };
+        delete goalToAdd.linkedTaskIdsString;
+
+        await actions.add(goalToAdd);
 
         // Sync to Calendar
         if (isCalendarConnected && newGoal.deadline) {
@@ -90,7 +97,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                 eventDate.setHours(9, 0, 0, 0);
 
                 const event = createEventObject(
-                    `[Goal] ${newGoal.title}`,
+                    `${newGoal.title} [Goal]`,
                     `Strategic Goal: ${newGoal.description || ''}`,
                     eventDate
                 );
@@ -104,7 +111,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
         setNewGoal({
             title: '', description: '', type: 'numeric', target: 100, current: 0, unit: '%',
             deadline: '', status: 'active', isHidden: false,
-            linkedTaskIds: [], link: '', linkName: '',
+            linkedTaskIds: [], linkedTaskIdsString: '', link: '', linkName: '',
             xpReward: 50, coinReward: 20, tags: [], moduleId: moduleId || 'architect'
         });
     };
@@ -124,12 +131,41 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
             linkedTaskIds: (editData.linkedTaskIdsString || '').split(',').map(s => s.trim()).filter(Boolean)
         };
         delete updatedData.linkedTaskIdsString;
+
+        // Calendar Sync
+        if (updatedData.googleEventId && isCalendarConnected) {
+             try {
+                if (updatedData.deadline) {
+                    const eventDate = new Date(updatedData.deadline);
+                    eventDate.setHours(9, 0, 0, 0);
+
+                     const eventUpdate = createEventObject(
+                        `${updatedData.title} [Goal]`,
+                        `Strategic Goal: ${updatedData.description || ''}`,
+                        eventDate
+                    );
+                    await updateEvent(updatedData.googleEventId, eventUpdate);
+                }
+             } catch (e) {
+                 console.error("Failed to update calendar event", e);
+             }
+        }
+
         await actions.update(editingId, updatedData);
         setEditingId(null);
     };
 
     const deleteGoal = async (id) => {
         if (window.confirm('Delete this goal?')) {
+            const goalToDelete = goals.find(g => g.id === id);
+            if (goalToDelete && goalToDelete.googleEventId && isCalendarConnected) {
+                 try {
+                     await deleteEvent(goalToDelete.googleEventId);
+                 } catch (e) {
+                     console.error("Failed to delete goal calendar event", e);
+                 }
+            }
+
             await actions.delete(id);
         }
     };
@@ -321,17 +357,18 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
             {/* Add Goal Form */}
             {isAdding && (
                 <div className="mb-6 p-6 bg-gradient-to-r from-yellow-900/20 to-black border border-yellow-500/30 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1 space-y-2">
-                            <label className="text-[10px] font-bold text-yellow-500 uppercase">Goal Title</label>
-                            <input
-                                className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-sm text-white focus:border-yellow-500 outline-none"
-                                value={newGoal.title}
-                                onChange={e => setNewGoal({ ...newGoal, title: e.target.value })}
-                                placeholder="e.g. 1 Million Dram Profit"
-                            />
-                        </div>
-                        <div className="w-full md:w-32 space-y-2">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-yellow-500 uppercase">Goal Title</label>
+                        <input
+                            className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-sm text-white focus:border-yellow-500 outline-none"
+                            value={newGoal.title}
+                            onChange={e => setNewGoal({ ...newGoal, title: e.target.value })}
+                            placeholder="e.g. 1 Million Dram Profit"
+                        />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
                             <label className="text-[10px] font-bold text-yellow-500 uppercase">Type</label>
                             <select
                                 className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-xs text-white focus:border-yellow-500 outline-none"
@@ -342,7 +379,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                                 <option value="simple">Simple</option>
                             </select>
                         </div>
-                        <div className="w-full md:w-32 space-y-2">
+                        <div className="space-y-2">
                             <label className="text-[10px] font-bold text-yellow-500 uppercase">Deadline</label>
                             <input
                                 type="date"
@@ -364,9 +401,9 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                     </div>
 
                     {newGoal.type === 'numeric' && (
-                        <div className="flex gap-4">
+                        <div className="flex gap-2">
                             <div className="flex-1 space-y-2">
-                                <label className="text-[10px] font-bold text-yellow-500 uppercase">Target Value</label>
+                                <label className="text-[10px] font-bold text-yellow-500 uppercase">Target</label>
                                 <input
                                     type="number"
                                     className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-sm text-white focus:border-yellow-500 outline-none"
@@ -375,7 +412,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                                 />
                             </div>
                             <div className="flex-1 space-y-2">
-                                <label className="text-[10px] font-bold text-yellow-500 uppercase">Current Value</label>
+                                <label className="text-[10px] font-bold text-yellow-500 uppercase">Current</label>
                                 <input
                                     type="number"
                                     className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-sm text-white focus:border-yellow-500 outline-none"
@@ -383,29 +420,30 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                                     onChange={e => setNewGoal({ ...newGoal, current: e.target.value })}
                                 />
                             </div>
-                            <div className="w-24 space-y-2">
+                            <div className="w-16 space-y-2">
                                 <label className="text-[10px] font-bold text-yellow-500 uppercase">Unit</label>
                                 <input
                                     className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-sm text-white focus:border-yellow-500 outline-none"
                                     value={newGoal.unit}
                                     onChange={e => setNewGoal({ ...newGoal, unit: e.target.value })}
-                                    placeholder="AMD"
+                                    placeholder="%"
                                 />
                             </div>
                         </div>
                     )}
 
-                    <div className="flex gap-4">
-                        <div className="flex-1 space-y-2">
-                            <label className="text-[10px] font-bold text-yellow-500 uppercase">Linked Task IDs (Comma Separated)</label>
-                            <input
-                                className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-sm text-white focus:border-yellow-500 outline-none"
-                                value={newGoal.linkedTaskIds.join(', ')}
-                                onChange={e => setNewGoal({ ...newGoal, linkedTaskIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                                placeholder="e.g. 1, 2, 3"
-                            />
-                        </div>
-                        <div className="w-24 space-y-2">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-yellow-500 uppercase">Linked Task IDs</label>
+                        <input
+                            className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-sm text-white focus:border-yellow-500 outline-none"
+                            value={newGoal.linkedTaskIdsString}
+                            onChange={e => setNewGoal({ ...newGoal, linkedTaskIdsString: e.target.value })}
+                            placeholder="e.g. 1, 2, 3"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
                             <label className="text-[10px] font-bold text-yellow-500 uppercase">XP Reward</label>
                             <input
                                 type="number"
@@ -414,7 +452,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                                 onChange={e => setNewGoal({ ...newGoal, xpReward: e.target.value })}
                             />
                         </div>
-                        <div className="w-24 space-y-2">
+                        <div className="space-y-2">
                             <label className="text-[10px] font-bold text-yellow-500 uppercase">Coin Reward</label>
                             <input
                                 type="number"
@@ -425,8 +463,8 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                         </div>
                     </div>
 
-                    <div className="flex gap-4">
-                        <div className="flex-1 space-y-2">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
                             <label className="text-[10px] font-bold text-yellow-500 uppercase">Link Name</label>
                             <input
                                 className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-sm text-white focus:border-yellow-500 outline-none"
@@ -435,7 +473,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                                 placeholder="e.g. Financial Plan"
                             />
                         </div>
-                        <div className="flex-[2] space-y-2">
+                        <div className="space-y-2">
                             <label className="text-[10px] font-bold text-yellow-500 uppercase">Link URL</label>
                             <input
                                 className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-sm text-white focus:border-yellow-500 outline-none"
@@ -473,20 +511,30 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                             <div className="p-6 relative z-10">
                                 {isEditing ? (
                                     <div className="space-y-4">
-                                        <div className="flex gap-2">
+                                        <div className="space-y-2">
                                             <input
-                                                className="flex-1 bg-black/60 border border-yellow-500/30 rounded p-2 text-sm font-bold text-white"
+                                                className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-sm font-bold text-white"
                                                 value={editData.title}
                                                 onChange={e => setEditData({ ...editData, title: e.target.value })}
+                                                placeholder="Title"
                                             />
-                                            <select
-                                                className="w-24 bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
-                                                value={editData.type}
-                                                onChange={e => setEditData({ ...editData, type: e.target.value })}
-                                            >
-                                                <option value="numeric">Numeric</option>
-                                                <option value="simple">Simple</option>
-                                            </select>
+                                            
+                                            <div className="grid grid-cols-2 gap-2">
+                                                 <select
+                                                    className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
+                                                    value={editData.type}
+                                                    onChange={e => setEditData({ ...editData, type: e.target.value })}
+                                                >
+                                                    <option value="numeric">Numeric</option>
+                                                    <option value="simple">Simple</option>
+                                                </select>
+                                                <input
+                                                    type="date"
+                                                    className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
+                                                    value={editData.deadline}
+                                                    onChange={e => setEditData({ ...editData, deadline: e.target.value })}
+                                                />
+                                            </div>
                                         </div>
 
                                         <textarea
@@ -497,7 +545,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                                         />
 
                                         {editData.type === 'numeric' && (
-                                            <div className="flex gap-2">
+                                            <div className="flex items-center gap-2">
                                                 <input
                                                     type="number"
                                                     className="flex-1 bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
@@ -552,8 +600,8 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                                             </div>
                                         </div>
 
-                                        <div className="flex gap-2">
-                                            <div className="flex-1 space-y-1">
+                                        <div className="space-y-2">
+                                            <div className="space-y-1">
                                                 <label className="text-[9px] font-bold text-yellow-500 uppercase">Linked Task IDs</label>
                                                 <input
                                                     className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
@@ -562,27 +610,29 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                                                     placeholder="1, 2, 3"
                                                 />
                                             </div>
-                                            <div className="w-20 space-y-1">
-                                                <label className="text-[9px] font-bold text-yellow-500 uppercase">XP</label>
-                                                <input
-                                                    type="number"
-                                                    className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
-                                                    value={editData.xpReward}
-                                                    onChange={e => setEditData({ ...editData, xpReward: e.target.value })}
-                                                />
-                                            </div>
-                                            <div className="w-20 space-y-1">
-                                                <label className="text-[9px] font-bold text-yellow-500 uppercase">Coins</label>
-                                                <input
-                                                    type="number"
-                                                    className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
-                                                    value={editData.coinReward}
-                                                    onChange={e => setEditData({ ...editData, coinReward: e.target.value })}
-                                                />
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-bold text-yellow-500 uppercase">XP</label>
+                                                    <input
+                                                        type="number"
+                                                        className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
+                                                        value={editData.xpReward}
+                                                        onChange={e => setEditData({ ...editData, xpReward: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-bold text-yellow-500 uppercase">Coins</label>
+                                                    <input
+                                                        type="number"
+                                                        className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
+                                                        value={editData.coinReward}
+                                                        onChange={e => setEditData({ ...editData, coinReward: e.target.value })}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-col md:flex-row gap-2">
                                             <input
                                                 className="flex-1 bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
                                                 value={editData.linkName}
@@ -597,12 +647,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                                             />
                                         </div>
 
-                                        <input
-                                            type="date"
-                                            className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
-                                            value={editData.deadline}
-                                            onChange={e => setEditData({ ...editData, deadline: e.target.value })}
-                                        />
+                                       {/* Moved Type/Deadline above */ }
 
                                         <div className="flex justify-between items-center pt-2">
                                             <button

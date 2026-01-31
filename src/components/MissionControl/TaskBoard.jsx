@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, MoreVertical, Calendar, Clock, CheckCircle2, Circle, AlertCircle, Trash2, Edit2, X, Coins, Zap, ExternalLink, ChevronDown, Save, Eye, EyeOff, Archive, Filter, Calendar as CalendarIcon, Repeat, Check } from 'lucide-react';
-import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, updateEvent, getUserProfile } from '../../core/services/googleCalendar';
+import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, updateEvent, getUserProfile, deleteEvent } from '../../core/services/googleCalendar';
 
 const TAG_COLORS = [
     { name: 'Red', value: 'bg-red-500 text-white' },
@@ -74,7 +74,7 @@ const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit,
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 items-end">
-                            <div className="space-y-1">
+                            <div className="space-y-1 col-span-2 md:col-span-1">
                                 <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest ml-1 block">Priority</label>
                                 <select
                                     className="w-full bg-black/40 border border-blue-500/30 rounded px-2 text-[11px] text-white outline-none focus:border-blue-500 h-9"
@@ -614,7 +614,7 @@ Link: ${newTask.link || 'None'}
                 };
 
                 const event = createEventObject(
-                    `[Mission] ${newTask.title}`,
+                    `${newTask.title} [Mission]`,
                     richDescription,
                     startDate,
                     duration,
@@ -669,6 +669,53 @@ Link: ${newTask.link || 'None'}
     };
 
     const saveEdit = async () => {
+        // Update Calendar if synced
+        if (editData.googleEventId && isCalendarConnected) {
+            try {
+                // Parse date for update
+                let startDate;
+                let duration = 60;
+
+                if (editData.deadline) {
+                     startDate = new Date(editData.deadline);
+                     if (editData.startTime) {
+                        const [sh, sm] = editData.startTime.split(':');
+                        startDate.setHours(parseInt(sh), parseInt(sm), 0, 0);
+
+                        if (editData.endTime) {
+                            const [eh, em] = editData.endTime.split(':');
+                            const endDate = new Date(editData.deadline);
+                            endDate.setHours(parseInt(eh), parseInt(em), 0, 0);
+                            const diffMs = endDate - startDate;
+                            if (diffMs > 0) duration = Math.floor(diffMs / 60000);
+                        }
+                     } else {
+                         // Default 9 AM
+                         startDate.setHours(9, 0, 0, 0);
+                     }
+
+                     const richDescription = `
+Mission Task: ${editData.description || 'No description'}
+Priority: ${editData.priority}
+Rewards: ${editData.xpReward} XP, ${editData.coinReward} Coins
+Target: ${editData.targetValue > 0 ? `${editData.targetValue} ${editData.unit}` : 'N/A'}
+Link: ${editData.link || 'None'}
+                     `.trim();
+
+                     const eventUpdate = createEventObject(
+                         `${editData.title} [Mission]`,
+                         richDescription,
+                         startDate,
+                         duration
+                     );
+
+                     await updateEvent(editData.googleEventId, eventUpdate);
+                }
+            } catch (e) {
+                console.error("Failed to update calendar event", e);
+            }
+        }
+
         await actions.update(editingId, editData);
         setEditingId(null);
     };
@@ -701,6 +748,16 @@ Link: ${newTask.link || 'None'}
     };
 
     const deleteTaskId = async (id) => {
+        // Check for calendar event
+        const taskToDelete = tasks.find(t => t.id === id);
+        if (taskToDelete && taskToDelete.googleEventId && isCalendarConnected) {
+             try {
+                await deleteEvent(taskToDelete.googleEventId);
+             } catch (e) {
+                 console.error("Failed to delete from calendar", e);
+             }
+        }
+
         await actions.delete(id);
     };
 
@@ -877,7 +934,7 @@ Link: ${newTask.link || 'None'}
 
                         <div className="space-y-3 animate-in fade-in">
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 items-end">
-                                <div className="space-y-1">
+                                <div className="space-y-1 col-span-2 md:col-span-1">
                                     <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest ml-1 block">Priority</label>
                                     <select
                                         className="w-full bg-black/40 border border-white/10 rounded-lg px-2 text-[11px] text-white focus:border-blue-500/50 outline-none h-9"

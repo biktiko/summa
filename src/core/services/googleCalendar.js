@@ -192,6 +192,21 @@ export const updateEvent = async (eventId, eventData) => {
     }
 };
 
+export const deleteEvent = async (eventId) => {
+    if (!isSignedIn()) return null;
+
+    try {
+        const response = await gapi.client.calendar.events.delete({
+            'calendarId': 'primary',
+            'eventId': eventId
+        });
+        return response.result;
+    } catch (error) {
+        console.error("Error deleting event from calendar", error);
+        throw error;
+    }
+};
+
 export const createEventObject = (title, description, startTime, durationMinutes = 60, attendees = [], options = {}) => {
     const start = new Date(startTime);
     const end = new Date(start.getTime() + durationMinutes * 60000);

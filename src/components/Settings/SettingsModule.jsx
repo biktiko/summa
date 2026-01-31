@@ -39,7 +39,7 @@ const SettingsModule = ({ userData, updateUser }) => {
         username: userData.username || '',
 
         // Theme
-        themeColor: userData.themeColor || '#3b82f6',
+        // themeColor: userData.themeColor || '#3b82f6',
         backgroundColor: userData.backgroundColor || '#020202',
         themePreset: userData.themePreset || 'custom',
 
