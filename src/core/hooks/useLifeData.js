@@ -151,7 +151,7 @@ export const useLifeData = (activeUserId) => {
         } : {
             skills: [], projects: [], achievements: [],
             services: [], education: [], experience: [], languages: [], tasks: [], goals: [],
-            energy: 0, balance: 0,
+            balance: 0,
             transactions: [], categories: []
         },
         loading,

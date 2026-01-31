@@ -63,8 +63,8 @@ const LoginPage = () => {
                     <div className="relative group">
                         <Mail className="absolute left-3 top-3 w-4 h-4 text-neutral-500 group-focus-within:text-blue-500 transition-colors" />
                         <input
-                            type="email"
-                            placeholder="Email Address"
+                            type="text"
+                            placeholder="Email or Login"
                             value={formData.email}
                             onChange={e => setFormData({ ...formData, email: e.target.value })}
                             className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-neutral-600"

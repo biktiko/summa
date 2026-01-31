@@ -204,7 +204,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
     return (
         <div className={`mb-12 ${isSectionHidden ? 'opacity-50' : ''}`}>
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-yellow-500/10 rounded-lg">
                         <Target className="w-6 h-6 text-yellow-500" />
@@ -218,7 +218,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                     )}
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-wrap md:flex-nowrap">
                     {/* Calendar Connect Button */}
                     {viewMode === 'admin' && !isCalendarConnected && (
                         <button

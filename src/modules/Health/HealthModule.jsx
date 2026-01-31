@@ -169,6 +169,7 @@ const HealthModule = ({
                                 processTask={processTask}
                                 isSectionHidden={!isSectionVisible('tasks')}
                                 toggleSectionVisibility={() => toggleSectionVisibility('tasks')}
+                                settings={userData.gameplaySettings}
                             />
                         ) : (
                             <GoalsBoard

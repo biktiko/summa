@@ -4,7 +4,7 @@
  * Persists to localStorage for now.
  */
 
-const DB_KEY = 'life_os_db_v9';
+const DB_KEY = 'life_os_db_v10';
 
 // Initial Seed Data
 const SEED_DATA = {
@@ -24,6 +24,31 @@ const SEED_DATA = {
                 { id: 'pl1', name: 'GitHub', url: 'https://github.com/tigran' },
                 { id: 'pl2', name: 'Behance', url: 'https://behance.net/tigran' }
             ],
+            sectionVisibility: {
+                cv: true,
+                skills: true,
+                projects: true,
+                services: true,
+                education: true,
+                experience: true,
+                languages: true,
+                achievements: true,
+                tasks: true,
+                goals: true
+            }
+        },
+        {
+            id: 'guest',
+            username: 'guest',
+            email: 'guest',
+            password: '123456',
+            name: 'Guest User',
+            role: 'user',
+            energy: 100,
+            balance: 0,
+            xp: 0,
+            cvLink: '#',
+            portfolioLinks: [],
             sectionVisibility: {
                 cv: true,
                 skills: true,

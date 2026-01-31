@@ -428,6 +428,7 @@ const FinanceModule = ({
                             processTask={processTask}
                             isSectionHidden={!isSectionVisible('tasks')}
                             toggleSectionVisibility={() => toggleSectionVisibility('tasks')}
+                            settings={userData.gameplaySettings}
                         />
                     )}
 

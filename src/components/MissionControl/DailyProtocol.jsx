@@ -142,8 +142,8 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                 }
 
                 const event = createEventObject(
-                    `[Protocol] ${formData.title}`,
-                    `Daily Protocol Routine: ${formData.description || ''}\nFrequency: ${formData.frequency}`,
+                    `[Routine] ${formData.title}`,
+                    `Routine: ${formData.description || ''}\nFrequency: ${formData.frequency}`,
                     today,
                     30, // Default 30 min duration for routines
                     [],
@@ -223,13 +223,13 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
     return (
         <div className={`h-full flex flex-col ${isSectionHidden ? 'opacity-50 grayscale' : ''}`}>
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
-                    <h3 className="text-xl font-black text-white uppercase tracking-wider">Daily Protocol</h3>
-                    <p className="text-xs text-neutral-500 font-mono">Routine Operations & Habits</p>
+                    <h3 className="text-xl font-black text-white uppercase tracking-wider">Routines</h3>
+                    <p className="text-xs text-neutral-500 font-mono">Daily Operations & Habits</p>
                 </div>
                 {viewMode === 'admin' && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 self-start md:self-auto overflow-x-auto max-w-full pb-1">
                         {!isCalendarConnected ? (
                             <button
                                 onClick={connectCalendar}
@@ -356,7 +356,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
                         <form onSubmit={handleSave} className="space-y-6">
                             <div>
-                                <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-2">Protocol Name</label>
+                                <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-2">Routine Name</label>
                                 <input
                                     className="w-full bg-neutral-900 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500 transition-colors"
                                     value={formData.title}

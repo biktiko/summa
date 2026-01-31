@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, MoreVertical, Calendar, Clock, CheckCircle2, Circle, AlertCircle, Trash2, Edit2, X, Coins, Zap, ExternalLink, ChevronDown, Save, Eye, EyeOff, Archive, Filter, Calendar as CalendarIcon, Repeat } from 'lucide-react';
+import { Plus, MoreVertical, Calendar, Clock, CheckCircle2, Circle, AlertCircle, Trash2, Edit2, X, Coins, Zap, ExternalLink, ChevronDown, Save, Eye, EyeOff, Archive, Filter, Calendar as CalendarIcon, Repeat, Check } from 'lucide-react';
 import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, updateEvent, getUserProfile } from '../../core/services/googleCalendar';
 
 const TAG_COLORS = [
@@ -14,7 +14,7 @@ const TAG_COLORS = [
 ];
 
 // Extract TaskCard outside to prevent re-renders and focus loss
-const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId }) => {
+const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings }) => {
     // Skip hidden tasks for guests
     if (viewMode === 'guest' && task.isHidden) return null;
 
@@ -48,7 +48,7 @@ const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit,
     return (
         <div className={`group bg-black/40 border border-white/5 p-4 rounded-xl hover:border-blue-500/30 transition-all relative ${task.isHidden ? 'opacity-60 border-red-900/30' : ''}`}>
             {editingId === task.id ? (
-                <div className="space-y-4 z-10 relative bg-neutral-900/90 p-4 rounded-lg border border-blue-500/30">
+                <div className="space-y-4 z-10 relative bg-neutral-900/90 p-4 rounded-lg border border-blue-500/30 max-w-[85vw] md:max-w-none overflow-x-hidden">
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Task Title</label>
                         <input
@@ -59,11 +59,11 @@ const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit,
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-3">
                         <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Module</label>
+                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest ml-1">Module</label>
                             <select
-                                className="w-full bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
+                                className="w-full bg-black/40 border border-blue-500/30 rounded px-2 text-[11px] text-white outline-none focus:border-blue-500 h-9"
                                 value={editData.moduleId}
                                 onChange={e => setEditData({ ...editData, moduleId: e.target.value })}
                             >
@@ -72,40 +72,56 @@ const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit,
                                 <option value="health">Health</option>
                             </select>
                         </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Priority</label>
-                            <select
-                                className="w-full bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
-                                value={editData.priority}
-                                onChange={e => setEditData({ ...editData, priority: e.target.value })}
-                            >
-                                <option value="low">Low</option>
-                                <option value="medium">Medium</option>
-                                <option value="high">High</option>
-                            </select>
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">XP Reward</label>
-                            <input
-                                className="w-full bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-blue-400 outline-none focus:border-blue-500"
-                                placeholder="XP"
-                                type="number"
-                                value={editData.xpReward}
-                                onChange={e => setEditData({ ...editData, xpReward: e.target.value })}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Coin Reward</label>
-                            <input
-                                className="w-full bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-yellow-400 outline-none focus:border-blue-500"
-                                placeholder="Coins"
-                                type="number"
-                                value={editData.coinReward}
-                                onChange={e => setEditData({ ...editData, coinReward: e.target.value })}
-                            />
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 items-end">
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest ml-1 block">Priority</label>
+                                <select
+                                    className="w-full bg-black/40 border border-blue-500/30 rounded px-2 text-[11px] text-white outline-none focus:border-blue-500 h-9"
+                                    value={editData.priority}
+                                    onChange={e => setEditData({ ...editData, priority: e.target.value })}
+                                >
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+
+                            {(!settings || settings.xp !== false) && (
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest text-center block">XP Reward</label>
+                                    <input
+                                        className="w-full bg-black/40 border border-blue-500/30 rounded text-center px-1 text-[11px] text-blue-400 outline-none focus:border-blue-500 h-9"
+                                        placeholder="0"
+                                        type="number"
+                                        value={editData.xpReward}
+                                        onChange={e => setEditData({ ...editData, xpReward: e.target.value })}
+                                    />
+                                </div>
+                            )}
+
+                            {(!settings || settings.coins !== false) && (
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest text-center block">Coin Reward</label>
+                                    <input
+                                        className="w-full bg-black/40 border border-blue-500/30 rounded text-center px-1 text-[11px] text-yellow-400 outline-none focus:border-blue-500 h-9"
+                                        placeholder="0"
+                                        type="number"
+                                        value={editData.coinReward}
+                                        onChange={e => setEditData({ ...editData, coinReward: e.target.value })}
+                                    />
+                                </div>
+                            )}
+
+                            <div className="col-span-2 md:col-span-3 space-y-1">
+                                <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest ml-1">Task Deadline</label>
+                                <input
+                                    type="date"
+                                    className="w-full bg-black/40 border border-blue-500/30 rounded px-3 text-[11px] text-white outline-none focus:border-blue-500 h-9"
+                                    value={editData.deadline || ''}
+                                    onChange={e => setEditData({ ...editData, deadline: e.target.value })}
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -141,27 +157,108 @@ const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit,
                         </div>
                     </div>
 
+                    {/* Subtasks Edit */}
+                    <div className="space-y-2 border-t border-white/5 pt-2">
+                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Subtasks</label>
+                        <div className="space-y-2">
+                            {(editData.subtasks || []).map((subtask, idx) => (
+                                <div key={subtask.id || idx} className="flex items-center gap-2">
+                                     <button
+                                        onClick={() => {
+                                            const newSubtasks = [...(editData.subtasks || [])];
+                                            newSubtasks[idx] = { ...subtask, completed: !subtask.completed };
+                                            setEditData({ ...editData, subtasks: newSubtasks });
+                                        }}
+                                        className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${subtask.completed ? 'bg-blue-500 border-blue-500' : 'border-neutral-600'}`}
+                                     >
+                                         {subtask.completed && <Check className="w-2.5 h-2.5 text-black" />}
+                                     </button>
+                                     <input
+                                        className="flex-1 bg-transparent text-xs text-white outline-none border-b border-white/10 focus:border-blue-500/50 pb-0.5"
+                                        value={subtask.text}
+                                        onChange={(e) => {
+                                            const newSubtasks = [...(editData.subtasks || [])];
+                                            newSubtasks[idx] = { ...subtask, text: e.target.value };
+                                            setEditData({ ...editData, subtasks: newSubtasks });
+                                        }}
+                                     />
+                                     <button
+                                        onClick={() => {
+                                            const newSubtasks = [...(editData.subtasks || [])];
+                                            newSubtasks.splice(idx, 1);
+                                            setEditData({ ...editData, subtasks: newSubtasks });
+                                        }}
+                                        className="text-neutral-500 hover:text-red-500"
+                                     >
+                                        <X className="w-3 h-3" />
+                                     </button>
+                                </div>
+                            ))}
+                            <div className="flex items-center gap-2">
+                                <Plus className="w-3 h-3 text-neutral-500 flex-shrink-0" />
+                                <input
+                                    className="flex-1 bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
+                                    placeholder="Add subtask..."
+                                    value={editData.newSubtaskText || ''}
+                                    onChange={e => setEditData({ ...editData, newSubtaskText: e.target.value })}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && editData.newSubtaskText) {
+                                            const newSubtask = {
+                                                id: Date.now().toString(),
+                                                text: editData.newSubtaskText,
+                                                completed: false
+                                            };
+                                            setEditData({
+                                                ...editData,
+                                                subtasks: [...(editData.subtasks || []), newSubtask],
+                                                newSubtaskText: ''
+                                            });
+                                        }
+                                    }}
+                                />
+                                <button
+                                    onClick={() => {
+                                         if (editData.newSubtaskText) {
+                                            const newSubtask = {
+                                                id: Date.now().toString(),
+                                                text: editData.newSubtaskText,
+                                                completed: false
+                                            };
+                                            setEditData({
+                                                ...editData,
+                                                subtasks: [...(editData.subtasks || []), newSubtask],
+                                                newSubtaskText: ''
+                                            });
+                                        }
+                                    }}
+                                    className="p-2 bg-blue-500/20 text-blue-500 rounded hover:bg-blue-500 hover:text-white transition-all"
+                                >
+                                    <Plus className="w-3 h-3" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Progress Fields */}
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Progress Tracking</label>
-                        <div className="flex gap-2">
-                            <input
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                             <input
                                 type="number"
-                                className="flex-1 bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
+                                className="w-full bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
                                 placeholder="Current"
                                 value={editData.currentValue}
                                 onChange={e => setEditData({ ...editData, currentValue: e.target.value })}
                             />
-                            <span className="text-neutral-500 self-center">/</span>
                             <input
                                 type="number"
-                                className="flex-1 bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
+                                className="w-full bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
                                 placeholder="Target"
                                 value={editData.targetValue}
                                 onChange={e => setEditData({ ...editData, targetValue: e.target.value })}
                             />
                             <input
-                                className="w-16 bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
+                                className="w-full bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
                                 placeholder="Unit"
                                 value={editData.unit}
                                 onChange={e => setEditData({ ...editData, unit: e.target.value })}
@@ -238,6 +335,34 @@ const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit,
 
                     <p className="text-[10px] text-neutral-500 line-clamp-2 mb-3">{task.description}</p>
 
+                    {/* Subtasks List */}
+                    {task.subtasks && task.subtasks.length > 0 && (
+                        <div className="space-y-1 mb-3 pt-2 border-t border-white/5">
+                             <div className="flex items-center justify-between mb-1.5 opacity-60">
+                                <span className="text-[8px] font-bold text-neutral-500 uppercase tracking-wider">Subtasks</span>
+                                <span className="text-[8px] font-mono text-neutral-500">
+                                    {task.subtasks.filter(st => st.completed).length}/{task.subtasks.length}
+                                </span>
+                             </div>
+                             <div className="space-y-1.5">
+                                {task.subtasks.map((subtask, idx) => (
+                                    <button
+                                        key={subtask.id || idx}
+                                        onClick={(e) => { e.stopPropagation(); toggleSubtask(task, subtask.id); }}
+                                        className="w-full flex items-start gap-2 text-left group/sub"
+                                    >
+                                        <div className={`mt-0.5 w-3 h-3 rounded-full border flex items-center justify-center transition-colors flex-shrink-0 ${subtask.completed ? 'bg-blue-500 border-blue-500' : 'border-neutral-700 bg-black/40 group-hover/sub:border-neutral-500'}`}>
+                                            {subtask.completed && <Check className="w-2 h-2 text-black" />} 
+                                        </div>
+                                        <span className={`text-[10px] leading-tight transition-all ${subtask.completed ? 'text-neutral-600 line-through' : 'text-neutral-300 group-hover/sub:text-white'}`}>
+                                            {subtask.text}
+                                        </span>
+                                    </button>
+                                ))}
+                             </div>
+                        </div>
+                    )}
+
                     {/* Progress Bar for Tasks */}
                     {task.targetValue > 0 && (
                         <div className="mb-3">
@@ -256,12 +381,12 @@ const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit,
 
                     <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-2">
                         <div className="flex items-center gap-3">
-                            {task.xpReward > 0 && (
+                            {task.xpReward > 0 && (!settings || settings.xp !== false) && (
                                 <div className="flex items-center gap-1 text-[9px] font-bold text-blue-400">
                                     <Zap className="w-3 h-3" /> {task.xpReward} XP
                                 </div>
                             )}
-                            {task.coinReward > 0 && (
+                            {task.coinReward > 0 && (!settings || settings.coins !== false) && (
                                 <div className="flex items-center gap-1 text-[9px] font-bold text-yellow-400">
                                     <Coins className="w-3 h-3" /> {task.coinReward}
                                 </div>
@@ -310,8 +435,7 @@ const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit,
     );
 };
 
-// Extract StatusColumn outside as well to be safe
-const StatusColumn = ({ title, status, color, moduleTasks, viewMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId }) => {
+const StatusColumn = ({ title, status, color, moduleTasks, viewMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings }) => {
     const [page, setPage] = useState(0);
     const TASKS_PER_PAGE = 6;
 
@@ -340,6 +464,8 @@ const StatusColumn = ({ title, status, color, moduleTasks, viewMode, editingId, 
                         setEditingId={setEditingId}
                         updateStatus={updateStatus}
                         deleteTaskId={deleteTaskId}
+                        toggleSubtask={toggleSubtask}
+                        settings={settings}
                     />
                 ))}
             </div>
@@ -368,7 +494,7 @@ const StatusColumn = ({ title, status, color, moduleTasks, viewMode, editingId, 
     );
 };
 
-const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility }) => {
+const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings }) => {
     // Filter tasks for this specific module
     const [filters, setFilters] = useState({ tags: [], priority: '' });
     const [isPriorityOpen, setIsPriorityOpen] = useState(false);
@@ -394,7 +520,8 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
         title: '', status: 'todo', priority: 'medium', description: '',
         xpReward: 10, coinReward: 5, link: '', linkName: '', isHidden: false,
         targetValue: 0, currentValue: 0, unit: '', tags: [], deadline: '',
-        startTime: '', endTime: '', reminderBefore: 10, addToCalendar: true
+        startTime: '', endTime: '', reminderBefore: 10, addToCalendar: true,
+        subtasks: []
     });
     const [editingId, setEditingId] = useState(null);
     const [editData, setEditData] = useState({});
@@ -577,6 +704,19 @@ Link: ${newTask.link || 'None'}
         await actions.delete(id);
     };
 
+    const toggleSubtask = async (task, subtaskId) => {
+        if (!task.subtasks) return;
+        
+        const newSubtasks = task.subtasks.map(st => {
+            if (st.id === subtaskId) {
+                return { ...st, completed: !st.completed };
+            }
+            return st;
+        });
+        
+        await actions.update(task.id, { subtasks: newSubtasks });
+    };
+
     const toggleTagFilter = (tag) => {
         setFilters(prev => {
             const newTags = prev.tags.includes(tag)
@@ -592,7 +732,7 @@ Link: ${newTask.link || 'None'}
     return (
         <div className={`flex flex-col ${isSectionHidden ? 'opacity-50' : ''}`}>
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div className="flex items-center gap-3">
                     <h2 className="text-xl font-black uppercase tracking-tighter text-white">Mission Control</h2>
                     {viewMode === 'admin' && isSectionHidden && (
@@ -600,7 +740,7 @@ Link: ${newTask.link || 'None'}
                     )}
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-wrap md:flex-nowrap">
                     {/* Calendar Connect Button */}
                     {viewMode === 'admin' && (
                         <div className="flex items-center gap-2 bg-neutral-900/50 p-1 rounded-lg border border-white/5">
@@ -735,44 +875,53 @@ Link: ${newTask.link || 'None'}
                             />
                         </div>
 
-                        <div className="flex gap-2">
-                            <div className="space-y-1 flex-1">
-                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Priority</label>
-                                <select
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white focus:border-blue-500/50 outline-none h-9"
-                                    value={newTask.priority}
-                                    onChange={e => setNewTask({ ...newTask, priority: e.target.value })}
-                                >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                </select>
+                        <div className="space-y-3 animate-in fade-in">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 items-end">
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest ml-1 block">Priority</label>
+                                    <select
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-2 text-[11px] text-white focus:border-blue-500/50 outline-none h-9"
+                                        value={newTask.priority}
+                                        onChange={e => setNewTask({ ...newTask, priority: e.target.value })}
+                                    >
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                    </select>
+                                </div>
+
+                                {(!settings || settings.xp !== false) && (
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest text-center block">XP Reward</label>
+                                        <input
+                                            placeholder="10"
+                                            type="number"
+                                            className="w-full bg-black/40 border border-white/10 rounded-lg px-2 text-center text-[11px] text-white focus:border-blue-500/50 outline-none h-9"
+                                            value={newTask.xpReward}
+                                            onChange={e => setNewTask({ ...newTask, xpReward: e.target.value })}
+                                        />
+                                    </div>
+                                )}
+
+                                {(!settings || settings.coins !== false) && (
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest text-center block">Coin Reward</label>
+                                        <input
+                                            placeholder="5"
+                                            type="number"
+                                            className="w-full bg-black/40 border border-white/10 rounded-lg px-2 text-center text-[11px] text-white focus:border-blue-500/50 outline-none h-9"
+                                            value={newTask.coinReward}
+                                            onChange={e => setNewTask({ ...newTask, coinReward: e.target.value })}
+                                        />
+                                    </div>
+                                )}
                             </div>
-                            <div className="space-y-1 w-24">
-                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">XP</label>
-                                <input
-                                    placeholder="10"
-                                    type="number"
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white focus:border-blue-500/50 outline-none h-9"
-                                    value={newTask.xpReward}
-                                    onChange={e => setNewTask({ ...newTask, xpReward: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-1 w-24">
-                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Coins</label>
-                                <input
-                                    placeholder="5"
-                                    type="number"
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white focus:border-blue-500/50 outline-none h-9"
-                                    value={newTask.coinReward}
-                                    onChange={e => setNewTask({ ...newTask, coinReward: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-1 w-32">
-                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Deadline</label>
+
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest ml-1">Task Deadline</label>
                                 <input
                                     type="date"
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white focus:border-blue-500/50 outline-none h-9"
+                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 text-[11px] text-white focus:border-blue-500/50 outline-none h-9"
                                     value={newTask.deadline}
                                     onChange={e => setNewTask({ ...newTask, deadline: e.target.value })}
                                 />
@@ -836,10 +985,64 @@ Link: ${newTask.link || 'None'}
                             </div>
                         )}
 
-                        {/* Progress Fields for New Task */}
-                        <div className="flex gap-2">
-                            <div className="space-y-1 flex-1">
-                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Target Value (Optional)</label>
+                        {/* Subtasks in Create Form */}
+                        <div className="space-y-2 border-t border-white/5 pt-2">
+                             <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Subtasks</label>
+                             <div className="space-y-2">
+                                {(newTask.subtasks || []).map((subtask, idx) => (
+                                    <div key={subtask.id || idx} className="flex items-center gap-2">
+                                        <div className="w-4 h-4 rounded-full border border-neutral-600 flex items-center justify-center flex-shrink-0">
+                                            {subtask.completed && <Check className="w-2.5 h-2.5 text-neutral-500" />}
+                                        </div>
+                                         <input
+                                            className="flex-1 bg-transparent text-xs text-white outline-none border-b border-white/10 focus:border-blue-500/50 pb-0.5"
+                                            value={subtask.text}
+                                            onChange={(e) => {
+                                                const newSubtasks = [...(newTask.subtasks || [])];
+                                                newSubtasks[idx] = { ...subtask, text: e.target.value };
+                                                setNewTask({ ...newTask, subtasks: newSubtasks });
+                                            }}
+                                         />
+                                         <button
+                                            onClick={() => {
+                                                const newSubtasks = [...(newTask.subtasks || [])];
+                                                newSubtasks.splice(idx, 1);
+                                                setNewTask({ ...newTask, subtasks: newSubtasks });
+                                            }}
+                                            className="text-neutral-500 hover:text-red-500"
+                                         >
+                                            <X className="w-3 h-3" />
+                                         </button>
+                                    </div>
+                                ))}
+                                <div className="flex items-center gap-2">
+                                    <Plus className="w-3 h-3 text-neutral-500 flex-shrink-0" />
+                                    <input
+                                        className="flex-1 bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white outline-none focus:border-blue-500/50"
+                                        placeholder="Add subtask..."
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && e.target.value) {
+                                                const newSubtask = {
+                                                    id: Date.now().toString(),
+                                                    text: e.target.value,
+                                                    completed: false
+                                                };
+                                                setNewTask({
+                                                    ...newTask,
+                                                    subtasks: [...(newTask.subtasks || []), newSubtask]
+                                                });
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                    />
+                                </div>
+                             </div>
+                        </div>
+
+                        {/* Progress Fields for New Task - Using Grid to fix Unit overflow */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Target Value</label>
                                 <input
                                     type="number"
                                     className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white focus:border-blue-500/50 outline-none"
@@ -848,7 +1051,7 @@ Link: ${newTask.link || 'None'}
                                     onChange={e => setNewTask({ ...newTask, targetValue: e.target.value })}
                                 />
                             </div>
-                            <div className="space-y-1 w-24">
+                            <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Unit</label>
                                 <input
                                     className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white focus:border-blue-500/50 outline-none"
@@ -895,8 +1098,8 @@ Link: ${newTask.link || 'None'}
             }
 
             {/* Board Columns */}
-            <div className="flex-1 overflow-x-auto pb-4 mb-8">
-                <div className="flex gap-6 min-w-[900px]">
+            <div className="flex-1 pb-4 mb-8">
+                <div className="flex flex-col md:flex-row gap-6">
                     <StatusColumn
                         title="To Do"
                         status="todo"
@@ -911,6 +1114,8 @@ Link: ${newTask.link || 'None'}
                         setEditingId={setEditingId}
                         updateStatus={updateStatus}
                         deleteTaskId={deleteTaskId}
+                        toggleSubtask={toggleSubtask}
+                        settings={settings}
                     />
                     <StatusColumn
                         title="In Progress"
@@ -926,6 +1131,8 @@ Link: ${newTask.link || 'None'}
                         setEditingId={setEditingId}
                         updateStatus={updateStatus}
                         deleteTaskId={deleteTaskId}
+                        toggleSubtask={toggleSubtask}
+                        settings={settings}
                     />
                     <StatusColumn
                         title="Done"
@@ -941,6 +1148,8 @@ Link: ${newTask.link || 'None'}
                         setEditingId={setEditingId}
                         updateStatus={updateStatus}
                         deleteTaskId={deleteTaskId}
+                        toggleSubtask={toggleSubtask}
+                        settings={settings}
                     />
                 </div>
             </div>
@@ -981,6 +1190,8 @@ Link: ${newTask.link || 'None'}
                             setEditingId={setEditingId}
                             updateStatus={updateStatus}
                             deleteTaskId={deleteTaskId}
+                            toggleSubtask={toggleSubtask}
+                            settings={settings}
                         />
                     ))}
 

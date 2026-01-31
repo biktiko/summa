@@ -5,7 +5,8 @@ import HealthModule from './Health/HealthModule';
 import SettingsModule from '../components/Settings/SettingsModule';
 import FinanceModule from './Finance/FinanceModule';
 
-const LocalizationModule = () => <div className="p-8 text-neutral-500 font-mono uppercase">Localization Module // Offline</div>;
+
+const NetworkModule = () => <div className="p-8 text-neutral-500 font-mono uppercase">Network Module // Offline</div>;
 
 export const MODULES = [
     {
@@ -30,11 +31,11 @@ export const MODULES = [
         description: 'Physical Health & Biometrics'
     },
     {
-        id: 'localization',
-        label: 'Localization',
+        id: 'network',
+        label: 'Network',
         icon: Globe,
-        component: LocalizationModule,
-        description: 'Languages & Communication'
+        component: NetworkModule,
+        description: 'Connections & Communications'
     },
     {
         id: 'settings',

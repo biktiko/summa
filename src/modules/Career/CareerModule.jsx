@@ -370,6 +370,7 @@ const ArchitectModule = ({
                                 moduleId="architect"
                                 viewMode={viewMode}
                                 processTask={processTask}
+                                settings={userData.gameplaySettings}
                                 isSectionHidden={!isSectionVisible('tasks')}
                                 toggleSectionVisibility={() => toggleSectionVisibility('tasks')}
                             />

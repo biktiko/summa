@@ -17,16 +17,25 @@ import TaskBoard from "./components/MissionControl/TaskBoard";
 const AuthenticatedApp = () => {
   const { user, logout } = useAuth();
   const [activeTabId, setActiveTabId] = useState(MODULES[0].id);
+  const [lastActiveTabId, setLastActiveTabId] = useState(MODULES[0].id); // Track previous tab for Settings toggle
   const [currentModuleView, setCurrentModuleView] = useState('dashboard'); // 'dashboard' | 'tasks' | 'notes'
   const [activeTaskTab, setActiveTaskTab] = useState('missions'); // 'protocol' | 'missions' | 'goals' (shared state)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Swipe State
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
 
   // Initialize System Core with Logged In User ID
   const system = useLifeData(user.id);
   const { userData, loading, totalXP, level, viewMode, toggleViewMode, updateUser } = system;
 
   // --- Smart Module Switching ---
+  // --- Smart Module Switching ---
   const handleModuleChange = (newModuleId) => {
+    if (activeTabId !== 'settings' && newModuleId === 'settings') {
+        setLastActiveTabId(activeTabId);
+    }
     setActiveTabId(newModuleId);
 
     // If we are currently in a "sticky" view (Tasks or Notes), keep it.
@@ -43,6 +52,61 @@ const AuthenticatedApp = () => {
       setCurrentModuleView(defaultViews[newModuleId] || 'dashboard');
     }
   };
+
+  const toggleSettings = () => {
+    if (activeTabId === 'settings') {
+        handleModuleChange(lastActiveTabId);
+    } else {
+        handleModuleChange('settings');
+    }
+  };
+
+  // --- Swipe Logic ---
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  }
+
+  const onTouchMove = (e) => setTouchEnd(e.targetTouches[0].clientX);
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe || isRightSwipe) {
+       // Filter visible modules
+       const visibleModules = MODULES.filter(m => {
+          if (m.id === 'settings') return false; // Don't swipe into settings
+          if (viewMode === 'guest') {
+            const privacy = userData?.modulePrivacy?.[m.id];
+            if (privacy?.enabled === false) return false;
+          } else {
+             // Admin Mode: respect user hidden modules
+             if (userData?.hiddenModules?.includes(m.id)) return false;
+          }
+          return true;
+       });
+       
+       const currentIndex = visibleModules.findIndex(m => m.id === activeTabId);
+       if (currentIndex === -1) return; // Currently in settings or unknown
+
+       if (isLeftSwipe) {
+          // Next
+          if (currentIndex < visibleModules.length - 1) {
+             handleModuleChange(visibleModules[currentIndex + 1].id);
+          }
+       }
+       
+       if (isRightSwipe) {
+          // Prev
+          if (currentIndex > 0) {
+             handleModuleChange(visibleModules[currentIndex - 1].id);
+          }
+       }
+    }
+  }
 
   // Loading State
   if (loading) {
@@ -69,7 +133,7 @@ const AuthenticatedApp = () => {
     }}>
 
       {/* --- HUD Header --- */}
-      <header className="p-4 md:p-6 border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-50">
+      <header className="p-4 md:p-6 border-b border-white/5 bg-black/40 backdrop-blur-xl relative md:sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
 
           {/* User Profile */}
@@ -112,7 +176,7 @@ const AuthenticatedApp = () => {
           {/* This container has the stats */}
           <div className="flex items-center gap-6 bg-neutral-900/40 p-3 rounded-xl border border-white/5 w-full md:w-auto font-mono overflow-x-auto md:overflow-visible">
             <button
-              onClick={() => setActiveTabId('settings')}
+              onClick={toggleSettings}
               className={`p-2 rounded-lg transition-colors ${activeTabId === 'settings' ? 'text-white' : 'text-neutral-500 hover:text-white'}`}
               title="System Settings"
             >
@@ -120,31 +184,26 @@ const AuthenticatedApp = () => {
             </button>
             <div className="w-px h-6 bg-white/10" />
 
-            {/* Energy */}
-            <div className="flex-1 min-w-[80px] md:w-32">
-              <div className="flex justify-between text-[7px] mb-1 font-bold uppercase text-yellow-500">
-                <span>Energy</span>
-                <span>{userData.energy}%</span>
-              </div>
-              <div className="h-1 bg-black rounded-full overflow-hidden">
-                <div className="h-full bg-yellow-500 transition-all duration-1000" style={{ width: `${userData.energy}% ` }} />
-              </div>
-            </div>
+
             {/* XP */}
-            <div className="flex-1 min-w-[100px] md:w-40">
-              <div className="flex justify-between text-[7px] mb-1 font-bold uppercase" style={{ color: themeColor }}>
-                <span>XP Progress</span>
-                <span>{totalXP % 500}/500</span>
+            {(!userData.gameplaySettings || userData.gameplaySettings.xp !== false) && (
+              <div className="flex-1 min-w-[100px] md:w-40">
+                <div className="flex justify-between text-[7px] mb-1 font-bold uppercase" style={{ color: themeColor }}>
+                  <span>XP Progress</span>
+                  <span>{totalXP % 500}/500</span>
+                </div>
+                <div className="h-1 bg-black rounded-full overflow-hidden">
+                  <div className="h-full transition-all duration-700" style={{ width: `${(totalXP % 500) / 5}% `, backgroundColor: themeColor }} />
+                </div>
               </div>
-              <div className="h-1 bg-black rounded-full overflow-hidden">
-                <div className="h-full transition-all duration-700" style={{ width: `${(totalXP % 500) / 5}% `, backgroundColor: themeColor }} />
-              </div>
-            </div>
+            )}
             {/* Balance */}
-            <div className="flex items-center gap-2 text-yellow-400 font-bold">
-              <Coins className="w-3 h-3" />
-              <span className="text-xs">{userData.balance}</span>
-            </div>
+            {(!userData.gameplaySettings || userData.gameplaySettings.coins !== false) && (
+              <div className="flex items-center gap-2 text-yellow-400 font-bold">
+                <Coins className="w-3 h-3" />
+                <span className="text-xs">{userData.balance}</span>
+              </div>
+            )}
             {/* Logout */}
             <button onClick={logout} className="ml-2 text-neutral-500 hover:text-red-500 transition-colors" title="Logout">
               <LogOut className="w-4 h-4" />
@@ -164,6 +223,9 @@ const AuthenticatedApp = () => {
               const privacy = userData?.modulePrivacy?.[m.id];
               // Default to public (true) if not set
               if (privacy?.enabled === false) return false;
+            } else {
+              // Admin Mode: respect user hidden modules
+              if (userData?.hiddenModules?.includes(m.id)) return false;
             }
             return true;
           }).map(module => (
@@ -194,7 +256,12 @@ const AuthenticatedApp = () => {
         </aside>
 
         {/* --- Main Module Content --- */}
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto relative">
+        <main 
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            className="flex-1 p-4 md:p-8 md:overflow-y-auto relative"
+        >
 
           {/* Render the Active Module and pass the System Core + View State */}
           <ActiveModule
@@ -214,6 +281,9 @@ const AuthenticatedApp = () => {
           if (viewMode === 'guest') {
             const privacy = userData?.modulePrivacy?.[m.id];
             if (privacy?.enabled === false) return false;
+          } else {
+             // Admin Mode: respect user hidden modules
+             if (userData?.hiddenModules?.includes(m.id)) return false;
           }
           return true;
         }).map(module => (
