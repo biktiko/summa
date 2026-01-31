@@ -45,7 +45,7 @@ const SettingsModule = ({ userData, updateUser }) => {
         backgroundColor: userData.backgroundColor || '#020202',
         themePreset: userData.themePreset || 'custom',
 
-        themePreset: userData.themePreset || 'custom',
+
 
         // Privacy
         modulePrivacy: userData.modulePrivacy || {},

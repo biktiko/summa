@@ -571,6 +571,15 @@ export class FirestoreDatabase {
     async updateSupplement(id, data) { return this._updateItem('supplements', id, data); }
     async deleteSupplement(id) { return this._deleteItem('supplements', id); }
 
+    async addTransaction(userId, data) { return this._addItem('transactions', userId, data); }
+    async updateTransaction(id, data) { return this._updateItem('transactions', id, data); }
+    async deleteTransaction(id) { return this._deleteItem('transactions', id); }
+
+    async addCategory(userId, data) { return this._addItem('categories', userId, data); }
+    async updateCategory(id, data) { return this._updateItem('categories', id, data); }
+    async deleteCategory(id) { return this._deleteItem('categories', id); }
+
+
 
     // --- Auth (Custom on top of Firestore) ---
 
@@ -585,6 +594,29 @@ export class FirestoreDatabase {
             }
         }
         return null;
+    }
+
+    async initUserAfterAuth(uid, email, name) {
+        const ref = doc(firestore, 'users', uid);
+        const snap = await getDoc(ref);
+
+        if (snap.exists()) {
+            return { ...snap.data(), id: uid };
+        } else {
+            // New User Setup
+            const newItem = {
+                id: uid,
+                email, 
+                name, 
+                role: 'user', 
+                energy: 100, 
+                balance: 0, 
+                xp: 0,
+                joinedAt: new Date().toISOString()
+            };
+            await setDoc(ref, newItem);
+            return newItem;
+        }
     }
 
     async createUser(email, password, name) {

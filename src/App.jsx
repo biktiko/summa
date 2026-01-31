@@ -319,7 +319,7 @@ const App = () => {
 };
 
 const AuthWrapper = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, isVerified, resendVerification, logout } = useAuth();
 
   if (loading) {
     return (
@@ -332,6 +332,43 @@ const AuthWrapper = () => {
 
   if (!user) {
     return <LoginPage />;
+  }
+
+  if (!isVerified) {
+      return (
+        <div className="min-h-screen bg-[#020202] text-neutral-200 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden font-sans">
+             {/* Background Effects */}
+             <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
+             
+             <div className="w-16 h-16 bg-yellow-600/20 rounded-2xl flex items-center justify-center mb-6 border border-yellow-500/20 z-10 animate-pulse">
+                <UserCheck className="w-8 h-8 text-yellow-500" />
+             </div>
+             
+             <h2 className="text-2xl font-black uppercase tracking-tighter mb-2 z-10">Verification Required</h2>
+             <p className="text-neutral-500 text-xs font-bold uppercase tracking-widest max-w-sm mb-8 z-10 leading-relaxed">
+                A security protocol link has been sent to your email channel.<br/>
+                Please verify your identity to access the system.
+             </p>
+             
+             <div className="flex flex-col gap-3 w-full max-w-xs z-10">
+                <button 
+                  onClick={() => resendVerification().then(() => alert('Verification Link Sent! Please check your Inbox and Spam folder.'))}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest py-3.5 rounded-xl transition-all shadow-lg shadow-blue-900/20"
+                >
+                    Resend Link
+                </button>
+                <button 
+                  onClick={logout}
+                  className="w-full bg-neutral-900/80 border border-white/10 hover:bg-white/5 text-neutral-400 font-bold uppercase tracking-widest py-3.5 rounded-xl transition-all backdrop-blur-sm"
+                >
+                    Return to Login
+                </button>
+                <div className="mt-4 text-[10px] text-neutral-600 uppercase font-bold tracking-widest">
+                    Done verifying? <span className="text-blue-500 cursor-pointer hover:underline" onClick={() => window.location.reload()}>Reload Page</span>
+                </div>
+             </div>
+        </div>
+      );
   }
 
   return <AuthenticatedApp />;
