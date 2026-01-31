@@ -136,7 +136,7 @@ const HealthModule = ({
                             onClick={() => setMissionTab('missions')}
                             className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${missionTab === 'missions' ? 'text-blue-500' : 'text-neutral-500 hover:text-white'}`}
                         >
-                            Mission & Backlog
+                            Tasks
                             {missionTab === 'missions' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 rounded-t-full" />}
                         </button>
                         <button
