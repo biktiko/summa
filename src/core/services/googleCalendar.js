@@ -135,6 +135,7 @@ export const signOutFromGoogle = () => {
 };
 
 export const isSignedIn = () => {
+    if (!window.gapi || !window.gapi.client) return false;
     const token = gapi.client.getToken();
     return token !== null && token.access_token !== undefined;
 };

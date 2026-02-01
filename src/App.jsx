@@ -1,36 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Routes, Route, useParams, Link, useNavigate } from 'react-router-dom';
 
 import {
-  Trophy, User, Coins, Menu, X, LogOut, Edit2, CheckSquare, Sliders, UserCheck, Copy
+  Trophy, User, Coins, Menu, X, LogOut, Edit2, CheckSquare, Sliders, UserCheck, Copy, ArrowRight, LayoutDashboard
 } from 'lucide-react';
 
 // Core "Brain"
 import { useLifeData } from './core/hooks/useLifeData';
 import { AuthProvider, useAuth } from './core/hooks/useAuth';
+import { db } from './core/services/db';
 
 // Module Registry
 import { MODULES } from './modules/registry';
 import LoginPage from './modules/Auth/LoginPage';
 import TaskBoard from "./components/MissionControl/TaskBoard";
+import SettingsModule from './components/Settings/SettingsModule';
 
-// --- Authenticated App Shell ---
-const AuthenticatedApp = () => {
-  const { user, logout } = useAuth();
-  const [activeTabId, setActiveTabId] = useState(MODULES[0].id);
-  const [lastActiveTabId, setLastActiveTabId] = useState(MODULES[0].id); // Track previous tab for Settings toggle
-  const [currentModuleView, setCurrentModuleView] = useState('dashboard'); // 'dashboard' | 'tasks' | 'notes'
-  const [activeTaskTab, setActiveTaskTab] = useState('missions'); // 'protocol' | 'missions' | 'goals' (shared state)
+// --- System Interface (The Shell) ---
+// This component handles the UI rendering for both Admin and Guest modes
+const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
+  const { userData, loading, totalXP, level, viewMode, toggleViewMode, updateUser } = system;
+
+  // Filter Modules based on Privacy/Visibility
+  const visibleModules = useMemo(() => {
+    return MODULES.filter(m => {
+        if (m.id === 'settings') return false; 
+        if (viewMode === 'guest') {
+            const privacy = userData?.modulePrivacy?.[m.id];
+            // Explicitly check if enabled is strictly false
+            if (privacy && privacy.enabled === false) return false;
+        } else {
+             if (userData?.hiddenModules?.includes(m.id)) return false;
+        }
+        return true;
+    });
+  }, [userData, viewMode]);
+  
+  const [activeTabId, setActiveTabId] = useState(null);
+  const [lastActiveTabId, setLastActiveTabId] = useState(MODULES[0].id);
+  const [currentModuleView, setCurrentModuleView] = useState('dashboard'); 
+  const [activeTaskTab, setActiveTaskTab] = useState('missions');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Initialize Active Tab
+  useEffect(() => {
+    if (visibleModules.length > 0) {
+        // If we are currently in settings, don't force redirect
+        if (activeTabId === 'settings') return;
+
+        // If current activeTabId is not in visible modules, switch to first visible
+        if (!activeTabId || !visibleModules.find(m => m.id === activeTabId)) {
+             setActiveTabId(visibleModules[0].id);
+        }
+    }
+  }, [visibleModules, activeTabId]);
 
   // Swipe State
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
 
-  // Initialize System Core with Logged In User ID
-  const system = useLifeData(user.id);
-  const { userData, loading, totalXP, level, viewMode, toggleViewMode, updateUser } = system;
-
-  // --- Smart Module Switching ---
   // --- Smart Module Switching ---
   const handleModuleChange = (newModuleId) => {
     if (activeTabId !== 'settings' && newModuleId === 'settings') {
@@ -38,17 +66,14 @@ const AuthenticatedApp = () => {
     }
     setActiveTabId(newModuleId);
 
-    // If we are currently in a "sticky" view (Tasks or Notes), keep it.
     if (['tasks', 'notes'].includes(currentModuleView)) {
-      // Do nothing, keep 'tasks' or 'notes'
+      // keep view
     } else {
-      // Otherwise, reset to the default view for the new module
       const defaultViews = {
-        career: 'profile', // Portfolio
-        finance: 'dashboard', // Finance Dashboard
-        health: 'dashboard', // Health Dashboard
+        career: 'profile',
+        finance: 'dashboard',
+        health: 'dashboard',
       };
-      // Fallback to 'dashboard' if unknown
       setCurrentModuleView(defaultViews[newModuleId] || 'dashboard');
     }
   };
@@ -75,32 +100,17 @@ const AuthenticatedApp = () => {
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
 
-    if (isLeftSwipe || isRightSwipe) {
-       // Filter visible modules
-       const visibleModules = MODULES.filter(m => {
-          if (m.id === 'settings') return false; // Don't swipe into settings
-          if (viewMode === 'guest') {
-            const privacy = userData?.modulePrivacy?.[m.id];
-            if (privacy?.enabled === false) return false;
-          } else {
-             // Admin Mode: respect user hidden modules
-             if (userData?.hiddenModules?.includes(m.id)) return false;
-          }
-          return true;
-       });
-       
+    if (isLeftSwipe || isRightSwipe) {       
        const currentIndex = visibleModules.findIndex(m => m.id === activeTabId);
-       if (currentIndex === -1) return; // Currently in settings or unknown
+       if (currentIndex === -1) return;
 
        if (isLeftSwipe) {
-          // Next
           if (currentIndex < visibleModules.length - 1) {
              handleModuleChange(visibleModules[currentIndex + 1].id);
           }
        }
        
        if (isRightSwipe) {
-          // Prev
           if (currentIndex > 0) {
              handleModuleChange(visibleModules[currentIndex - 1].id);
           }
@@ -110,45 +120,49 @@ const AuthenticatedApp = () => {
 
   // Loading State
   if (loading) {
-    // ... (Keep existing loading state)
     return (
       <div className="min-h-screen bg-[#020202] text-blue-500 flex flex-col items-center justify-center font-mono gap-4">
         <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <div className="text-xs font-black uppercase tracking-[0.2em]">Loading User Data...</div>
+        <div className="text-xs font-black uppercase tracking-[0.2em]">Loading System...</div>
       </div>
     );
   }
+  
+  // Show Nav if more than 1 module
+  const showDetailNav = visibleModules.length > 1;
 
-  // Find Active Module
-  const ActiveModule = MODULES.find(m => m.id === activeTabId)?.component || (() => <div>Module Not Found</div>);
-
-  // Dynamic Theme Styles
-  const themeColor = userData.themeColor || '#3b82f6';
-  const backgroundColor = userData.backgroundColor || '#020202';
+  const ActiveModule = (activeTabId === 'settings' ? SettingsModule : MODULES.find(m => m.id === activeTabId)?.component) || (() => <div className='p-8'>Module Not Found</div>);
+  const themeColor = userData?.themeColor || '#3b82f6';
+  const backgroundColor = userData?.backgroundColor || '#020202';
+  
+  const displayName = userData?.firstName 
+      ? `${userData.firstName} ${userData.lastName || ''}` 
+      : (authUser?.name || 'Guest User');
 
   return (
     <div className="min-h-screen text-neutral-100 font-sans flex flex-col selection:bg-blue-500/30 relative transition-colors duration-500 pb-20 md:pb-0" style={{
       backgroundColor: backgroundColor,
       '--theme-color': themeColor
     }}>
-
       {/* --- HUD Header --- */}
       <header className="p-4 md:p-6 border-b border-white/5 bg-black/40 backdrop-blur-xl relative md:sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
 
           {/* User Profile */}
           <div className="flex items-center gap-4 w-full md:w-auto">
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="hidden md:block p-2 text-neutral-500 hover:text-white transition-colors"
-            >
-              <Menu className="w-6 h-6" />
-            </button>
+             {showDetailNav && (
+                <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="hidden md:block p-2 text-neutral-500 hover:text-white transition-colors"
+                >
+                <Menu className="w-6 h-6" />
+                </button>
+             )}
             <div
               className="w-12 h-12 rounded-lg flex items-center justify-center shadow-lg shrink-0 overflow-hidden relative"
               style={{ backgroundColor: themeColor, boxShadow: `0 10px 15px -3px ${themeColor}40` }}
             >
-              {userData.avatar ? (
+              {userData?.avatar ? (
                 <img src={userData.avatar} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <User className="w-6 h-6 text-white" />
@@ -156,58 +170,75 @@ const AuthenticatedApp = () => {
             </div>
             <div>
               <h1 className="text-lg font-black uppercase tracking-tighter leading-none mb-1 flex items-center gap-2">
-                {userData.firstName ? `${userData.firstName} ${userData.lastName || ''}` : user.name}
+                {displayName}
               </h1>
               <div className="text-[8px] text-neutral-500 font-bold uppercase tracking-widest flex items-center gap-2 flex-wrap">
-                <span style={{ color: themeColor }}>Architect LVL {level}</span>
-                <span className="w-1 h-1 bg-neutral-800 rounded-full"></span>
-                <span>Status: Online</span>
-                <button
-                  onClick={toggleViewMode}
-                  className={`ml-2 px-2 py-0.5 rounded border text-[8px] transition-all ${viewMode === 'admin' ? 'bg-red-900/20 border-red-500/30 text-red-500' : 'bg-green-900/20 border-green-500/30 text-green-500'} `}
-                >
-                  {viewMode === 'admin' ? 'ADMIN MODE' : 'GUEST MODE'}
-                </button>
+                {!isGuest && (
+                    <>
+                        <span style={{ color: themeColor }}>Architect LVL {level}</span>
+                        <span className="w-1 h-1 bg-neutral-800 rounded-full"></span>
+                    </>
+                )}
+                <span>{isGuest ? 'GUEST VIEW' : 'Status: Online'}</span>
+                {!isGuest && (
+                    <button
+                    onClick={toggleViewMode}
+                    className={`ml-2 px-2 py-0.5 rounded border text-[8px] transition-all ${viewMode === 'admin' ? 'bg-red-900/20 border-red-500/30 text-red-500' : 'bg-green-900/20 border-green-500/30 text-green-500'} `}
+                    >
+                    {viewMode === 'admin' ? 'ADMIN MODE' : 'GUEST MODE'}
+                    </button>
+                )}
               </div>
             </div>
           </div>
 
           {/* Stats Bar */}
-          {/* This container has the stats */}
           <div className="flex items-center gap-6 bg-neutral-900/40 p-3 rounded-xl border border-white/5 w-full md:w-auto font-mono overflow-x-auto md:overflow-visible">
-            <button
-              onClick={toggleSettings}
-              className={`p-2 rounded-lg transition-colors ${activeTabId === 'settings' ? 'text-white' : 'text-neutral-500 hover:text-white'}`}
-              title="System Settings"
-            >
-              <Sliders className="w-5 h-5" />
-            </button>
-            <div className="w-px h-6 bg-white/10" />
-
-
-            {/* XP */}
-            {(!userData.gameplaySettings || userData.gameplaySettings.xp !== false) && (
-              <div className="flex-1 min-w-[100px] md:w-40">
-                <div className="flex justify-between text-[7px] mb-1 font-bold uppercase" style={{ color: themeColor }}>
-                  <span>XP Progress</span>
-                  <span>{totalXP % 500}/500</span>
-                </div>
-                <div className="h-1 bg-black rounded-full overflow-hidden">
-                  <div className="h-full transition-all duration-700" style={{ width: `${(totalXP % 500) / 5}% `, backgroundColor: themeColor }} />
-                </div>
-              </div>
+            {!isGuest && (
+              <button
+                onClick={toggleSettings}
+                className={`p-2 rounded-lg transition-colors ${activeTabId === 'settings' ? 'text-white' : 'text-neutral-500 hover:text-white'}`}
+                title="System Settings"
+              >
+                <Sliders className="w-5 h-5" />
+              </button>
             )}
-            {/* Balance */}
-            {(!userData.gameplaySettings || userData.gameplaySettings.coins !== false) && (
-              <div className="flex items-center gap-2 text-yellow-400 font-bold">
+            
+            {/* XP - Hidden for Guest unless publicXP is on */}
+            {((!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.xp !== false)) || (isGuest && userData?.gameplaySettings?.publicXP)) && (
+              <>
+                 <div className="w-px h-6 bg-white/10" />
+                 <div className="flex-1 min-w-[100px] md:w-40">
+                    <div className="flex justify-between text-[7px] mb-1 font-bold uppercase" style={{ color: themeColor }}>
+                    <span>XP Progress</span>
+                    <span>{totalXP % 500}/500</span>
+                    </div>
+                    <div className="h-1 bg-black rounded-full overflow-hidden">
+                    <div className="h-full transition-all duration-700" style={{ width: `${(totalXP % 500) / 5}% `, backgroundColor: themeColor }} />
+                    </div>
+                 </div>
+              </>
+            )}
+
+            {/* Balance - Hidden for Guest unless publicCoins is on */}
+            {((!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.coins !== false)) || (isGuest && userData?.gameplaySettings?.publicCoins)) && (
+              <div className="flex items-center gap-2 text-yellow-400 font-bold ml-2">
                 <Coins className="w-3 h-3" />
-                <span className="text-xs">{userData.balance}</span>
+                <span className="text-xs">{userData?.balance || 0}</span>
               </div>
             )}
-            {/* Logout */}
-            <button onClick={logout} className="ml-2 text-neutral-500 hover:text-red-500 transition-colors" title="Logout">
-              <LogOut className="w-4 h-4" />
-            </button>
+            
+            {/* Logout / Login / Create */}
+            {logout ? (
+                <button onClick={logout} className="ml-4 text-neutral-500 hover:text-red-500 transition-colors" title="Logout">
+                    <LogOut className="w-4 h-4" />
+                </button>
+            ) : (
+                <Link to="/" className="ml-2 flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all">
+                    <span>Create My Portfolio</span>
+                    <ArrowRight className="w-3 h-3" />
+                </Link>
+            )}
           </div>
         </div>
       </header>
@@ -215,45 +246,37 @@ const AuthenticatedApp = () => {
       <div className="w-full max-w-[1800px] mx-auto flex flex-col md:flex-row flex-1 border-x border-white/5 relative">
 
         {/* --- Sidebar Navigation (Desktop) --- */}
-        <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} hidden md:flex transition-all duration-300 p-4 space-y-2 border-r border-white/5 flex-col gap-2 md:gap-0`}>
-          {MODULES.filter(m => {
-            if (m.id === 'settings') return false;
-            // Privacy Filter
-            if (viewMode === 'guest') {
-              const privacy = userData?.modulePrivacy?.[m.id];
-              // Default to public (true) if not set
-              if (privacy?.enabled === false) return false;
-            } else {
-              // Admin Mode: respect user hidden modules
-              if (userData?.hiddenModules?.includes(m.id)) return false;
-            }
-            return true;
-          }).map(module => (
-            <button
-              key={module.id}
-              onClick={() => handleModuleChange(module.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 md:shrink ${activeTabId === module.id ? 'text-white shadow-lg' : 'text-neutral-500 hover:bg-white/5'} ${!isSidebarOpen && 'justify-center px-2'} `}
-              style={activeTabId === module.id ? { backgroundColor: themeColor } : {}}
-              title={!isSidebarOpen ? module.label : ''}
-            >
-              <module.icon className="w-4 h-4" />
-              {isSidebarOpen && <span>{module.label}</span>}
-            </button>
-          ))}
-
-          {/* Settings Separator */}
-          <div className="pt-4 mt-auto border-t border-white/5">
-            <button
-              onClick={() => setActiveTabId('settings')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 md:shrink ${activeTabId === 'settings' ? 'text-white shadow-lg' : 'text-neutral-500 hover:bg-white/5'} ${!isSidebarOpen && 'justify-center px-2'}`}
-              style={activeTabId === 'settings' ? { backgroundColor: themeColor } : {}}
-              title={!isSidebarOpen ? 'Settings' : ''}
-            >
-              <Sliders className="w-4 h-4" />
-              {isSidebarOpen && <span>Settings</span>}
-            </button>
-          </div>
-        </aside>
+        {(showDetailNav) && (
+            <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} hidden md:flex transition-all duration-300 p-4 space-y-2 border-r border-white/5 flex-col gap-2 md:gap-0`}>
+            {visibleModules.map(module => (
+                <button
+                key={module.id}
+                onClick={() => handleModuleChange(module.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 md:shrink ${activeTabId === module.id ? 'text-white shadow-lg' : 'text-neutral-500 hover:bg-white/5'} ${!isSidebarOpen && 'justify-center px-2'} `}
+                style={activeTabId === module.id ? { backgroundColor: themeColor } : {}}
+                title={!isSidebarOpen ? module.label : ''}
+                >
+                <module.icon className="w-4 h-4" />
+                {isSidebarOpen && <span>{module.label}</span>}
+                </button>
+            ))}
+            
+            {/* Settings in Sidebar (Admin Only) */}
+            {!isGuest && (
+                <div className="pt-4 mt-auto border-t border-white/5">
+                    <button
+                    onClick={() => setActiveTabId('settings')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 md:shrink ${activeTabId === 'settings' ? 'text-white shadow-lg' : 'text-neutral-500 hover:bg-white/5'} ${!isSidebarOpen && 'justify-center px-2'}`}
+                    style={activeTabId === 'settings' ? { backgroundColor: themeColor } : {}}
+                    title={!isSidebarOpen ? 'Settings' : ''}
+                    >
+                    <Sliders className="w-4 h-4" />
+                    {isSidebarOpen && <span>Settings</span>}
+                    </button>
+                </div>
+            )}
+            </aside>
+        )}
 
         {/* --- Main Module Content --- */}
         <main 
@@ -262,116 +285,179 @@ const AuthenticatedApp = () => {
             onTouchEnd={onTouchEnd}
             className="flex-1 p-4 md:p-8 md:overflow-y-auto relative"
         >
-
-          {/* Render the Active Module and pass the System Core + View State */}
-          <ActiveModule
-            {...system}
-            activeView={currentModuleView}
-            setActiveView={setCurrentModuleView}
-            missionTab={activeTaskTab}
-            setMissionTab={setActiveTaskTab}
-          />
+          {activeTabId ? (
+                <ActiveModule
+                    {...system}
+                    activeView={currentModuleView}
+                    setActiveView={setCurrentModuleView}
+                    missionTab={activeTaskTab}
+                    setMissionTab={setActiveTaskTab}
+                />
+            ) : (
+                <div className="flex items-center justify-center h-full text-neutral-500 text-xs font-mono uppercase">
+                    Initializing Interface...
+                </div>
+            )}
         </main>
-
       </div>
 
       {/* --- Bottom Navigation (Mobile) --- */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0A0A0A]/90 backdrop-blur-xl border-t border-white/5 z-50 flex items-center justify-around p-2 pb-6">
-        {MODULES.filter(m => {
-          if (viewMode === 'guest') {
-            const privacy = userData?.modulePrivacy?.[m.id];
-            if (privacy?.enabled === false) return false;
-          } else {
-             // Admin Mode: respect user hidden modules
-             if (userData?.hiddenModules?.includes(m.id)) return false;
-          }
-          return true;
-        }).map(module => (
-          <button
-            key={module.id}
-            onClick={() => handleModuleChange(module.id)}
-            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${activeTabId === module.id ? 'text-white' : 'text-neutral-500'}`}
-            style={activeTabId === module.id ? { color: themeColor } : {}}
-          >
-            <module.icon className={`w-5 h-5 mb-1 ${activeTabId === module.id && 'scale-110 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]'}`} />
-            <span className="text-[9px] font-black uppercase tracking-wider">{module.label}</span>
-          </button>
-        ))}
-      </nav>
+      {showDetailNav && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0A0A0A]/90 backdrop-blur-xl border-t border-white/5 z-50 flex items-center justify-around p-2 pb-6">
+            {visibleModules.map(module => (
+            <button
+                key={module.id}
+                onClick={() => handleModuleChange(module.id)}
+                className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${activeTabId === module.id ? 'text-white' : 'text-neutral-500'}`}
+                style={activeTabId === module.id ? { color: themeColor } : {}}
+            >
+                <module.icon className={`w-5 h-5 mb-1 ${activeTabId === module.id && 'scale-110 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]'}`} />
+                <span className="text-[9px] font-black uppercase tracking-wider">{module.label}</span>
+            </button>
+            ))}
+        </nav>
+      )}
 
-      {/* --- Footer (Desktop Only) --- */}
+      {/* --- Footer --- */}
       <footer className="hidden md:block p-4 border-t border-white/5 text-center bg-black/80">
         <div className="text-[8px] text-neutral-800 font-black uppercase tracking-[0.8em]">
-          SUMMA OS // SYSTEM_STATUS: STABLE // GROWTH_PROTOCOL: ACTIVE
+           SUMMA OS // PORTFOLIO_MODE: {isGuest ? 'GUEST' : 'ADMIN'}
         </div>
       </footer>
-    </div >
+    </div>
   );
 };
 
-// --- Main Entry Point ---
-const App = () => {
-  return (
-    <AuthProvider>
-      <AuthWrapper />
-    </AuthProvider>
-  );
-};
+// --- Authenticated Route (Admin View) ---
+const AuthenticatedRoute = () => {
+    const { user, loading, isVerified, resendVerification, logout } = useAuth();
+    
+    // We fetch data for the logged-in user, defaulting to 'admin' view mode
+    const system = useLifeData(user?.id, 'admin');
 
-const AuthWrapper = () => {
-  const { user, loading, isVerified, resendVerification, logout } = useAuth();
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-[#020202] text-blue-500 flex flex-col items-center justify-center font-mono gap-4">
+            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div className="text-xs font-black uppercase tracking-[0.2em]">Initializing Security...</div>
+            </div>
+        );
+    }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#020202] text-blue-500 flex flex-col items-center justify-center font-mono gap-4">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <div className="text-xs font-black uppercase tracking-[0.2em]">Initializing Security...</div>
-      </div>
-    );
-  }
+    if (!user) {
+        return <LoginPage />;
+    }
 
-  if (!user) {
-    return <LoginPage />;
-  }
-
-  if (!isVerified) {
-      return (
+    if (!isVerified) {
+        return (
         <div className="min-h-screen bg-[#020202] text-neutral-200 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden font-sans">
-             {/* Background Effects */}
-             <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
-             
-             <div className="w-16 h-16 bg-yellow-600/20 rounded-2xl flex items-center justify-center mb-6 border border-yellow-500/20 z-10 animate-pulse">
+                {/* Background Effects */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
+                
+                <div className="w-16 h-16 bg-yellow-600/20 rounded-2xl flex items-center justify-center mb-6 border border-yellow-500/20 z-10 animate-pulse">
                 <UserCheck className="w-8 h-8 text-yellow-500" />
-             </div>
-             
-             <h2 className="text-2xl font-black uppercase tracking-tighter mb-2 z-10">Verification Required</h2>
-             <p className="text-neutral-500 text-xs font-bold uppercase tracking-widest max-w-sm mb-8 z-10 leading-relaxed">
+                </div>
+                
+                <h2 className="text-2xl font-black uppercase tracking-tighter mb-2 z-10">Verification Required</h2>
+                <p className="text-neutral-500 text-xs font-bold uppercase tracking-widest max-w-sm mb-8 z-10 leading-relaxed">
                 A security protocol link has been sent to your email channel.<br/>
                 Please verify your identity to access the system.
-             </p>
-             
-             <div className="flex flex-col gap-3 w-full max-w-xs z-10">
+                </p>
+                
+                <div className="flex flex-col gap-3 w-full max-w-xs z-10">
                 <button 
-                  onClick={() => resendVerification().then(() => alert('Verification Link Sent! Please check your Inbox and Spam folder.'))}
-                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest py-3.5 rounded-xl transition-all shadow-lg shadow-blue-900/20"
+                    onClick={() => resendVerification().then(() => alert('Verification Link Sent! Please check your Inbox and Spam folder.'))}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest py-3.5 rounded-xl transition-all shadow-lg shadow-blue-900/20"
                 >
                     Resend Link
                 </button>
                 <button 
-                  onClick={logout}
-                  className="w-full bg-neutral-900/80 border border-white/10 hover:bg-white/5 text-neutral-400 font-bold uppercase tracking-widest py-3.5 rounded-xl transition-all backdrop-blur-sm"
+                    onClick={logout}
+                    className="w-full bg-neutral-900/80 border border-white/10 hover:bg-white/5 text-neutral-400 font-bold uppercase tracking-widest py-3.5 rounded-xl transition-all backdrop-blur-sm"
                 >
                     Return to Login
                 </button>
                 <div className="mt-4 text-[10px] text-neutral-600 uppercase font-bold tracking-widest">
                     Done verifying? <span className="text-blue-500 cursor-pointer hover:underline" onClick={() => window.location.reload()}>Reload Page</span>
                 </div>
-             </div>
+                </div>
         </div>
-      );
-  }
+        );
+    }
 
-  return <AuthenticatedApp />;
+    return <SystemInterface system={system} authUser={user} logout={logout} isGuest={false} />;
+};
+
+// --- Public Profile Route (Guest View) ---
+const PublicProfileRoute = () => {
+    const { username } = useParams();
+    const [targetUserId, setTargetUserId] = useState(null);
+    const [lookupLoading, setLookupLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        const resolveUser = async () => {
+             setError(null);
+             setLookupLoading(true);
+             try {
+                // Try to find by username
+                const userData = await db.getUserByUsername(username);
+                if (userData) {
+                    setTargetUserId(userData.id);
+                } else {
+                    setError('User not found');
+                }
+             } catch (e) {
+                 console.error("Profile lookup failed:", e);
+                 setError('System Error');
+             } finally {
+                 setLookupLoading(false);
+             }
+        };
+
+        if (username) resolveUser();
+    }, [username]);
+
+    // Force guest mode
+    const system = useLifeData(targetUserId, 'guest');
+
+    if (lookupLoading) {
+        return (
+            <div className="min-h-screen bg-[#020202] text-neutral-500 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-neutral-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    if (error || !targetUserId) {
+        return (
+            <div className="min-h-screen bg-[#020202] text-white flex flex-col items-center justify-center p-8 text-center">
+                <h1 className="text-4xl font-black uppercase tracking-tighter mb-4 text-neutral-800">404 Error</h1>
+                <p className="text-neutral-500 font-bold uppercase tracking-widest mb-8">User Profile Not Found</p>
+                <Link to="/" className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-blue-500 transition-all">
+                    Create Your Own Profile
+                </Link>
+            </div>
+        );
+    }
+
+    // Render System in Guest Mode (No Auth User, No Logout)
+    return <SystemInterface system={system} authUser={null} logout={null} isGuest={true} />;
+};
+
+// --- Main Entry Point ---
+const App = () => {
+  return (
+    <AuthProvider>
+        <Routes>
+            {/* The root path is the Authenticated "Admin" App */}
+            <Route path="/" element={<AuthenticatedRoute />} />
+            
+            {/* The dynamic path checks for a username */}
+            <Route path="/:username" element={<PublicProfileRoute />} />
+        </Routes>
+    </AuthProvider>
+  );
 };
 
 export default App;

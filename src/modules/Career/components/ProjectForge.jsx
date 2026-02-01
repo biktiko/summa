@@ -10,7 +10,7 @@ const ProjectForge = ({ projects, actions, viewMode, isSectionHidden, toggleSect
     if (viewMode === 'guest' && isSectionHidden) return null;
 
     return (
-        <div className={`space-y-6 ${isSectionHidden ? 'opacity-50' : ''}`}>
+        <div className={`space-y-6`}>
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <Folder className="w-5 h-5 text-blue-500" />

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Save, Edit2, X, GraduationCap, Briefcase, Globe, Trophy, Eye, EyeOff, ExternalLink } from 'lucide-react';
-
+import { Plus, Trash2, Save, Edit2, X, GraduationCap, Briefcase, Globe, Trophy, Eye, EyeOff, ExternalLink, ChevronDown } from 'lucide-react';
 // --- Generic Editable List Component ---
-const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, variant, isSectionHidden, toggleSectionVisibility }) => {
+const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, variant, isSectionHidden, toggleSectionVisibility, renderItem, ...props }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [newItem, setNewItem] = useState(fields.reduce((acc, f) => ({ ...acc, [f.key]: '' }), { link: '', linkName: '', isHidden: false }));
     const [editingId, setEditingId] = useState(null);
@@ -13,15 +12,15 @@ const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, var
 
     const isGold = variant === 'gold';
     const containerClass = isGold
-        ? `space-y-6 p-6 rounded-3xl bg-gradient-to-br from-yellow-900/10 to-transparent border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.05)] ${isSectionHidden ? 'opacity-50 border-red-900/30' : ''}`
-        : `space-y-6 ${isSectionHidden ? 'opacity-50' : ''}`;
+        ? `space-y-6 p-6 rounded-3xl bg-gradient-to-br from-yellow-900/10 to-transparent border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.05)] ${isSectionHidden ? 'border-red-900/30' : ''}`
+        : `space-y-6`;
     const titleClass = isGold
         ? "text-sm font-black uppercase tracking-widest text-yellow-500 drop-shadow-sm"
         : "text-sm font-black uppercase tracking-widest text-neutral-300";
     const iconClass = isGold ? "w-5 h-5 text-yellow-400" : "w-5 h-5 text-blue-500";
     const itemClass = (isHidden) => isGold
-        ? `group relative p-5 bg-black/40 border rounded-2xl transition-all shadow-lg flex flex-col h-full ${isHidden ? 'border-red-900/30 opacity-60 hover:opacity-100' : 'border-yellow-500/10 hover:border-yellow-500/30'}`
-        : `group relative p-5 bg-neutral-900/30 border rounded-2xl transition-all flex flex-col h-full ${isHidden ? 'border-red-900/30 opacity-60 hover:opacity-100' : 'border-white/5 hover:border-white/10'}`;
+        ? `group relative p-5 bg-black/40 border rounded-2xl transition-all shadow-lg flex flex-col h-full ${isHidden ? 'border-red-900/30' : 'border-yellow-500/10 hover:border-yellow-500/30'}`
+        : `group relative p-5 bg-neutral-900/30 border rounded-2xl transition-all flex flex-col h-full ${isHidden ? 'border-red-900/30' : 'border-white/5 hover:border-white/10'}`;
 
     const handleAdd = async () => {
         if (!newItem[fields[0].key]) return; // First field is required
@@ -81,8 +80,23 @@ const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, var
                                     value={newItem[field.key]}
                                     onChange={e => setNewItem({ ...newItem, [field.key]: e.target.value })}
                                 />
+                            ) : field.type === 'select' ? (
+                                <div className="relative">
+                                     <select
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-white focus:border-blue-500/50 outline-none appearance-none"
+                                        value={newItem[field.key]}
+                                        onChange={e => setNewItem({ ...newItem, [field.key]: e.target.value })}
+                                    >
+                                        <option value="" disabled>Select {field.label}</option>
+                                        {field.options && field.options.map(opt => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-neutral-500 pointer-events-none" />
+                                </div>
                             ) : (
                                 <input
+                                    type={field.type || 'text'}
                                     className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-white focus:border-blue-500/50 outline-none"
                                     value={newItem[field.key]}
                                     onChange={e => setNewItem({ ...newItem, [field.key]: e.target.value })}
@@ -132,8 +146,22 @@ const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, var
                                                 value={editData[field.key]}
                                                 onChange={e => setEditData({ ...editData, [field.key]: e.target.value })}
                                             />
+                                        ) : field.type === 'select' ? (
+                                            <div className="relative">
+                                                <select
+                                                    className="w-full bg-black/40 border border-blue-500/30 rounded p-2 text-sm font-bold text-white outline-none focus:border-blue-500 appearance-none"
+                                                    value={editData[field.key]}
+                                                    onChange={e => setEditData({ ...editData, [field.key]: e.target.value })}
+                                                >
+                                                     {field.options && field.options.map(opt => (
+                                                        <option key={opt} value={opt}>{opt}</option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-neutral-500 pointer-events-none" />
+                                            </div>
                                         ) : (
                                             <input
+                                                type={field.type || 'text'}
                                                 className="w-full bg-black/40 border border-blue-500/30 rounded p-2 text-sm font-bold text-white outline-none focus:border-blue-500"
                                                 value={editData[field.key]}
                                                 onChange={e => setEditData({ ...editData, [field.key]: e.target.value })}
@@ -175,14 +203,16 @@ const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, var
                             </div>
                         ) : (
                             <>
-                                <div className="flex-1">
-                                    <h4 className={`font-bold text-base mb-1 ${isGold ? 'text-yellow-100' : 'text-neutral-200'}`}>{item[fields[0].key]}</h4>
-                                    {fields.slice(1).map(field => (
-                                        <p key={field.key} className={`text-xs mb-2 ${field.type === 'textarea' ? 'text-neutral-500 line-clamp-3' : 'text-neutral-400 font-mono'}`}>
-                                            {item[field.key]}
-                                        </p>
-                                    ))}
-                                </div>
+                                {renderItem ? renderItem(item, isGold) : (
+                                    <div className="flex-1">
+                                        <h4 className={`font-bold text-base mb-1 ${isGold ? 'text-yellow-100' : 'text-neutral-200'}`}>{item[fields[0].key]}</h4>
+                                        {fields.slice(1).map(field => (
+                                            <p key={field.key} className={`text-xs mb-2 ${field.type === 'textarea' ? 'text-neutral-500 line-clamp-3' : 'text-neutral-400 font-mono'}`}>
+                                                {item[field.key]}
+                                            </p>
+                                        ))}
+                                    </div>
+                                )}
 
                                 {/* Link Display */}
                                 {item.link && item.link !== '#' && (
@@ -209,16 +239,58 @@ const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, var
     );
 };
 
+const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const [year, month] = dateStr.split('-');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[parseInt(month) - 1]} ${year}`;
+};
+
+const calculateDuration = (start, end) => {
+    if (!start) return '';
+    const startDate = new Date(start);
+    const endDate = end ? new Date(end) : new Date();
+    const diffMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 + (endDate.getMonth() - startDate.getMonth()) + (endDate.getDate() >= startDate.getDate() ? 0 : -1);
+    const years = Math.floor(diffMonths / 12);
+    const months = diffMonths % 12;
+    if (diffMonths < 0) return '';
+    const parts = [];
+    if (years > 0) parts.push(`${years} yr${years > 1 ? 's' : ''}`);
+    if (months > 0) parts.push(`${months} mo${months > 1 ? 's' : ''}`);
+    return parts.length > 0 ? parts.join(' ') : '1 mo';
+};
+
+const DateRangeRenderer = ({ item, isGold, titleField, subtitleField, descField }) => (
+    <div className="flex-1">
+        <h4 className={`font-bold text-base mb-1 ${isGold ? 'text-yellow-100' : 'text-neutral-200'}`}>{item[titleField]}</h4>
+        {subtitleField && <p className="text-xs text-neutral-400 font-bold mb-2">{item[subtitleField]}</p>}
+        
+        <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-blue-400 mb-3 bg-blue-500/5 py-1 px-2 rounded w-fit">
+             <span>{formatDate(item.startDate)} — {item.endDate ? formatDate(item.endDate) : 'Present'}</span>
+             <span className="w-1 h-1 rounded-full bg-neutral-600" />
+             <span className="text-neutral-500">{calculateDuration(item.startDate, item.endDate)}</span>
+        </div>
+
+        {descField && (
+            <p className="text-xs text-neutral-500 line-clamp-4 leading-relaxed whitespace-pre-wrap">
+                {item[descField]}
+            </p>
+        )}
+    </div>
+);
+
 export const EducationSection = (props) => (
     <EditableList
-        title="Education Protocol"
+        title="Education"
         icon={GraduationCap}
         fields={[
             { key: 'degree', label: 'Degree / Certificate' },
             { key: 'institution', label: 'Institution' },
-            { key: 'year', label: 'Year(s)' },
+            { key: 'startDate', label: 'Start Date', type: 'month' },
+            { key: 'endDate', label: 'End Date', type: 'month' },
             { key: 'description', label: 'Description', type: 'textarea' }
         ]}
+        renderItem={(item) => <DateRangeRenderer item={item} titleField="degree" subtitleField="institution" descField="description" />}
         {...props}
     />
 );
@@ -230,9 +302,11 @@ export const ExperienceSection = (props) => (
         fields={[
             { key: 'role', label: 'Role / Position' },
             { key: 'company', label: 'Company' },
-            { key: 'duration', label: 'Duration' },
+            { key: 'startDate', label: 'Start Date', type: 'month' },
+            { key: 'endDate', label: 'End Date', type: 'month' },
             { key: 'description', label: 'Responsibilities', type: 'textarea' }
         ]}
+        renderItem={(item) => <DateRangeRenderer item={item} titleField="role" subtitleField="company" descField="description" />}
         {...props}
     />
 );
@@ -242,8 +316,18 @@ export const LanguagesSection = (props) => (
         title="Language Modules"
         icon={Globe}
         fields={[
-            { key: 'name', label: 'Language' },
-            { key: 'level', label: 'Proficiency Level' },
+            { 
+                key: 'name', 
+                label: 'Language', 
+                type: 'select', 
+                options: ['Armenian', 'Russian', 'English', 'German', 'French', 'Spanish', 'Italian', 'Chinese', 'Japanese'] 
+            },
+            { 
+                key: 'level', 
+                label: 'Proficiency Level', 
+                type: 'select',
+                options: ['Native', 'Fluent', 'Professional', 'Intermediate', 'Beginner']
+            },
             { key: 'description', label: 'Notes', type: 'textarea' }
         ]}
         {...props}

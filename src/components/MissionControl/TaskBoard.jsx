@@ -787,7 +787,7 @@ Link: ${editData.link || 'None'}
     const backlogTasks = moduleTasks.filter(t => t.status === 'backlog');
 
     return (
-        <div className={`flex flex-col ${isSectionHidden ? 'opacity-50' : ''}`}>
+        <div className={`flex flex-col`}>
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div className="flex items-center gap-3">

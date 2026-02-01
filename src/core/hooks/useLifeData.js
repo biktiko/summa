@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '../services/db';
 
-export const useLifeData = (activeUserId) => {
+export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState('admin'); // 'admin' | 'guest'
+    const [viewMode, setViewMode] = useState(initialViewMode); // 'admin' | 'guest'
 
     // Use the passed activeUserId if available, otherwise default to 'u1' (for dev)
     const userId = activeUserId || 'u1';

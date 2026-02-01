@@ -180,6 +180,13 @@ export class MockDatabase {
         localStorage.setItem(DB_KEY, JSON.stringify(data));
     }
 
+    async getUserByUsername(username) {
+        const db = this._getDb();
+        const user = db.users.find(u => u.username === username);
+        if (!user) return null;
+        return this.getUserData(user.id);
+    }
+
     async getUserData(userId) {
         const db = this._getDb();
         const user = db.users.find(u => u.id === userId);
@@ -442,6 +449,19 @@ export class FirestoreDatabase {
     }
 
     // --- Users ---
+
+    async getUserByUsername(username) {
+        const usersRef = collection(firestore, 'users');
+        const q = query(usersRef, where('username', '==', username));
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+            // Return query data found
+            const data = snapshot.docs[0].data();
+            return { ...data, id: data.id || snapshot.docs[0].id };
+        }
+        return null;
+    }
 
     async getUserData(userId) {
         // 1. Get User Doc

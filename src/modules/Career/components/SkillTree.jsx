@@ -191,10 +191,10 @@ const SkillTree = ({ skills, updateSkillLevel, addNewSkill, updateSkillDetails, 
     const categories = [...new Set(skills.map(s => s.category))];
 
     return (
-        <div className={`space-y-6 ${isSectionHidden ? 'opacity-50' : ''}`}>
+        <div className={`space-y-6`}>
             <div className="flex items-center justify-between border-b border-white/5 pb-4">
                 <div className="flex items-center gap-3">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-300">Skill Matrix</h3>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-300">⚡ Skill Matrix</h3>
                     {viewMode === 'admin' && isSectionHidden && (
                         <span className="text-[9px] font-bold text-red-500 uppercase border border-red-900/50 px-2 py-0.5 rounded bg-red-900/20">Hidden Section</span>
                     )}
@@ -212,7 +212,7 @@ const SkillTree = ({ skills, updateSkillLevel, addNewSkill, updateSkillDetails, 
                             onClick={() => setIsAdding(!isAdding)}
                             className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 hover:text-white transition-all text-[10px] font-bold uppercase tracking-wider"
                         >
-                            <Plus className="w-3 h-3" /> Initialize Protocol
+                            <Plus className="w-3 h-3" /> Add Skill
                         </button>
                     </div>
                 )}
@@ -226,16 +226,23 @@ const SkillTree = ({ skills, updateSkillLevel, addNewSkill, updateSkillDetails, 
                         value={newSkillName}
                         onChange={(e) => setNewSkillName(e.target.value)}
                     />
-                    <select
-                        className="bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-white focus:border-blue-500/50 outline-none"
-                        value={newSkillCategory}
-                        onChange={(e) => setNewSkillCategory(e.target.value)}
-                    >
-                        <option value="Technical">Technical</option>
-                        <option value="Product">Product</option>
-                        <option value="Design">Design</option>
-                        <option value="Soft Skills">Soft Skills</option>
-                    </select>
+                    <div className="relative w-40">
+                         <input
+                            list="skill-categories"
+                            placeholder="Category (Type or Select)"
+                            className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-white focus:border-blue-500/50 outline-none [&::-webkit-calendar-picker-indicator]:hidden"
+                            value={newSkillCategory}
+                            onChange={(e) => setNewSkillCategory(e.target.value)}
+                        />
+                        <datalist id="skill-categories">
+                            <option value="Technical" />
+                            <option value="Product" />
+                            <option value="Design" />
+                            <option value="Soft Skills" />
+                            <option value="Languages" />
+                            <option value="Tools" />
+                        </datalist>
+                    </div>
                     <button onClick={handleAdd} className="px-4 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-500">ADD</button>
                 </div>
             )}

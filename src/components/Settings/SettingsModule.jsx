@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 
-import { User, Palette, Save, Upload, CheckCircle2, Calendar, LogOut, Moon, Sun, Monitor, Smartphone, Sliders, Shield, Zap, Lock, Copy, Loader2, Check, XCircle, ChevronLeft, ChevronRight, Target, Coins, Activity, Globe, Database, HardDrive } from 'lucide-react';
+import { User, Palette, Save, Upload, CheckCircle2, Calendar, LogOut, Moon, Sun, Monitor, Smartphone, Sliders, Shield, Zap, Lock, Copy, Loader2, Check, XCircle, ChevronLeft, ChevronRight, Target, Coins, Trophy, Activity, Globe, Database, HardDrive } from 'lucide-react';
 import { isSignedIn, signInToGoogle, signOutFromGoogle, getUserProfile } from '../../core/services/googleCalendar';
 import { db, SEED_DATA } from '../../core/services/db';
+
 
 const SettingsModule = ({ userData, updateUser }) => {
     // Mobile Navigation State
@@ -51,7 +52,7 @@ const SettingsModule = ({ userData, updateUser }) => {
         modulePrivacy: userData.modulePrivacy || {},
 
         // Gameplay
-        gameplaySettings: userData.gameplaySettings || { xp: true, coins: true },
+        gameplaySettings: userData.gameplaySettings || { xp: true, coins: true, publicXP: false, publicCoins: false },
         hiddenModules: userData.hiddenModules || []
     });
 
@@ -101,15 +102,22 @@ const SettingsModule = ({ userData, updateUser }) => {
         setIsCheckingUsername(true);
         setUsernameStatus('checking');
 
-        // Simulate API check
-        setTimeout(() => {
-            setIsCheckingUsername(false);
-            if (usernameInput.toLowerCase() === 'admin' || usernameInput.toLowerCase() === 'sysadmin') {
-                setUsernameStatus('taken');
-            } else {
-                setUsernameStatus('available');
+        // Real API Check
+        const check = async () => {
+            try {
+                const existingUser = await db.getUserByUsername(usernameInput);
+                setIsCheckingUsername(false);
+                if (existingUser && existingUser.id !== userData.id) {
+                    setUsernameStatus('taken');
+                } else {
+                    setUsernameStatus('available');
+                }
+            } catch (e) {
+                console.error(e);
+                setIsCheckingUsername(false);
             }
-        }, 1500);
+        };
+        check();
     };
 
     const handleConfirmUsername = () => {
@@ -135,25 +143,7 @@ const SettingsModule = ({ userData, updateUser }) => {
         }
     };
 
-    const [isMigrating, setIsMigrating] = useState(false);
 
-    const handleMigrateData = async () => {
-        if (window.confirm("This will upload all local data from your browser to the new Firebase Database. This process might take a few seconds. Continue?")) {
-            setIsMigrating(true);
-            try {
-                // Get raw local storage data or fallback to seed
-                const rawLocal = localStorage.getItem('life_os_db_v10');
-                const legacyData = rawLocal ? JSON.parse(rawLocal) : SEED_DATA;
-                
-                await db.migrateFromLocalStorage(legacyData);
-            } catch (e) {
-                console.error(e);
-                alert("Migration Error: " + e.message);
-            } finally {
-                setIsMigrating(false);
-            }
-        }
-    };
 
     const colors = [
         { name: 'Blue', hex: '#3b82f6' },
@@ -226,11 +216,11 @@ const SettingsModule = ({ userData, updateUser }) => {
                                         <div className="flex items-center gap-2 overflow-hidden">
                                             <span className="text-[10px] text-blue-400 whitespace-nowrap">Guest Link:</span>
                                             <code className="text-[10px] text-blue-300 truncate font-mono select-all">
-                                                summa.am/{localData.username}
+                                                https://summa-managment.web.app/{localData.username}
                                             </code>
                                         </div>
                                         <button
-                                            onClick={() => navigator.clipboard.writeText(`summa.am/${localData.username}`)}
+                                            onClick={() => navigator.clipboard.writeText(`https://summa-managment.web.app/${localData.username}`)}
                                             className="p-1.5 hover:bg-blue-500/20 rounded text-blue-400 transition-colors"
                                             title="Copy Link"
                                         >
@@ -444,52 +434,7 @@ const SettingsModule = ({ userData, updateUser }) => {
                 </div>
             )}
 
-            {activeTab === 'system' && (
-                <div className="space-y-8">
-                     <div className="bg-black/40 border border-white/5 rounded-2xl p-6">
-                        <div className="flex items-start gap-4">
-                            <div className="p-4 bg-orange-500/10 rounded-xl">
-                                <Database className="w-8 h-8 text-orange-500" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-lg font-bold text-white mb-1">Database Management</h3>
-                                <p className="text-xs text-neutral-400 mb-4">Manage your data storage and synchronization.</p>
-                                
-                                <div className="space-y-4">
-                                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-bold text-white">Migration Tool</span>
-                                            <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-1 rounded">One-time</span>
-                                        </div>
-                                        <p className="text-[10px] text-neutral-500 mb-4">
-                                            Move your existing data from this device (LocalStorage) to the new Cloud Database (Firebase). 
-                                            Use this only once after setting up the database.
-                                        </p>
-                                        <button
-                                            onClick={handleMigrateData}
-                                            disabled={isMigrating}
-                                            className="px-4 py-2 bg-white text-black hover:bg-neutral-200 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2"
-                                        >
-                                            {isMigrating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                                            {isMigrating ? 'Migrating...' : 'Migrate Local Data to Cloud'}
-                                        </button>
-                                    </div>
-                                    
-                                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-bold text-white">Connection Status</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                            <span className="text-xs text-green-500">Firestore Active</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                     </div>
-                </div>
-            )}
+
 
             {activeTab === 'privacy' && (
                 <div className="space-y-8">
@@ -502,6 +447,54 @@ const SettingsModule = ({ userData, updateUser }) => {
                     </div>
 
                     <div className="space-y-6">
+                        {/* Global Visibility */}
+                        <div className="bg-black/40 border border-white/5 rounded-xl p-4">
+                            <h4 className="text-sm font-bold text-white mb-4">Global Visibility</h4>
+                             <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500">
+                                            <Trophy className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-bold text-white">Show Level & XP</div>
+                                            <div className="text-[10px] text-neutral-500">Visible to guests in header</div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setLocalData({
+                                            ...localData,
+                                            gameplaySettings: { ...localData.gameplaySettings, publicXP: !localData.gameplaySettings.publicXP }
+                                        })}
+                                        className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${localData.gameplaySettings.publicXP ? 'bg-blue-600' : 'bg-neutral-700'}`}
+                                    >
+                                        <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${localData.gameplaySettings.publicXP ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500">
+                                            <Coins className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-bold text-white">Show Balance</div>
+                                            <div className="text-[10px] text-neutral-500">Visible to guests in header</div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setLocalData({
+                                            ...localData,
+                                            gameplaySettings: { ...localData.gameplaySettings, publicCoins: !localData.gameplaySettings.publicCoins }
+                                        })}
+                                        className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${localData.gameplaySettings.publicCoins ? 'bg-blue-600' : 'bg-neutral-700'}`}
+                                    >
+                                        <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${localData.gameplaySettings.publicCoins ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+                             </div>
+                        </div>
+
                         {[
                             {
                                 id: 'career', label: 'Career & Portfolio',
@@ -750,7 +743,7 @@ const SettingsModule = ({ userData, updateUser }) => {
                 <button
                     onClick={handleSave}
                     className="w-full md:w-auto px-8 py-3 bg-white text-black hover:bg-neutral-200 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2"
-                    style={{ backgroundColor: localData.themeColor, color: '#fff' }}
+                    style={{ backgroundColor: localData.themeColor || '#fff', color: localData.themeColor ? '#fff' : '#000' }}
                 >
                     <Save className="w-4 h-4" /> Save Changes
                 </button>
@@ -762,7 +755,7 @@ const SettingsModule = ({ userData, updateUser }) => {
         { id: 'profile', label: 'Profile Settings', icon: User, desc: 'Personal info, identity & bio' },
         { id: 'appearance', label: 'Appearance', icon: Palette, desc: 'Theme, colors & layout' },
         { id: 'integrations', label: 'Integrations', icon: Sliders, desc: 'Connect external services' },
-        { id: 'system', label: 'System & Data', icon: HardDrive, desc: 'Database migration & storage' },
+
         { id: 'privacy', label: 'Privacy Control', icon: Lock, desc: 'Manage public visibility' },
         { id: 'gameplay', label: 'Gameplay & Modules', icon: CheckCircle2, desc: 'XP, Rewards & Module Visibility' }
     ];

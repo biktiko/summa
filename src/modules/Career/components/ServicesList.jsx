@@ -13,7 +13,7 @@ const ServicesList = ({ services, actions, viewMode, isSectionHidden, toggleSect
         <div className={`space-y-6 ${isSectionHidden ? 'opacity-50' : ''}`}>
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-400">Services Protocols</h3>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-400">🛠️ Services</h3>
                     {viewMode === 'admin' && isSectionHidden && (
                         <span className="text-[9px] font-bold text-red-500 uppercase border border-red-900/50 px-2 py-0.5 rounded bg-red-900/20">Hidden Section</span>
                     )}

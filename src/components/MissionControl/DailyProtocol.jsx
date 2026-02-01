@@ -329,10 +329,10 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
     if (isSectionHidden && viewMode !== 'admin') return null;
 
     return (
-        <div className={`h-full flex flex-col ${isSectionHidden ? 'opacity-50 grayscale' : ''}`}>
+        <div className={`h-full flex flex-col`}>
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div>
-                    <h3 className="text-xl font-black text-white uppercase tracking-wider">Routines</h3>
+                    <h3 className="text-xl font-black text-white uppercase tracking-wider">🔄 Routines</h3>
                     <p className="text-xs text-neutral-500 font-mono">Daily Operations & Habits</p>
                 </div>
                 {viewMode === 'admin' && (
