@@ -505,10 +505,7 @@ const ArchitectModule = ({
             ) : activeView === 'tasks' ? (
                 <div className="flex-1 min-h-[600px] flex flex-col">
                     {/* Mission Control Tabs */}
-                    <div className="flex justify-between items-end mb-8 border-b border-white/5 pb-1">
-                        <div className="flex items-center gap-4 border-r border-white/10 pr-6 mr-6">
-                             <h2 className="text-xl font-black uppercase tracking-tighter text-neutral-500">Career Mission Controls</h2>
-                        </div>
+                    <div className="flex justify-between items-end mb-8 border-b border-white/5 pb-1 overflow-x-auto">
                         <div className="flex items-center gap-6">
                         <button
                             onClick={() => setMissionTab('protocol')}

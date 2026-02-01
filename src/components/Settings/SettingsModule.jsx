@@ -28,6 +28,7 @@ const SettingsModule = ({ userData, updateUser }) => {
     const [usernameInput, setUsernameInput] = useState(userData.username || '');
     const [isCheckingUsername, setIsCheckingUsername] = useState(false);
     const [usernameStatus, setUsernameStatus] = useState(userData.username ? 'current' : 'idle'); // 'idle', 'checking', 'available', 'taken', 'current'
+    const [isSaved, setIsSaved] = useState(false);
 
     const [localData, setLocalData] = useState({
         // Profile
@@ -68,7 +69,8 @@ const SettingsModule = ({ userData, updateUser }) => {
 
     const handleSave = () => {
         updateUser(localData);
-        // Maybe show a toast
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 2000);
     };
 
     const handleAvatarChange = (e) => {
@@ -186,21 +188,23 @@ const SettingsModule = ({ userData, updateUser }) => {
                         <div className="flex-1 space-y-6 w-full">
                             <div className="space-y-1">
                                 <label className="text-[10px] text-neutral-400 font-bold uppercase">Username / Handle</label>
-                                <div className="flex gap-2">
-                                    <div className="flex items-center px-3 bg-white/5 border border-white/10 rounded-lg text-sm text-neutral-500">@</div>
-                                    <input
-                                        value={usernameInput}
-                                        onChange={e => {
-                                            setUsernameInput(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''));
-                                            setUsernameStatus('idle');
-                                        }}
-                                        className={`flex-1 bg-black/40 border rounded-lg p-3 text-sm text-white focus:outline-none transition-all ${usernameStatus === 'taken' ? 'border-red-500/50 focus:border-red-500' : usernameStatus === 'available' ? 'border-green-500/50 focus:border-green-500' : 'border-white/10 focus:border-blue-500/50'}`}
-                                        placeholder="unique_username"
-                                    />
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <div className="flex gap-2 flex-1">
+                                        <div className="flex items-center px-3 bg-white/5 border border-white/10 rounded-lg text-sm text-neutral-500">@</div>
+                                        <input
+                                            value={usernameInput}
+                                            onChange={e => {
+                                                setUsernameInput(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''));
+                                                setUsernameStatus('idle');
+                                            }}
+                                            className={`flex-1 bg-black/40 border rounded-lg p-3 text-sm text-white focus:outline-none transition-all ${usernameStatus === 'taken' ? 'border-red-500/50 focus:border-red-500' : usernameStatus === 'available' ? 'border-green-500/50 focus:border-green-500' : 'border-white/10 focus:border-blue-500/50'}`}
+                                            placeholder="unique_username"
+                                        />
+                                    </div>
                                     <button
                                         onClick={usernameStatus === 'available' ? handleConfirmUsername : handleCheckUsername}
                                         disabled={isCheckingUsername || usernameStatus === 'current' || usernameStatus === 'taken' || !usernameInput}
-                                        className={`px-4 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${usernameStatus === 'available' ? 'bg-green-600 text-white hover:bg-green-500 shadow-lg shadow-green-900/20' : usernameStatus === 'taken' ? 'bg-red-900/20 text-red-500 border border-red-500/30 cursor-not-allowed' : usernameStatus === 'current' ? 'bg-white/5 text-neutral-500 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/20'}`}
+                                        className={`px-4 py-3 sm:py-0 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 w-full sm:w-auto ${usernameStatus === 'available' ? 'bg-green-600 text-white hover:bg-green-500 shadow-lg shadow-green-900/20' : usernameStatus === 'taken' ? 'bg-red-900/20 text-red-500 border border-red-500/30 cursor-not-allowed' : usernameStatus === 'current' ? 'bg-white/10 text-neutral-400 cursor-default border border-white/5' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/20'}`}
                                     >
                                         {isCheckingUsername ? <Loader2 className="w-4 h-4 animate-spin" /> :
                                             usernameStatus === 'available' ? <><Check className="w-4 h-4" /> Claim</> :
@@ -742,10 +746,12 @@ const SettingsModule = ({ userData, updateUser }) => {
             <div className="flex justify-end pt-4 border-t border-white/5 sticky bottom-0 bg-[#0A0A0A]/95 p-4 backdrop-blur-md -mx-4 -mb-4 mt-8 z-10 border-t border-white/10">
                 <button
                     onClick={handleSave}
-                    className="w-full md:w-auto px-8 py-3 bg-white text-black hover:bg-neutral-200 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2"
-                    style={{ backgroundColor: localData.themeColor || '#fff', color: localData.themeColor ? '#fff' : '#000' }}
+                    disabled={isSaved}
+                    className={`w-full md:w-auto px-8 py-3 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2 ${isSaved ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                    style={{ backgroundColor: isSaved ? undefined : (localData.themeColor || '#3b82f6') }}
                 >
-                    <Save className="w-4 h-4" /> Save Changes
+                    {isSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                    {isSaved ? 'Saved!' : 'Save Changes'}
                 </button>
             </div>
         </div>
