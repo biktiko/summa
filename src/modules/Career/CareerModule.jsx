@@ -376,26 +376,26 @@ const ArchitectModule = ({
                     </p>
                 </div>
 
-                <div className="flex items-center gap-4 self-start md:self-auto ml-auto">
+                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto mt-4 md:mt-0 md:ml-auto">
                     {/* Sub-Navigation */}
-                    <div className="flex bg-neutral-900/50 p-1 rounded-lg border border-white/5 overflow-x-auto">
-                        <button onClick={() => setActiveView('profile')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'profile' ? 'bg-blue-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}>
+                    <div className="flex bg-neutral-900/50 p-1 rounded-lg border border-white/5 overflow-x-auto no-scrollbar">
+                        <button onClick={() => setActiveView('profile')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'profile' ? 'bg-blue-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}>
                             <LayoutDashboard className="w-3 h-3" /> Portfolio
                         </button>
                         {(viewMode === 'admin' || isSectionVisible('tasks') || isSectionVisible('goals') || isSectionVisible('protocol')) && (
-                            <button onClick={() => setActiveView('tasks')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'tasks' ? 'bg-blue-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}>
+                            <button onClick={() => setActiveView('tasks')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'tasks' ? 'bg-blue-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}>
                                 <CheckSquare className="w-3 h-3" /> Tasks
                             </button>
                         )}
                         {(viewMode === 'admin' || isSectionVisible('notes')) && (
-                            <button onClick={() => setActiveView('notes')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'notes' ? 'bg-blue-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}>
+                            <button onClick={() => setActiveView('notes')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'notes' ? 'bg-blue-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}>
                                 <StickyNote className="w-3 h-3" /> Notes
                             </button>
                         )}
                     </div>
                 
                     {viewMode === 'admin' && (
-                         <button onClick={() => setActiveView('settings')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'settings' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-white'}`}>
+                         <button onClick={() => setActiveView('settings')} className={`flex items-center justify-center gap-2 px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'settings' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-white bg-neutral-900/50 border border-white/5 md:border-transparent md:bg-transparent'}`}>
                             <Settings className="w-3 h-3" /> Configure
                         </button>
                     )}
