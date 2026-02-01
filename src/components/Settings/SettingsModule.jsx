@@ -46,8 +46,7 @@ const SettingsModule = ({ userData, updateUser }) => {
         // themeColor: userData.themeColor || '#3b82f6',
         backgroundColor: userData.backgroundColor || '#020202',
         themePreset: userData.themePreset || 'custom',
-
-
+        swipeMode: userData.swipeMode || 'modules', // 'modules', 'internal', 'sections'
 
         // Privacy
         modulePrivacy: userData.modulePrivacy || {},
@@ -318,6 +317,34 @@ const SettingsModule = ({ userData, updateUser }) => {
             {activeTab === 'appearance' && (
                 <div className="space-y-10">
                     {/* Presets */}
+                    {/* Swipe Logic Setting */}
+                    <div>
+                        <h3 className="text-sm font-bold text-white mb-4">Swipe Logic</h3>
+                        <div className="space-y-3">
+                            {[
+                                { id: 'modules', label: 'Switch Modules', desc: 'Swipe Left/Right to switch between Career, Finance, Health.' },
+                                { id: 'internal', label: 'Internal Navigation', desc: 'Swipe to switch between Portfolio, Tasks, Notes within a module.' },
+                                { id: 'sections', label: 'Section Windows', desc: 'Swipe to switch between Routine, Mission Tasks, and Goals in the Task view.' }
+                            ].map((mode) => (
+                                <button
+                                    key={mode.id}
+                                    onClick={() => setLocalData({ ...localData, swipeMode: mode.id })}
+                                    className={`w-full text-left p-4 rounded-xl border transition-all flex items-center gap-4 ${localData.swipeMode === mode.id ? 'bg-white/10 border-blue-500' : 'bg-transparent border-white/10 hover:border-white/30'}`}
+                                >
+                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${localData.swipeMode === mode.id ? 'border-blue-500' : 'border-neutral-500'}`}>
+                                        {localData.swipeMode === mode.id && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
+                                    </div>
+                                    <div>
+                                        <div className={`text-sm font-bold ${localData.swipeMode === mode.id ? 'text-white' : 'text-neutral-400'}`}>{mode.label}</div>
+                                        <div className="text-[10px] text-neutral-500">{mode.desc}</div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <hr className="border-white/5" />
+
                     <div>
                         <h3 className="text-sm font-bold text-white mb-4">Theme Presets</h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -384,6 +411,8 @@ const SettingsModule = ({ userData, updateUser }) => {
                             </div>
                         </div>
                     </div>
+
+
                 </div>
             )}
 

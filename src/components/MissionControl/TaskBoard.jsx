@@ -48,7 +48,10 @@ const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit,
     return (
         <div className={`group bg-black/40 border border-white/5 p-4 rounded-xl hover:border-blue-500/30 transition-all relative ${task.isHidden ? 'opacity-60 border-red-900/30' : ''}`}>
             {editingId === task.id ? (
-                <div className="space-y-4 z-10 relative bg-neutral-900/90 p-4 rounded-lg border border-blue-500/30 max-w-[85vw] md:max-w-none overflow-x-hidden">
+                <div className="space-y-4 z-20 relative bg-[#0A0A0A] p-4 rounded-lg border border-blue-500/30 w-full max-h-[75vh] overflow-y-auto custom-scrollbar shadow-2xl">
+                    <div className="sticky top-0 bg-[#0A0A0A] z-10 pb-2 border-b border-white/5 mb-4">
+                        <h4 className="text-xs font-black uppercase tracking-widest text-blue-500">Edit Mission</h4>
+                    </div>
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Task Title</label>
                         <input
@@ -437,7 +440,15 @@ const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit,
 
 const StatusColumn = ({ title, status, color, moduleTasks, viewMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings }) => {
     const [page, setPage] = useState(0);
-    const TASKS_PER_PAGE = 6;
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const TASKS_PER_PAGE = isMobile ? 4 : 6;
 
     const filteredTasks = moduleTasks.filter(t => t.status === status);
     const totalPages = Math.ceil(filteredTasks.length / TASKS_PER_PAGE);
@@ -496,7 +507,7 @@ const StatusColumn = ({ title, status, color, moduleTasks, viewMode, editingId, 
 
 const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings }) => {
     // Filter tasks for this specific module
-    const [filters, setFilters] = useState({ tags: [], priority: '' });
+    const [filters, setFilters] = useState({ tags: [], priority: '', dateStart: '', dateEnd: '' });
     const [isPriorityOpen, setIsPriorityOpen] = useState(false);
     const [isTagsOpen, setIsTagsOpen] = useState(false);
 
@@ -506,6 +517,22 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
     const moduleTasks = tasks.filter(t => {
         if (t.moduleId !== moduleId) return false;
         if (filters.priority && t.priority !== filters.priority) return false;
+        
+        // Date Filter
+        if (filters.dateStart || filters.dateEnd) {
+            if (!t.deadline) return false; // If no deadline, it doesn't match a date range
+            const taskDate = new Date(t.deadline).setHours(0,0,0,0);
+            
+            if (filters.dateStart) {
+                const startDate = new Date(filters.dateStart).setHours(0,0,0,0);
+                if (taskDate < startDate) return false;
+            }
+            if (filters.dateEnd) {
+                const endDate = new Date(filters.dateEnd).setHours(0,0,0,0);
+                if (taskDate > endDate) return false;
+            }
+        }
+
         if (filters.tags.length > 0) {
             if (!t.tags) return false;
             // Check if task has ANY of the selected tags
@@ -528,6 +555,9 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
     const [isCalendarConnected, setIsCalendarConnected] = useState(false);
     const [userEmail, setUserEmail] = useState('');
     const [guestEmail, setGuestEmail] = useState(localStorage.getItem('calendar_guest_email') || '');
+
+    // Mobile Column View State
+    const [mobileColumnView, setMobileColumnView] = useState('todo'); // 'todo', 'in_progress', 'done', 'backlog'
 
     useEffect(() => {
         const init = async () => {
@@ -791,40 +821,13 @@ Link: ${editData.link || 'None'}
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-black uppercase tracking-tighter text-white">Mission Control</h2>
-                    {viewMode === 'admin' && isSectionHidden && (
-                        <span className="text-[9px] font-bold text-red-500 uppercase border border-red-900/50 px-2 py-0.5 rounded bg-red-900/20">Hidden Section</span>
-                    )}
+                    {/* Header Removed as per request */}
+
                 </div>
 
                 <div className="flex items-center gap-4 flex-wrap md:flex-nowrap">
                     {/* Calendar Connect Button */}
-                    {viewMode === 'admin' && (
-                        <div className="flex items-center gap-2 bg-neutral-900/50 p-1 rounded-lg border border-white/5">
-                            {!isCalendarConnected ? (
-                                <button
-                                    onClick={connectCalendar}
-                                    className="p-2 text-neutral-400 hover:text-white transition-colors"
-                                    title="Connect Google Calendar"
-                                >
-                                    <CalendarIcon className="w-4 h-4" />
-                                </button>
-                            ) : (
-                                <a
-                                    href="https://calendar.google.com"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg group transition-all hover:bg-green-500/20"
-                                >
-                                    <CalendarIcon className="w-3 h-3 text-green-500" />
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-bold text-green-500 uppercase tracking-wider group-hover:underline">Open Calendar</span>
-                                        {userEmail && <span className="text-[8px] text-neutral-500 hidden sm:inline">{userEmail}</span>}
-                                    </div>
-                                </a>
-                            )}
-                        </div>
-                    )}
+
 
                     {/* Filters */}
                     <div className="flex items-center gap-2 bg-neutral-900/50 p-1 rounded-lg border border-white/5 relative z-20">
@@ -892,6 +895,30 @@ Link: ${editData.link || 'None'}
                                     )}
                                 </div>
                             )}
+                        </div>
+
+                        {/* Date Filter */}
+                        <div className="flex items-center gap-1 border-l border-white/5 pl-2 ml-1">
+                             <input 
+                                type="date"
+                                className="bg-transparent text-[10px] text-neutral-400 focus:text-white outline-none w-20 md:w-auto"
+                                value={filters.dateStart}
+                                onChange={(e) => setFilters({ ...filters, dateStart: e.target.value })}
+                                placeholder="From"
+                             />
+                             <span className="text-neutral-600">-</span>
+                             <input 
+                                type="date"
+                                className="bg-transparent text-[10px] text-neutral-400 focus:text-white outline-none w-20 md:w-auto"
+                                value={filters.dateEnd}
+                                onChange={(e) => setFilters({ ...filters, dateEnd: e.target.value })}
+                                placeholder="To"
+                             />
+                             {(filters.dateStart || filters.dateEnd) && (
+                                 <button onClick={() => setFilters({ ...filters, dateStart: '', dateEnd: '' })} className="hover:text-red-500 text-neutral-600">
+                                     <X className="w-3 h-3" />
+                                 </button>
+                             )}
                         </div>
                     </div>
 
@@ -1097,7 +1124,7 @@ Link: ${editData.link || 'None'}
                         </div>
 
                         {/* Progress Fields for New Task - Using Grid to fix Unit overflow */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Target Value</label>
                                 <input
@@ -1154,60 +1181,93 @@ Link: ${editData.link || 'None'}
                 )
             }
 
-            {/* Board Columns */}
+            {/* Board Columns - Mobile Navigation & Desktop Grid */}
             <div className="flex-1 pb-4 mb-8">
+                {/* Mobile View Selector */}
+                <div className="md:hidden flex items-center justify-between bg-neutral-900/50 p-1.5 rounded-xl border border-white/5 mb-4">
+                    <button
+                        onClick={() => setMobileColumnView('todo')}
+                        className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${mobileColumnView === 'todo' ? 'bg-blue-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+                    >
+                        To Do
+                    </button>
+                    <button
+                        onClick={() => setMobileColumnView('in_progress')}
+                        className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${mobileColumnView === 'in_progress' ? 'bg-yellow-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+                    >
+                        In Progress
+                    </button>
+                    <button
+                        onClick={() => setMobileColumnView('done')}
+                        className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${mobileColumnView === 'done' ? 'bg-green-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+                    >
+                        Done
+                    </button>
+                </div>
+
                 <div className="flex flex-col md:flex-row gap-6">
-                    <StatusColumn
-                        title="To Do"
-                        status="todo"
-                        color="blue"
-                        moduleTasks={moduleTasks}
-                        viewMode={viewMode}
-                        editingId={editingId}
-                        editData={editData}
-                        setEditData={setEditData}
-                        startEdit={startEdit}
-                        saveEdit={saveEdit}
-                        setEditingId={setEditingId}
-                        updateStatus={updateStatus}
-                        deleteTaskId={deleteTaskId}
-                        toggleSubtask={toggleSubtask}
-                        settings={settings}
-                    />
-                    <StatusColumn
-                        title="In Progress"
-                        status="in_progress"
-                        color="yellow"
-                        moduleTasks={moduleTasks}
-                        viewMode={viewMode}
-                        editingId={editingId}
-                        editData={editData}
-                        setEditData={setEditData}
-                        startEdit={startEdit}
-                        saveEdit={saveEdit}
-                        setEditingId={setEditingId}
-                        updateStatus={updateStatus}
-                        deleteTaskId={deleteTaskId}
-                        toggleSubtask={toggleSubtask}
-                        settings={settings}
-                    />
-                    <StatusColumn
-                        title="Done"
-                        status="done"
-                        color="green"
-                        moduleTasks={moduleTasks}
-                        viewMode={viewMode}
-                        editingId={editingId}
-                        editData={editData}
-                        setEditData={setEditData}
-                        startEdit={startEdit}
-                        saveEdit={saveEdit}
-                        setEditingId={setEditingId}
-                        updateStatus={updateStatus}
-                        deleteTaskId={deleteTaskId}
-                        toggleSubtask={toggleSubtask}
-                        settings={settings}
-                    />
+                    {/* To Do Column */}
+                    <div className={`${mobileColumnView === 'todo' ? 'block' : 'hidden'} md:block flex-1`}>
+                        <StatusColumn
+                            title="To Do"
+                            status="todo"
+                            color="blue"
+                            moduleTasks={moduleTasks}
+                            viewMode={viewMode}
+                            editingId={editingId}
+                            editData={editData}
+                            setEditData={setEditData}
+                            startEdit={startEdit}
+                            saveEdit={saveEdit}
+                            setEditingId={setEditingId}
+                            updateStatus={updateStatus}
+                            deleteTaskId={deleteTaskId}
+                            toggleSubtask={toggleSubtask}
+                            settings={settings}
+                        />
+                    </div>
+
+                    {/* In Progress Column */}
+                    <div className={`${mobileColumnView === 'in_progress' ? 'block' : 'hidden'} md:block flex-1`}>
+                         <StatusColumn
+                            title="In Progress"
+                            status="in_progress"
+                            color="yellow"
+                            moduleTasks={moduleTasks}
+                            viewMode={viewMode}
+                            editingId={editingId}
+                            editData={editData}
+                            setEditData={setEditData}
+                            startEdit={startEdit}
+                            saveEdit={saveEdit}
+                            setEditingId={setEditingId}
+                            updateStatus={updateStatus}
+                            deleteTaskId={deleteTaskId}
+                            toggleSubtask={toggleSubtask}
+                            settings={settings}
+                        />
+                    </div>
+
+                    {/* Done Column */}
+                    <div className={`${mobileColumnView === 'done' ? 'block' : 'hidden'} md:block flex-1`}>
+                        <StatusColumn
+                            title="Done"
+                            status="done"
+                            color="green"
+                            moduleTasks={moduleTasks}
+                            viewMode={viewMode}
+                            editingId={editingId}
+                            editData={editData}
+                            setEditData={setEditData}
+                            startEdit={startEdit}
+                            saveEdit={saveEdit}
+                            setEditingId={setEditingId}
+                            updateStatus={updateStatus}
+                            deleteTaskId={deleteTaskId}
+                            toggleSubtask={toggleSubtask}
+                            settings={settings}
+                        />
+                    </div>
                 </div>
             </div>
 

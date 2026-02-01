@@ -101,20 +101,77 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
     const isRightSwipe = distance < -50;
 
     if (isLeftSwipe || isRightSwipe) {       
-       const currentIndex = visibleModules.findIndex(m => m.id === activeTabId);
-       if (currentIndex === -1) return;
+        // Get Swipe Mode
+        const swipeMode = userData?.swipeMode || 'modules'; // 'modules', 'internal', 'sections'
+        
+        console.log("Swipe Mode Detected:", swipeMode); // For Debugging
 
-       if (isLeftSwipe) {
-          if (currentIndex < visibleModules.length - 1) {
-             handleModuleChange(visibleModules[currentIndex + 1].id);
-          }
-       }
-       
-       if (isRightSwipe) {
-          if (currentIndex > 0) {
-             handleModuleChange(visibleModules[currentIndex - 1].id);
-          }
-       }
+        // --- MODE 1: SWITCH MODULES ---
+        if (swipeMode === 'modules') {
+            const currentIndex = visibleModules.findIndex(m => m.id === activeTabId);
+            if (currentIndex === -1) return;
+
+            if (isLeftSwipe) {
+                if (currentIndex < visibleModules.length - 1) {
+                    handleModuleChange(visibleModules[currentIndex + 1].id);
+                }
+            }
+            if (isRightSwipe) {
+                if (currentIndex > 0) {
+                    handleModuleChange(visibleModules[currentIndex - 1].id);
+                }
+            }
+            return;
+        }
+
+        // --- MODE 2: INTERNAL NAVIGATION (Views) ---
+        if (swipeMode === 'internal') {
+            // Define internal view structure for each module
+            const viewMaps = {
+                career: ['profile', 'tasks', 'notes', ...(viewMode === 'admin' ? ['settings'] : [])],
+                finance: ['dashboard', 'tasks', 'notes'],
+                health: ['dashboard', 'tasks', 'notes'],
+                network: ['dashboard'] // Assuming network is simple for now
+            };
+
+            const currentViews = viewMaps[activeTabId] || [];
+            if (currentViews.length === 0) return;
+
+            const currentIndex = currentViews.indexOf(currentModuleView);
+            // If current view not found, possibly default to 0, but let's be safe
+            if (currentIndex === -1) return;
+
+            if (isLeftSwipe && currentIndex < currentViews.length - 1) {
+                setCurrentModuleView(currentViews[currentIndex + 1]);
+            } else if (isRightSwipe && currentIndex > 0) {
+                setCurrentModuleView(currentViews[currentIndex - 1]);
+            }
+            return;
+        }
+
+        // --- MODE 3: SECTIONS (Mission Tabs) ---
+        if (swipeMode === 'sections') {
+            // Only applies if we are in the 'tasks' view for most modules (or similar operative views)
+            if (currentModuleView === 'tasks') {
+                const tabs = ['protocol', 'missions', 'goals'];
+                const currentIndex = tabs.indexOf(activeTaskTab);
+                
+                if (currentIndex !== -1) {
+                    if (isLeftSwipe && currentIndex < tabs.length - 1) {
+                        setActiveTaskTab(tabs[currentIndex + 1]);
+                    } else if (isRightSwipe && currentIndex > 0) {
+                        setActiveTaskTab(tabs[currentIndex - 1]);
+                    }
+                }
+            }
+            // Add other specific section logic if needed (e.g. Health Dashboard Tabs)
+            else if (activeTabId === 'health' && currentModuleView === 'dashboard') {
+                // Health Dashboard has 'metrics' and 'telemetry' (internal state of HealthModule, not accessible here via activeTaskTab)
+                // Since statusTab is local state in HealthModule, we can't control it from App.jsx easily without lifting state.
+                // For now, we support the main Mission Control tabs which are lifted to App.jsx.
+            }
+            return;
+        }
     }
   }
 

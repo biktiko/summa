@@ -151,10 +151,19 @@ const ArchitectModule = ({
     userData,
     updateSkillLevel, addNewSkill, updateSkillDetails, deleteSkill, updateUserCv, updateUser,
     skillsActions, projectsActions, servicesActions, educationActions, experienceActions, languagesActions, achievementsActions, tasksActions, goalsActions, notesActions, protocolsActions,
-    processTask, viewMode
+    processTask, viewMode, activeView: propActiveView, setActiveView: propSetActiveView,
+    missionTab: propMissionTab, setMissionTab: propSetMissionTab
 }) => {
-    const [activeView, setActiveView] = useState('profile');
-    const [missionTab, setMissionTab] = useState('missions');
+    // If props are provided (from App.jsx), use them. Otherwise use local state (legacy/fallback).
+    const [localActiveView, setLocalActiveView] = useState('profile');
+    const activeView = propActiveView || localActiveView;
+    const setActiveView = propSetActiveView || setLocalActiveView;
+
+    const [localMissionTab, setLocalMissionTab] = useState('missions');
+    const missionTab = propMissionTab || localMissionTab;
+    const setMissionTab = propSetMissionTab || setLocalMissionTab;
+
+    const [profileTab, setProfileTab] = useState('dashboard');
     const [newPortfolioLink, setNewPortfolioLink] = useState({ name: '', url: '' });
     
     // Initialize order from userData or default
@@ -394,114 +403,135 @@ const ArchitectModule = ({
                         )}
                     </div>
                 
-                    {viewMode === 'admin' && (
-                         <button onClick={() => setActiveView('settings')} className={`flex items-center justify-center gap-2 px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'settings' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-white bg-neutral-900/50 border border-white/5 md:border-transparent md:bg-transparent'}`}>
-                            <Settings className="w-3 h-3" /> Configure
-                        </button>
-                    )}
+
                 </div>
             </div>
 
             {/* Content Area */}
+            {/* Content Area */}
             {activeView === 'profile' ? (
-                <div className="grid grid-cols-1 gap-8">
-                    <div className="space-y-16">
-                        {sectionOrder.map(section => {
-                            switch (section) {
-                                case 'about': return <AboutMeSection key="about" userData={userData} updateUser={updateUser} viewMode={viewMode} isSectionHidden={!isSectionVisible('about')} toggleSectionVisibility={() => toggleSectionVisibility('about')} />;
-                                case 'cv': return <div key="cv">{renderCVSection()}</div>;
-                                case 'experience':
-                                    return (
-                                        <ExperienceSection
-                                            key="experience"
-                                            items={userData.experience}
-                                            actions={experienceActions}
-                                            viewMode={viewMode}
-                                            isSectionHidden={!isSectionVisible('experience')}
-                                            toggleSectionVisibility={() => toggleSectionVisibility('experience')}
-                                        />
-                                    );
-                                case 'skills':
-                                    return (userData.skills?.length > 0 || viewMode === 'admin') && (
-                                        <SkillTree
-                                            key="skills"
-                                            skills={userData.skills}
-                                            updateSkillLevel={updateSkillLevel}
-                                            addNewSkill={addNewSkill}
-                                            updateSkillDetails={updateSkillDetails}
-                                            deleteSkill={deleteSkill}
-                                            viewMode={viewMode}
-                                            isSectionHidden={!isSectionVisible('skills')}
-                                            toggleSectionVisibility={() => toggleSectionVisibility('skills')}
-                                        />
-                                    );
-                                case 'languages':
-                                    return (userData.languages?.length > 0 || viewMode === 'admin') && (
-                                        <LanguagesSection
-                                            key="languages"
-                                            items={userData.languages}
-                                            actions={languagesActions}
-                                            viewMode={viewMode}
-                                            isSectionHidden={!isSectionVisible('languages')}
-                                            toggleSectionVisibility={() => toggleSectionVisibility('languages')}
-                                        />
-                                    );
-                                case 'projects':
-                                    return (userData.projects?.length > 0 || viewMode === 'admin') && (
-                                        <ProjectForge
-                                            key="projects"
-                                            projects={userData.projects}
-                                            actions={projectsActions}
-                                            viewMode={viewMode}
-                                            isSectionHidden={!isSectionVisible('projects')}
-                                            toggleSectionVisibility={() => toggleSectionVisibility('projects')}
-                                        />
-                                    );
-                                case 'achievements':
-                                    return (userData.achievements?.length > 0 || viewMode === 'admin') && (
-                                         <AchievementsSection
-                                            key="achievements"
-                                            items={userData.achievements}
-                                            actions={achievementsActions}
-                                            viewMode={viewMode}
-                                            isSectionHidden={!isSectionVisible('achievements')}
-                                            toggleSectionVisibility={() => toggleSectionVisibility('achievements')}
-                                        />
-                                    );
-                                case 'services':
-                                    return (userData.services?.length > 0 || viewMode === 'admin') && (
-                                        <ServicesList
-                                            key="services"
-                                            services={userData.services}
-                                            actions={servicesActions}
-                                            viewMode={viewMode}
-                                            isSectionHidden={!isSectionVisible('services')}
-                                            toggleSectionVisibility={() => toggleSectionVisibility('services')}
-                                        />
-                                    );
-                                case 'education':
-                                    return (userData.education?.length > 0 || viewMode === 'admin') && (
-                                        <EducationSection
-                                            key="education"
-                                            items={userData.education}
-                                            actions={educationActions}
-                                            viewMode={viewMode}
-                                            isSectionHidden={!isSectionVisible('education')}
-                                            toggleSectionVisibility={() => toggleSectionVisibility('education')}
-                                        />
-                                    );
-                                default: return null;
-                            }
-                        })}
-                    </div>
+                <div className="flex flex-col h-full">
+                     {/* Profile Sub-Navigation */}
+                     {viewMode === 'admin' && (
+                        <div className="flex items-center gap-6 mb-8 border-b border-white/5 pb-1">
+                             <button
+                                 onClick={() => setProfileTab('dashboard')}
+                                 className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${profileTab === 'dashboard' ? 'text-blue-500' : 'text-neutral-500 hover:text-white'}`}
+                             >
+                                 Dashboard
+                                 {profileTab === 'dashboard' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 rounded-t-full" />}
+                             </button>
+                             <button
+                                 onClick={() => setProfileTab('settings')}
+                                 className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${profileTab === 'settings' ? 'text-neutral-200' : 'text-neutral-500 hover:text-white'}`}
+                             >
+                                 Settings
+                                 {profileTab === 'settings' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-neutral-200 rounded-t-full" />}
+                             </button>
+                        </div>
+                     )}
+
+                    {profileTab === 'dashboard' ? (
+                        <div className="grid grid-cols-1 gap-8 animate-in fade-in duration-500">
+                             <div className="space-y-16">
+                                {sectionOrder.map(section => {
+                                    switch (section) {
+                                        case 'about': return <AboutMeSection key="about" userData={userData} updateUser={updateUser} viewMode={viewMode} isSectionHidden={!isSectionVisible('about')} toggleSectionVisibility={() => toggleSectionVisibility('about')} />;
+                                        case 'cv': return <div key="cv">{renderCVSection()}</div>;
+                                        case 'experience':
+                                            return (
+                                                <ExperienceSection
+                                                    key="experience"
+                                                    items={userData.experience}
+                                                    actions={experienceActions}
+                                                    viewMode={viewMode}
+                                                    isSectionHidden={!isSectionVisible('experience')}
+                                                    toggleSectionVisibility={() => toggleSectionVisibility('experience')}
+                                                />
+                                            );
+                                        case 'skills':
+                                            return (userData.skills?.length > 0 || viewMode === 'admin') && (
+                                                <SkillTree
+                                                    key="skills"
+                                                    skills={userData.skills}
+                                                    updateSkillLevel={updateSkillLevel}
+                                                    addNewSkill={addNewSkill}
+                                                    updateSkillDetails={updateSkillDetails}
+                                                    deleteSkill={deleteSkill}
+                                                    viewMode={viewMode}
+                                                    isSectionHidden={!isSectionVisible('skills')}
+                                                    toggleSectionVisibility={() => toggleSectionVisibility('skills')}
+                                                />
+                                            );
+                                        case 'languages':
+                                            return (userData.languages?.length > 0 || viewMode === 'admin') && (
+                                                <LanguagesSection
+                                                    key="languages"
+                                                    items={userData.languages}
+                                                    actions={languagesActions}
+                                                    viewMode={viewMode}
+                                                    isSectionHidden={!isSectionVisible('languages')}
+                                                    toggleSectionVisibility={() => toggleSectionVisibility('languages')}
+                                                />
+                                            );
+                                        case 'projects':
+                                            return (userData.projects?.length > 0 || viewMode === 'admin') && (
+                                                <ProjectForge
+                                                    key="projects"
+                                                    projects={userData.projects}
+                                                    actions={projectsActions}
+                                                    viewMode={viewMode}
+                                                    isSectionHidden={!isSectionVisible('projects')}
+                                                    toggleSectionVisibility={() => toggleSectionVisibility('projects')}
+                                                />
+                                            );
+                                        case 'achievements':
+                                            return (userData.achievements?.length > 0 || viewMode === 'admin') && (
+                                                 <AchievementsSection
+                                                    key="achievements"
+                                                    items={userData.achievements}
+                                                    actions={achievementsActions}
+                                                    viewMode={viewMode}
+                                                    isSectionHidden={!isSectionVisible('achievements')}
+                                                    toggleSectionVisibility={() => toggleSectionVisibility('achievements')}
+                                                />
+                                            );
+                                        case 'services':
+                                            return (userData.services?.length > 0 || viewMode === 'admin') && (
+                                                <ServicesList
+                                                    key="services"
+                                                    services={userData.services}
+                                                    actions={servicesActions}
+                                                    viewMode={viewMode}
+                                                    isSectionHidden={!isSectionVisible('services')}
+                                                    toggleSectionVisibility={() => toggleSectionVisibility('services')}
+                                                />
+                                            );
+                                        case 'education':
+                                            return (userData.education?.length > 0 || viewMode === 'admin') && (
+                                                <EducationSection
+                                                    key="education"
+                                                    items={userData.education}
+                                                    actions={educationActions}
+                                                    viewMode={viewMode}
+                                                    isSectionHidden={!isSectionVisible('education')}
+                                                    toggleSectionVisibility={() => toggleSectionVisibility('education')}
+                                                />
+                                            );
+                                        default: return null;
+                                    }
+                                })}
+                            </div>
+                        </div>
+                    ) : (
+                        <CareerSettings 
+                            sectionOrder={sectionOrder} 
+                            setSectionOrder={handleUpdateSectionOrder}
+                            isSectionVisible={isSectionVisible}
+                            toggleSectionVisibility={toggleSectionVisibility}
+                        />
+                    )}
                 </div>
-            ) : activeView === 'settings' ? (
-                <CareerSettings 
-                    sectionOrder={sectionOrder} 
-                    setSectionOrder={handleUpdateSectionOrder}
-                    isSectionVisible={isSectionVisible}
-                    toggleSectionVisibility={toggleSectionVisibility}
-                />
             ) : activeView === 'tasks' ? (
                 <div className="flex-1 min-h-[600px] flex flex-col">
                     {/* Mission Control Tabs */}
