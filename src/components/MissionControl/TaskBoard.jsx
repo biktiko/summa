@@ -510,6 +510,7 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
     const [filters, setFilters] = useState({ tags: [], priority: '', dateStart: '', dateEnd: '' });
     const [isPriorityOpen, setIsPriorityOpen] = useState(false);
     const [isTagsOpen, setIsTagsOpen] = useState(false);
+    const [isDateFilterOpen, setIsDateFilterOpen] = useState(false);
 
     // Get all unique tags from tasks
     const allTags = Array.from(new Set(tasks.flatMap(t => t.tags || []).map(t => t.text)));
@@ -830,13 +831,13 @@ Link: ${editData.link || 'None'}
 
 
                     {/* Filters */}
-                    <div className="flex items-center gap-2 bg-neutral-900/50 p-1 rounded-lg border border-white/5 relative z-20">
+                    <div className="flex flex-wrap items-center gap-2 bg-neutral-900/50 p-1 rounded-lg border border-white/5 relative z-20 max-w-full">
                         <Filter className="w-3 h-3 text-neutral-500 ml-2" />
 
                         {/* Priority Filter */}
                         <div className="relative">
                             <button
-                                onClick={() => { setIsPriorityOpen(!isPriorityOpen); setIsTagsOpen(false); }}
+                                onClick={() => { setIsPriorityOpen(!isPriorityOpen); setIsTagsOpen(false); setIsDateFilterOpen(false); }}
                                 className="flex items-center gap-1 text-[10px] text-neutral-300 hover:text-white px-2 py-1 rounded hover:bg-white/5 transition-colors"
                             >
                                 {filters.priority ? filters.priority.charAt(0).toUpperCase() + filters.priority.slice(1) : 'All Priorities'}
@@ -860,7 +861,7 @@ Link: ${editData.link || 'None'}
                         {/* Tags Filter */}
                         <div className="relative">
                             <button
-                                onClick={() => { setIsTagsOpen(!isTagsOpen); setIsPriorityOpen(false); }}
+                                onClick={() => { setIsTagsOpen(!isTagsOpen); setIsPriorityOpen(false); setIsDateFilterOpen(false); }}
                                 className="flex items-center gap-1 text-[10px] text-neutral-300 hover:text-white px-2 py-1 rounded hover:bg-white/5 transition-colors"
                             >
                                 {filters.tags.length > 0 ? `${filters.tags.length} Tags` : 'All Tags'}
@@ -898,27 +899,58 @@ Link: ${editData.link || 'None'}
                         </div>
 
                         {/* Date Filter */}
-                        <div className="flex items-center gap-1 border-l border-white/5 pl-2 ml-1">
-                             <input 
-                                type="date"
-                                className="bg-transparent text-[10px] text-neutral-400 focus:text-white outline-none w-20 md:w-auto"
-                                value={filters.dateStart}
-                                onChange={(e) => setFilters({ ...filters, dateStart: e.target.value })}
-                                placeholder="From"
-                             />
-                             <span className="text-neutral-600">-</span>
-                             <input 
-                                type="date"
-                                className="bg-transparent text-[10px] text-neutral-400 focus:text-white outline-none w-20 md:w-auto"
-                                value={filters.dateEnd}
-                                onChange={(e) => setFilters({ ...filters, dateEnd: e.target.value })}
-                                placeholder="To"
-                             />
-                             {(filters.dateStart || filters.dateEnd) && (
-                                 <button onClick={() => setFilters({ ...filters, dateStart: '', dateEnd: '' })} className="hover:text-red-500 text-neutral-600">
-                                     <X className="w-3 h-3" />
-                                 </button>
-                             )}
+                        {/* Date Filter */}
+                        <div className="w-px h-3 bg-white/10" />
+
+                        <div className="relative">
+                            <button
+                                onClick={() => { setIsDateFilterOpen(!isDateFilterOpen); setIsPriorityOpen(false); setIsTagsOpen(false); }}
+                                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded hover:bg-white/5 transition-colors ${filters.dateStart || filters.dateEnd ? 'text-blue-400 font-bold' : 'text-neutral-300 hover:text-white'}`}
+                            >
+                                <CalendarIcon className="w-3 h-3" />
+                                <span>{filters.dateStart || filters.dateEnd ? 'Date Range' : 'Dates'}</span>
+                                <ChevronDown className="w-3 h-3" />
+                            </button>
+
+                            {isDateFilterOpen && (
+                                <div className="absolute top-full right-0 mt-2 w-64 bg-[#0A0A0A] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50 p-3">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-3 flex items-center gap-2">
+                                        <Filter className="w-3 h-3 text-blue-500" /> Filter by Date
+                                    </h4>
+                                    
+                                    <div className="space-y-3">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider">From</label>
+                                                <input 
+                                                    type="date"
+                                                    className="w-full bg-neutral-900 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none focus:border-blue-500/50"
+                                                    value={filters.dateStart}
+                                                    onChange={(e) => setFilters({ ...filters, dateStart: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider">To</label>
+                                                <input 
+                                                    type="date"
+                                                    className="w-full bg-neutral-900 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none focus:border-blue-500/50"
+                                                    value={filters.dateEnd}
+                                                    onChange={(e) => setFilters({ ...filters, dateEnd: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {(filters.dateStart || filters.dateEnd) && (
+                                            <button 
+                                                onClick={() => { setFilters({ ...filters, dateStart: '', dateEnd: '' }); setIsDateFilterOpen(false); }}
+                                                className="w-full flex items-center justify-center gap-2 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all text-[10px] font-bold uppercase tracking-wider"
+                                            >
+                                                <X className="w-3 h-3" /> Clear Date Filter
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

@@ -256,15 +256,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
 
                 <div className="flex items-center gap-4 flex-wrap md:flex-nowrap">
                     {/* Calendar Connect Button */}
-                    {viewMode === 'admin' && !isCalendarConnected && (
-                        <button
-                            onClick={connectCalendar}
-                            className="p-2 bg-neutral-900/50 border border-white/5 rounded-lg text-neutral-400 hover:text-white transition-colors"
-                            title="Connect Google Calendar"
-                        >
-                            <CalendarIcon className="w-4 h-4" />
-                        </button>
-                    )}
+
 
                     {/* Filters */}
                     <div className="flex items-center gap-2 bg-neutral-900/50 p-1 rounded-lg border border-white/5 relative z-20">
