@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Target, CheckCircle2, Circle, Trash2, Edit2, X, Eye, EyeOff, Calendar, TrendingUp, Save, Link as LinkIcon, ListChecks, Zap, Coins, CheckSquare, Filter, ChevronDown, Calendar as CalendarIcon } from 'lucide-react';
-import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, updateEvent, deleteEvent } from '../../core/services/googleCalendar';
+import { addEventToCalendar, createEventObject, isSignedIn, initGoogleCalendar, updateEvent, deleteEvent } from '../../core/services/googleCalendar';
 
 const TAG_COLORS = [
     { name: 'Red', value: 'bg-red-500 text-white' },
@@ -37,22 +37,13 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
         init();
     }, []);
 
-    const connectCalendar = async () => {
-        try {
-            await signInToGoogle();
-            setIsCalendarConnected(true);
-        } catch (e) {
-            console.error("Sign in failed", e);
-            alert("Failed to connect Google Calendar.");
-        }
-    };
+    // Calendar init removed as it was unused in this scope or redundant
+
 
     // Filters
     const [filters, setFilters] = useState({ tags: [], status: '' });
     const [isStatusOpen, setIsStatusOpen] = useState(false);
     const [isTagsOpen, setIsTagsOpen] = useState(false);
-
-    if (viewMode === 'guest' && isSectionHidden) return null;
 
     // Filter and Sort Goals
     const filteredGoals = useMemo(() => {
@@ -73,7 +64,9 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
             if (a.status === b.status) return 0;
             return a.status === 'completed' ? 1 : -1;
         });
-    }, [goals, filters, viewMode]);
+    }, [goals, filters, viewMode, moduleId]);
+
+    if (viewMode === 'guest' && isSectionHidden) return null;
 
     // Get all unique tags
     const allTags = Array.from(new Set(goals.flatMap(g => g.tags || []).map(t => t.text)));
@@ -125,9 +118,29 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
         });
     };
 
+    const calculateProjectedRewards = (goal) => {
+        let xp = 200;
+        let coins = 5;
+
+        // Linked Tasks
+        const linkedCount = (goal.linkedTaskIdsString || '').split(',').filter(Boolean).length || (goal.linkedTaskIds || []).length;
+        xp += (linkedCount * 10);
+        
+        // Description
+        if (goal.description) xp += 10;
+        
+        // Link
+        if (goal.link) xp += 10;
+
+        return { xp, coins };
+    };
+
     const saveEdit = async () => {
+        const { xp, coins } = calculateProjectedRewards(editData);
         const updatedData = {
             ...editData,
+            xpReward: xp,
+            coinReward: coins,
             linkedTaskIds: (editData.linkedTaskIdsString || '').split(',').map(s => s.trim()).filter(Boolean)
         };
         delete updatedData.linkedTaskIdsString;
@@ -172,10 +185,33 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
 
     const toggleGoalCompletion = async (goal) => {
         const newStatus = goal.status === 'completed' ? 'active' : 'completed';
-        await actions.update(goal.id, { status: newStatus });
+        const updates = { status: newStatus };
 
-        if (newStatus === 'completed' && processTask) {
-            processTask(goal);
+        if (newStatus === 'completed') {
+             const { xp, coins } = calculateProjectedRewards(goal);
+             let finalXp = xp;
+             let finalCoins = coins;
+
+             if (goal.deadline) {
+                 const deadlineDate = new Date(goal.deadline);
+                 deadlineDate.setHours(23, 59, 59, 999);
+                 const now = new Date();
+                 
+                 if (now <= deadlineDate) {
+                     finalXp = finalXp * 2; // +100%
+                     finalCoins += 5;
+                 } else {
+                     finalXp = 0; // 0 XP penalty
+                     finalCoins -= 5;
+                 }
+             }
+             updates.xpReward = finalXp;
+             updates.coinReward = finalCoins;
+
+             await actions.update(goal.id, updates);
+             if (processTask) processTask({ ...goal, ...updates });
+        } else {
+            await actions.update(goal.id, updates);
         }
     };
 
@@ -241,7 +277,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
         <div className={`mb-12`}>
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-                <div className="flex items-center gap-3">
+                <div className="hidden md:flex items-center gap-3">
                     <div className="p-2 bg-yellow-500/10 rounded-lg">
                         <Target className="w-6 h-6 text-yellow-500" />
                     </div>
@@ -249,9 +285,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                         <h2 className="text-xl font-black uppercase tracking-tighter text-white">Strategic Goals</h2>
                         <p className="text-[10px] text-yellow-500/80 font-mono uppercase tracking-widest">Long-term Objectives</p>
                     </div>
-                    {viewMode === 'admin' && isSectionHidden && (
-                        <span className="text-[9px] font-bold text-red-500 uppercase border border-red-900/50 px-2 py-0.5 rounded bg-red-900/20">Hidden Section</span>
-                    )}
+
                 </div>
 
                 <div className="flex items-center gap-4 flex-wrap md:flex-nowrap">
@@ -436,22 +470,20 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-yellow-500 uppercase">XP Reward</label>
-                            <input
-                                type="number"
-                                className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-sm text-white focus:border-yellow-500 outline-none"
-                                value={newGoal.xpReward}
-                                onChange={e => setNewGoal({ ...newGoal, xpReward: e.target.value })}
-                            />
+                             <div className="relative">
+                                <span className="absolute left-2 top-2 text-[10px] text-neutral-500 font-bold">XP</span>
+                                <div className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 pl-8 text-sm text-blue-400 font-bold">
+                                    {calculateProjectedRewards(newGoal).xp}
+                                </div>
+                            </div>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-yellow-500 uppercase">Coin Reward</label>
-                            <input
-                                type="number"
-                                className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 text-sm text-white focus:border-yellow-500 outline-none"
-                                value={newGoal.coinReward}
-                                onChange={e => setNewGoal({ ...newGoal, coinReward: e.target.value })}
-                            />
+                            <div className="relative">
+                                <span className="absolute left-2 top-2 text-[10px] text-neutral-500 font-bold">G</span>
+                                <div className="w-full bg-black/60 border border-yellow-500/30 rounded-lg p-2 pl-8 text-sm text-yellow-400 font-bold">
+                                    {calculateProjectedRewards(newGoal).coins}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -605,21 +637,15 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
                                             <div className="grid grid-cols-2 gap-2">
                                                 <div className="space-y-1">
                                                     <label className="text-[9px] font-bold text-yellow-500 uppercase">XP</label>
-                                                    <input
-                                                        type="number"
-                                                        className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
-                                                        value={editData.xpReward}
-                                                        onChange={e => setEditData({ ...editData, xpReward: e.target.value })}
-                                                    />
+                                                    <div className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-blue-400 font-bold">
+                                                        {calculateProjectedRewards(editData).xp}
+                                                    </div>
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="text-[9px] font-bold text-yellow-500 uppercase">Coins</label>
-                                                    <input
-                                                        type="number"
-                                                        className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-white"
-                                                        value={editData.coinReward}
-                                                        onChange={e => setEditData({ ...editData, coinReward: e.target.value })}
-                                                    />
+                                                    <div className="w-full bg-black/60 border border-yellow-500/30 rounded p-2 text-xs text-yellow-400 font-bold">
+                                                        {calculateProjectedRewards(editData).coins}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

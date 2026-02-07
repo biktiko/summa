@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Routes, Route, useParams, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, useParams, Link } from 'react-router-dom';
 
 import {
   Trophy, User, Coins, Menu, X, LogOut, Edit2, CheckSquare, Sliders, UserCheck, Copy, ArrowRight, LayoutDashboard
@@ -19,7 +19,7 @@ import SettingsModule from './components/Settings/SettingsModule';
 // --- System Interface (The Shell) ---
 // This component handles the UI rendering for both Admin and Guest modes
 const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
-  const { userData, loading, totalXP, level, viewMode, toggleViewMode, updateUser } = system;
+  const { userData, loading, level, viewMode, toggleViewMode, xpProgressInLevel, xpRequiredForNextLevel } = system;
 
   // Filter Modules based on Privacy/Visibility
   const visibleModules = useMemo(() => {
@@ -42,15 +42,19 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
   const [activeTaskTab, setActiveTaskTab] = useState('missions');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Initialize Active Tab
+  // Initialize Active Tab - synced safely
   useEffect(() => {
     if (visibleModules.length > 0) {
         // If we are currently in settings, don't force redirect
         if (activeTabId === 'settings') return;
 
         // If current activeTabId is not in visible modules, switch to first visible
-        if (!activeTabId || !visibleModules.find(m => m.id === activeTabId)) {
-             setActiveTabId(visibleModules[0].id);
+        const isValid = visibleModules.find(m => m.id === activeTabId);
+        if (!activeTabId || !isValid) {
+             const timeoutId = setTimeout(() => {
+                 setActiveTabId(visibleModules[0].id);
+             }, 0);
+             return () => clearTimeout(timeoutId);
         }
     }
   }, [visibleModules, activeTabId]);
@@ -188,7 +192,14 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
   // Show Nav if more than 1 module
   const showDetailNav = visibleModules.length > 1;
 
-  const ActiveModule = (activeTabId === 'settings' ? SettingsModule : MODULES.find(m => m.id === activeTabId)?.component) || (() => <div className='p-8'>Module Not Found</div>);
+  let ActiveComponent = null;
+  if (activeTabId === 'settings') {
+      ActiveComponent = SettingsModule;
+  } else {
+      const activeModule = MODULES.find(m => m.id === activeTabId);
+      if (activeModule) ActiveComponent = activeModule.component;
+  }
+  
   const themeColor = userData?.themeColor || '#3b82f6';
   const backgroundColor = userData?.backgroundColor || '#020202';
   
@@ -202,100 +213,156 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
       '--theme-color': themeColor
     }}>
       {/* --- HUD Header --- */}
-      <header className="p-4 md:p-6 border-b border-white/5 bg-black/40 backdrop-blur-xl relative md:sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-
-          {/* User Profile */}
-          <div className="flex items-center gap-4 w-full md:w-auto">
-             {showDetailNav && (
-                <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="hidden md:block p-2 text-neutral-500 hover:text-white transition-colors"
-                >
-                <Menu className="w-6 h-6" />
-                </button>
-             )}
-            <div
-              className="w-12 h-12 rounded-lg flex items-center justify-center shadow-lg shrink-0 overflow-hidden relative"
-              style={{ backgroundColor: themeColor, boxShadow: `0 10px 15px -3px ${themeColor}40` }}
-            >
-              {userData?.avatar ? (
-                <img src={userData.avatar} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-6 h-6 text-white" />
+      <header className="p-2 md:px-6 md:py-4 border-b border-white/5 bg-black/40 backdrop-blur-xl relative top-0 z-50">
+        <div className="max-w-7xl mx-auto">
+          
+          {/* Mobile: Aesthetic Single Row */}
+          <div className="md:hidden flex items-center gap-3">
+            {/* Left: Name + Level */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="font-black uppercase tracking-tighter text-xs">{userData?.firstName || displayName}</span>
+              {!isGuest && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ color: themeColor, backgroundColor: `${themeColor}15` }}>
+                  {level}
+                </span>
               )}
             </div>
-            <div>
-              <h1 className="text-lg font-black uppercase tracking-tighter leading-none mb-1 flex items-center gap-2">
-                {displayName}
-              </h1>
-              <div className="text-[8px] text-neutral-500 font-bold uppercase tracking-widest flex items-center gap-2 flex-wrap">
-                {!isGuest && (
-                    <>
-                        <span style={{ color: themeColor }}>Architect LVL {level}</span>
-                        <span className="w-1 h-1 bg-neutral-800 rounded-full"></span>
-                    </>
-                )}
-                <span>{isGuest ? 'GUEST VIEW' : 'Status: Online'}</span>
-                {!isGuest && (
-                    <button
-                    onClick={toggleViewMode}
-                    className={`ml-2 px-2 py-0.5 rounded border text-[8px] transition-all ${viewMode === 'admin' ? 'bg-red-900/20 border-red-500/30 text-red-500' : 'bg-green-900/20 border-green-500/30 text-green-500'} `}
-                    >
-                    {viewMode === 'admin' ? 'ADMIN MODE' : 'GUEST MODE'}
-                    </button>
-                )}
+
+            {/* Center: XP Bar with inline numbers */}
+            {!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.xp !== false) && (
+              <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                <div className="flex-1 relative h-2 bg-black rounded-full overflow-hidden">
+                  <div 
+                    className="h-full transition-all duration-700" 
+                    style={{ 
+                        width: `${xpRequiredForNextLevel > 0 ? (xpProgressInLevel / xpRequiredForNextLevel) * 100 : 0}%`, 
+                        backgroundColor: themeColor 
+                    }} 
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold font-mono" style={{ color: themeColor, textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                    {Math.floor(xpProgressInLevel)}/{xpRequiredForNextLevel}
+                  </span>
+                </div>
               </div>
+            )}
+
+            {/* Right: Coins + Settings grouped */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Coins */}
+              {((!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.coins !== false)) || (isGuest && userData?.gameplaySettings?.publicCoins)) && (
+                <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-lg border border-yellow-500/20">
+                  <Coins className="w-3 h-3 text-yellow-400" />
+                  <span className="font-bold text-[10px] text-yellow-400">{userData?.balance || 0}</span>
+                </div>
+              )}
+
+              {/* Settings */}
+              {!isGuest && (
+                <button
+                  onClick={toggleSettings}
+                  className="p-1.5 rounded-lg transition-colors border border-white/5 text-neutral-400 bg-neutral-900/50 hover:bg-white/5"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Stats Bar */}
-          <div className="flex items-center gap-6 bg-neutral-900/40 p-3 rounded-xl border border-white/5 w-full md:w-auto font-mono overflow-x-auto md:overflow-visible">
-            {!isGuest && (
-              <button
-                onClick={toggleSettings}
-                className={`p-2 rounded-lg transition-colors ${activeTabId === 'settings' ? 'text-white' : 'text-neutral-500 hover:text-white'}`}
-                title="System Settings"
+          {/* Desktop: Unified Compact Header */}
+          <div className="hidden md:flex flex-row justify-between items-center w-full">
+            {/* Left: Profile & Menu */}
+            <div className="flex items-center gap-4">
+               {showDetailNav && (
+                  <button
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  className="p-2 text-neutral-500 hover:text-white transition-colors"
+                  >
+                  <Menu className="w-5 h-5" />
+                  </button>
+               )}
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg shrink-0 overflow-hidden relative"
+                style={{ backgroundColor: themeColor, boxShadow: `0 5px 10px -3px ${themeColor}40` }}
               >
-                <Sliders className="w-5 h-5" />
-              </button>
-            )}
-            
-            {/* XP - Hidden for Guest unless publicXP is on */}
-            {((!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.xp !== false)) || (isGuest && userData?.gameplaySettings?.publicXP)) && (
-              <>
-                 <div className="w-px h-6 bg-white/10" />
-                 <div className="flex-1 min-w-[100px] md:w-40">
-                    <div className="flex justify-between text-[7px] mb-1 font-bold uppercase" style={{ color: themeColor }}>
-                    <span>XP Progress</span>
-                    <span>{totalXP % 500}/500</span>
-                    </div>
-                    <div className="h-1 bg-black rounded-full overflow-hidden">
-                    <div className="h-full transition-all duration-700" style={{ width: `${(totalXP % 500) / 5}% `, backgroundColor: themeColor }} />
-                    </div>
-                 </div>
-              </>
-            )}
-
-            {/* Balance - Hidden for Guest unless publicCoins is on */}
-            {((!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.coins !== false)) || (isGuest && userData?.gameplaySettings?.publicCoins)) && (
-              <div className="flex items-center gap-2 text-yellow-400 font-bold ml-2">
-                <Coins className="w-3 h-3" />
-                <span className="text-xs">{userData?.balance || 0}</span>
+                {userData?.avatar ? (
+                  <img src={userData.avatar} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-5 h-5 text-white" />
+                )}
               </div>
-            )}
-            
-            {/* Logout / Login / Create */}
-            {logout ? (
-                <button onClick={logout} className="ml-4 text-neutral-500 hover:text-red-500 transition-colors" title="Logout">
-                    <LogOut className="w-4 h-4" />
-                </button>
-            ) : (
-                <Link to="/" className="ml-2 flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all">
-                    <span>Create My Portfolio</span>
-                    <ArrowRight className="w-3 h-3" />
-                </Link>
-            )}
+              <div>
+                <h1 className="text-base font-black uppercase tracking-tighter leading-none flex items-center gap-2">
+                  {displayName}
+                </h1>
+                <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest flex items-center gap-2 mt-0.5">
+                  {!isGuest && (
+                      <span style={{ color: themeColor }}>Architect LVL {level}</span>
+                  )}
+                  <span className="w-1 h-1 bg-neutral-800 rounded-full"></span>
+                  <span>{isGuest ? 'GUEST VIEW' : 'Online'}</span>
+                  {!isGuest && (
+                      <button
+                      onClick={toggleViewMode}
+                      className={`ml-2 px-1.5 py-0.5 rounded border text-[9px] transition-all ${viewMode === 'admin' ? 'bg-red-900/20 border-red-500/30 text-red-500' : 'bg-green-900/20 border-green-500/30 text-green-500'}`}
+                      >
+                      {viewMode === 'admin' ? 'ADMIN' : 'GUEST'}
+                      </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Stats & Actions */}
+            <div className="flex items-center gap-6">
+                
+                {/* XP - Compact Bar */}
+                {((!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.xp !== false)) || (isGuest && userData?.gameplaySettings?.publicXP)) && (
+                  <div className="flex items-center gap-3 w-48">
+                        <span className="text-[9px] font-bold uppercase text-neutral-500 w-12 text-right">XP {Math.floor(xpProgressInLevel)}/{xpRequiredForNextLevel}</span>
+                        <div className="flex-1 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                            <div 
+                                className="h-full transition-all duration-700" 
+                                style={{ 
+                                    width: `${xpRequiredForNextLevel > 0 ? (xpProgressInLevel / xpRequiredForNextLevel) * 100 : 0}% `, 
+                                    backgroundColor: themeColor 
+                                }} 
+                            />
+                        </div>
+                  </div>
+                )}
+
+                {/* Balance */}
+                {((!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.coins !== false)) || (isGuest && userData?.gameplaySettings?.publicCoins)) && (
+                  <div className="flex items-center gap-2 text-yellow-500 font-bold bg-yellow-500/5 px-3 py-1 rounded-full border border-yellow-500/10">
+                    <Coins className="w-3.5 h-3.5" />
+                    <span className="text-xs">{userData?.balance || 0}</span>
+                  </div>
+                )}
+                
+                {/* Settings & Logout */}
+                <div className="flex items-center gap-1 border-l border-white/10 pl-4 ml-2">
+                    {!isGuest && (
+                        <button
+                            onClick={toggleSettings}
+                            className={`p-2 rounded-lg transition-colors ${activeTabId === 'settings' ? 'text-white bg-white/10' : 'text-neutral-500 hover:text-white hover:bg-white/5'}`}
+                            title="System Settings"
+                        >
+                            <Sliders className="w-4 h-4" />
+                        </button>
+                    )}
+                    
+                    {logout ? (
+                        <button onClick={logout} className="p-2 rounded-lg text-neutral-500 hover:text-red-500 hover:bg-red-500/10 transition-colors" title="Logout">
+                            <LogOut className="w-4 h-4" />
+                        </button>
+                    ) : (
+                        <Link to="/" className="ml-2 flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all">
+                            <span>Create</span>
+                            <ArrowRight className="w-3 h-3" />
+                        </Link>
+                    )}
+                </div>
+            </div>
           </div>
         </div>
       </header>
@@ -340,10 +407,10 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
-            className="flex-1 p-4 md:p-8 md:overflow-y-auto relative"
+            className="flex-1 p-2 md:p-8 md:overflow-y-auto relative"
         >
-          {activeTabId ? (
-                <ActiveModule
+          {ActiveComponent ? (
+                <ActiveComponent
                     {...system}
                     activeView={currentModuleView}
                     setActiveView={setCurrentModuleView}
@@ -352,7 +419,7 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
                 />
             ) : (
                 <div className="flex items-center justify-center h-full text-neutral-500 text-xs font-mono uppercase">
-                    Initializing Interface...
+                    Initializing Interface... (or Module Not Found)
                 </div>
             )}
         </main>

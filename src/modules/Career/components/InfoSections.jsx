@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Save, Edit2, X, GraduationCap, Briefcase, Globe, Trophy, Eye, EyeOff, ExternalLink, ChevronDown } from 'lucide-react';
 // --- Generic Editable List Component ---
-const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, variant, isSectionHidden, toggleSectionVisibility, renderItem, ...props }) => {
+const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, variant, isSectionHidden, toggleSectionVisibility, renderItem }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [newItem, setNewItem] = useState(fields.reduce((acc, f) => ({ ...acc, [f.key]: '' }), { link: '', linkName: '', isHidden: false }));
     const [editingId, setEditingId] = useState(null);

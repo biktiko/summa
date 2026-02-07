@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
-import { User, Palette, Save, Upload, CheckCircle2, Calendar, LogOut, Moon, Sun, Monitor, Smartphone, Sliders, Shield, Zap, Lock, Copy, Loader2, Check, XCircle, ChevronLeft, ChevronRight, Target, Coins, Trophy, Activity, Globe, Database, HardDrive } from 'lucide-react';
+import { User, Palette, Save, Upload, CheckCircle2, Calendar, LogOut, Moon, Sun, Monitor, Smartphone, Sliders, Shield, Zap, Lock, Copy, Loader2, Check, XCircle, ChevronLeft, ChevronRight, Target, Coins, Trophy, Activity, Globe, Database, HardDrive, FileSpreadsheet, Download } from 'lucide-react';
 import { isSignedIn, signInToGoogle, signOutFromGoogle, getUserProfile } from '../../core/services/googleCalendar';
 import { db, SEED_DATA } from '../../core/services/db';
-
 
 const SettingsModule = ({ userData, updateUser }) => {
     // Mobile Navigation State
@@ -163,6 +162,51 @@ const SettingsModule = ({ userData, updateUser }) => {
         { name: 'Paper', hex: '#f8fafc' },
         { name: 'Midnight', hex: '#1e1b4b' }
     ];
+
+    const handleDownloadTasks = () => {
+        const tasks = userData.tasks || [];
+        if (tasks.length === 0) {
+            alert("No tasks to export.");
+            return;
+        }
+
+        // Define Headers
+        const headers = ['ID', 'Title', 'Status', 'Priority', 'Difficulty', 'XP Reward', 'Coin Reward', 'Module', 'Created At', 'Completed At', 'Tags'];
+        
+        // Convert to CSV (Using semicolon delimiter for Excel compatibility in some regions)
+        const csvRows = [
+            headers.join(';'), // Header Row
+            ...tasks.map(task => {
+                const tags = (task.tags || []).map(t => t.text).join(' | ');
+                const row = [
+                    task.id,
+                    `"${(task.title || '').replace(/"/g, '""')}"`, // Escape quotes
+                    task.status,
+                    task.priority,
+                    task.difficulty,
+                    task.xpReward,
+                    task.coinReward,
+                    task.moduleId,
+                    task.createdAt || '',
+                    task.completedAt || '',
+                    `"${tags}"`
+                ];
+                return row.join(';');
+            })
+        ];
+
+        // Add BOM for UTF-8 support in Excel
+        const BOM = '\uFEFF';
+        const csvString = BOM + csvRows.join('\n');
+        
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `summa_tasks_export_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    };
 
     const renderContent = () => (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -771,12 +815,74 @@ const SettingsModule = ({ userData, updateUser }) => {
                 </div>
             )}
 
-            {/* Save Button (Mobile & Desktop) */}
-            <div className="flex justify-end pt-4 border-t border-white/5 sticky bottom-0 bg-[#0A0A0A]/95 p-4 backdrop-blur-md -mx-4 -mb-4 mt-8 z-10 border-t border-white/10">
+            {activeTab === 'tasks' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <div className="bg-black/40 border border-white/5 p-6 rounded-xl space-y-4">
+                         <div className="flex items-center gap-4">
+                            <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500">
+                                <FileSpreadsheet className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Export Mission Data</h3>
+                                <p className="text-xs text-neutral-500">Download all your mission tasks as a CSV file for analysis in Excel or Google Sheets.</p>
+                            </div>
+                        </div>
+                        <div className="pt-4 border-t border-white/5">
+                            <button
+                                onClick={handleDownloadTasks}
+                                className="px-6 py-3 bg-neutral-900 border border-white/10 hover:border-blue-500 hover:text-blue-500 text-white rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex items-center gap-2 w-full md:w-auto justify-center"
+                            >
+                                <Download className="w-4 h-4" /> Download All Tasks (.csv)
+                            </button>
+                        </div>
+                        
+                        <div className="pt-4 border-t border-white/5 space-y-3">
+                            <h4 className="text-xs font-bold text-red-500 uppercase tracking-wider">Danger Zone</h4>
+                            <div className="flex flex-wrap gap-3">
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm("Are you sure you want to RESET all your XP to 0? This action cannot be undone.")) {
+                                            updateUser({ xp: 0 });
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-500 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
+                                >
+                                    Reset XP
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm("Are you sure you want to RESET all your Coins to 0? This action cannot be undone.")) {
+                                            updateUser({ balance: 0 });
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-yellow-500 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
+                                >
+                                    Reset Coins
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Action Buttons (Mobile & Desktop) */}
+            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 pt-4 border-t border-white/5 sticky bottom-0 bg-[#0A0A0A]/95 p-4 backdrop-blur-md -mx-4 -mb-4 mt-8 z-10 border-t border-white/10">
+                <button
+                    onClick={() => {
+                        if (window.confirm('Are you sure you want to log out?')) {
+                            window.location.href = '/';
+                        }
+                    }}
+                    className="px-6 py-3 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2 bg-red-600/10 border-2 border-red-500/30 text-red-500 hover:bg-red-600/20 hover:border-red-500/50"
+                >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                </button>
+                
                 <button
                     onClick={handleSave}
                     disabled={isSaved}
-                    className={`w-full md:w-auto px-8 py-3 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2 ${isSaved ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                    className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2 ${isSaved ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
                     style={{ backgroundColor: isSaved ? undefined : (localData.themeColor || '#3b82f6') }}
                 >
                     {isSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
@@ -792,7 +898,8 @@ const SettingsModule = ({ userData, updateUser }) => {
         { id: 'integrations', label: 'Integrations', icon: Sliders, desc: 'Connect external services' },
 
         { id: 'privacy', label: 'Privacy Control', icon: Lock, desc: 'Manage public visibility' },
-        { id: 'gameplay', label: 'Gameplay & Modules', icon: CheckCircle2, desc: 'XP, Rewards & Module Visibility' }
+        { id: 'gameplay', label: 'Gameplay & Modules', icon: CheckCircle2, desc: 'XP, Rewards & Module Visibility' },
+        { id: 'tasks', label: 'Task Settings', icon: FileSpreadsheet, desc: 'Export & Manage Task Data' }
     ];
 
     return (

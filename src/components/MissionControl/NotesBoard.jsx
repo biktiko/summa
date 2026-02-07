@@ -114,7 +114,7 @@ const NotesBoard = ({ notes, actions, viewMode, moduleId }) => {
             if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
             return new Date(b.createdAt) - new Date(a.createdAt);
         });
-    }, [notes, search]);
+    }, [notes, search, moduleId]);
 
     const handleAdd = async () => {
         if (!formData.title && !formData.content) return;

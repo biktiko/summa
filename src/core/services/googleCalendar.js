@@ -161,17 +161,13 @@ export const addEventToCalendar = async (eventData) => {
         console.error("Error adding event to calendar", error);
         // If 401, token might be expired
         if (error.status === 401) {
-            try {
-                await signInToGoogle(); // Refresh token
-                // Retry once
-                const response = await gapi.client.calendar.events.insert({
-                    'calendarId': 'primary',
-                    'resource': eventData
-                });
-                return response.result;
-            } catch (retryError) {
-                throw retryError;
-            }
+            await signInToGoogle(); // Refresh token
+            // Retry once
+            const response = await gapi.client.calendar.events.insert({
+                'calendarId': 'primary',
+                'resource': eventData
+            });
+            return response.result;
         }
         throw error;
     }

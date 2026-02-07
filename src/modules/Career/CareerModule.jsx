@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import SkillTree from './components/SkillTree';
 import ProjectForge from './components/ProjectForge';
 import ServicesList from './components/ServicesList';
@@ -28,8 +28,6 @@ const SECTION_LABELS = {
 };
 
 const AboutMeSection = ({ userData, updateUser, viewMode, isSectionHidden, toggleSectionVisibility }) => {
-    // Add local state for instant updates, use ref to sync with debounced saves if needed
-    // However, simplest fix for lag is just to use local state + onBlur or debounced effect
     const [localBio, setLocalBio] = React.useState(userData.bio || '');
 
     // Sync from props if remote changes (e.g. initial load)
@@ -149,8 +147,8 @@ const CareerSettings = ({ sectionOrder, setSectionOrder, isSectionVisible, toggl
 
 const ArchitectModule = ({
     userData,
-    updateSkillLevel, addNewSkill, updateSkillDetails, deleteSkill, updateUserCv, updateUser,
-    skillsActions, projectsActions, servicesActions, educationActions, experienceActions, languagesActions, achievementsActions, tasksActions, goalsActions, notesActions, protocolsActions,
+    updateSkillLevel, addNewSkill, updateSkillDetails, deleteSkill, updateUser,
+    projectsActions, servicesActions, educationActions, experienceActions, languagesActions, achievementsActions, tasksActions, goalsActions, notesActions, protocolsActions,
     processTask, viewMode, activeView: propActiveView, setActiveView: propSetActiveView,
     missionTab: propMissionTab, setMissionTab: propSetMissionTab
 }) => {
@@ -167,52 +165,37 @@ const ArchitectModule = ({
     const [newPortfolioLink, setNewPortfolioLink] = useState({ name: '', url: '' });
     
     // Initialize order from userData or default
-    const [sectionOrder, setSectionOrderState] = useState(DEFAULT_SECTIONS);
-
-    useEffect(() => {
-        if (userData.careerSectionOrder && Array.isArray(userData.careerSectionOrder)) {
-            // Merge with default to ensure no missing keys if new ones added later
-            const merged = [...new Set([...userData.careerSectionOrder, ...DEFAULT_SECTIONS])]; // Simple merge
-            setSectionOrderState(merged.filter(k => DEFAULT_SECTIONS.includes(k))); // Ensure only valid keys
-        }
+    // Initialize order from userData or default (Derived, no local state needed)
+    const sectionOrder = React.useMemo(() => {
+        const order = (userData.careerSectionOrder && Array.isArray(userData.careerSectionOrder)) 
+            ? userData.careerSectionOrder 
+            : DEFAULT_SECTIONS;
+        // Merge with default to ensure no missing keys
+        const merged = [...new Set([...order, ...DEFAULT_SECTIONS])]; 
+        return merged.filter(k => DEFAULT_SECTIONS.includes(k));
     }, [userData.careerSectionOrder]);
 
     const handleUpdateSectionOrder = (newOrder) => {
-        setSectionOrderState(newOrder);
+        // Optimistic update could happen here if needed, but we rely on parent update
         updateUser({ careerSectionOrder: newOrder });
     };
 
     // --- Privacy Logic ---
-    const getModulePrivacy = () => userData.modulePrivacy?.career || {};
-    const isModuleEnabled = getModulePrivacy().enabled !== false;
-
-    const isSectionVisible = (sectionKey) => {
-        if (!isModuleEnabled) return false;
-        return getModulePrivacy().sections?.[sectionKey] !== false;
-    };
+    const isSectionVisible = useCallback((sectionKey) => {
+        const careerPrivacy = userData.modulePrivacy?.career || {};
+        if (careerPrivacy.enabled === false) return false;
+        return careerPrivacy.sections?.[sectionKey] !== false;
+    }, [userData.modulePrivacy]);
 
     // Auto-switch view if profile is empty/hidden for guest
     React.useEffect(() => {
-        if (viewMode === 'guest' && activeView === 'profile') {
-             // Check if main profile components are effectively empty
-             const hasCv = userData.cvLink && userData.cvLink !== '#';
-             const hasExp = userData.experience?.length > 0;
-             const hasSkills = userData.skills?.length > 0;
-             const hasProjects = userData.projects?.length > 0; 
-             const hasServices = userData.services?.length > 0;
-             const hasEdu = userData.education?.length > 0;
-             const hasBio = !!userData.bio;
-             
-             // If nothing to show in profile, try switching to tasks or notes if visible
-             if (!hasCv && !hasExp && !hasSkills && !hasProjects && !hasServices && !hasEdu && !hasBio) {
-                 if (isSectionVisible('tasks') || isSectionVisible('goals') || isSectionVisible('protocol')) {
-                     setActiveView('tasks');
-                 } else if (isSectionVisible('notes')) {
-                     setActiveView('notes');
-                 }
-             }
+        if (activeView === 'overview' && isSectionVisible('cv') && userData.cvLink && userData.cvLink !== '#') return;
+        if (viewMode === 'guest' && !isSectionVisible(activeView)) {
+            // Find first visible section
+            const first = sectionOrder.find(k => isSectionVisible(k));
+            if (first) setActiveView(first);
         }
-    }, [viewMode, userData]);
+    }, [viewMode, sectionOrder, userData, activeView, isSectionVisible, setActiveView]);
 
     const toggleSectionVisibility = (sectionKey) => {
         const currentPrivacy = userData.modulePrivacy || {};
@@ -252,7 +235,7 @@ const ArchitectModule = ({
     };
 
     const renderCVSection = () => {
-        const showCV = !(viewMode === 'guest' && (!isSectionVisible('cv') || !userData.cvLink || userData.cvLink === '#'));
+        // const showCV = !(viewMode === 'guest' && (!isSectionVisible('cv') || !userData.cvLink || userData.cvLink === '#'));
         const hasResume = userData.cvLink && userData.cvLink !== '#';
         const hasLinks = userData.portfolioLinks && userData.portfolioLinks.length > 0;
         const showResumeCard = (viewMode === 'admin') || (isSectionVisible('cv') && hasResume);
@@ -377,9 +360,9 @@ const ArchitectModule = ({
     return (
         <div className="animate-in fade-in duration-500 pb-20 h-full flex flex-col">
             {/* Module Header & Navigation */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-white/5 pb-6 mb-8 gap-4">
-                <div>
-                    <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-white mb-2" style={{ textShadow: '0 0 30px rgba(59, 130, 246, 0.5)' }}>Career</h1>
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-white/5 pb-2 md:pb-6 mb-3 md:mb-8 gap-2 md:gap-4">
+                <div className="hidden md:block">
+                    <h1 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-white mb-0" style={{ textShadow: '0 0 15px rgba(59, 130, 246, 0.3)' }}>Career</h1>
                     <p className="text-xs text-neutral-500 font-mono uppercase tracking-widest pl-1">
                         My Portfolio
                     </p>
@@ -535,28 +518,28 @@ const ArchitectModule = ({
             ) : activeView === 'tasks' ? (
                 <div className="flex-1 min-h-[600px] flex flex-col">
                     {/* Mission Control Tabs */}
-                    <div className="flex justify-between items-end mb-8 border-b border-white/5 pb-1 overflow-x-auto">
+                    <div className="flex justify-between items-end mb-1 md:mb-8 border-b border-white/5 pb-0.5 md:pb-1 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
                         <div className="flex items-center gap-6">
                         <button
                             onClick={() => setMissionTab('protocol')}
                             className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${missionTab === 'protocol' ? 'text-purple-500' : 'text-neutral-500 hover:text-white'}`}
                         >
                             Routine
-                            {missionTab === 'protocol' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-500 rounded-t-full" />}
+                            {missionTab === 'protocol' && <div className="hidden md:block absolute bottom-0 left-0 w-full h-0.5 bg-purple-500 rounded-t-full" />}
                         </button>
                         <button
                             onClick={() => setMissionTab('missions')}
                             className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${missionTab === 'missions' ? 'text-blue-500' : 'text-neutral-500 hover:text-white'}`}
                         >
                             Tasks
-                            {missionTab === 'missions' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 rounded-t-full" />}
+                            {missionTab === 'missions' && <div className="hidden md:block absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 rounded-t-full" />}
                         </button>
                         <button
                             onClick={() => setMissionTab('goals')}
                             className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${missionTab === 'goals' ? 'text-yellow-500' : 'text-neutral-500 hover:text-white'}`}
                         >
                             Strategic Goals
-                            {missionTab === 'goals' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-yellow-500 rounded-t-full" />}
+                            {missionTab === 'goals' && <div className="hidden md:block absolute bottom-0 left-0 w-full h-0.5 bg-yellow-500 rounded-t-full" />}
                         </button>
                     </div>
                     </div>

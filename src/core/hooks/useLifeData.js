@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { db } from '../services/db';
 
 export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
@@ -9,11 +9,11 @@ export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
     // Use the passed activeUserId if available, otherwise default to 'u1' (for dev)
     const userId = activeUserId || 'u1';
 
-    const refreshData = async () => {
+    const refreshData = useCallback(async () => {
         if (!userId) return;
         const data = await db.getUserData(userId);
         setUserData(data);
-    };
+    }, [userId]);
 
     useEffect(() => {
         const init = async () => {
@@ -22,11 +22,26 @@ export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
             setLoading(false);
         };
         init();
-    }, [userId]);
+    }, [refreshData]);
 
     // Derived State
     const totalXP = userData ? userData.xp : 0;
-    const level = Math.floor(totalXP / 1000) + 1;
+    
+    // Leveling Algorithm: Arithmetic Progression (Step = 100)
+    // Level 1 -> 2: 100 XP
+    // Level 2 -> 3: 200 XP
+    // Level 3 -> 4: 300 XP
+    // Total XP to reach Level L = (L-1)/2 * (2*100 + (L-2)*100) ... Sum of arithmetic series 100, 200...
+    // Sum = 100 * (L*(L-1)/2) = 50 * L * (L-1)
+    // Inverse: L^2 - L - (TotalXP / 50) = 0
+    // L = (1 + sqrt(1 + 4 * (TotalXP/50))) / 2 = (1 + sqrt(1 + 0.08 * TotalXP)) / 2
+    
+    const level = Math.max(1, Math.floor((1 + Math.sqrt(1 + 0.08 * totalXP)) / 2));
+    
+    // Calculate Progress within current level
+    const xpStartOfCurrentLevel = 50 * level * (level - 1);
+    const xpRequiredForNextLevel = level * 100; // Delta required to level up
+    const xpProgressInLevel = totalXP - xpStartOfCurrentLevel;
 
     // --- Actions ---
 
@@ -64,8 +79,80 @@ export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
     const languagesActions = createCRUD('languages', db.addLanguage.bind(db), db.updateLanguage.bind(db), db.deleteLanguage.bind(db));
     // Achievements
     const achievementsActions = createCRUD('achievements', db.addAchievement.bind(db), db.updateAchievement.bind(db), db.deleteAchievement.bind(db));
-    // Tasks
-    const tasksActions = createCRUD('tasks', db.addTask.bind(db), db.updateTask.bind(db), db.deleteTask.bind(db));
+    // Tasks (Optimistic)
+    const tasksActions = {
+        add: async (data) => {
+            if (viewMode === 'guest') return;
+            const tempId = 'opt-' + Date.now();
+            const optimisticTask = { ...data, id: tempId, isOptimistic: true };
+            
+            // Optimistic Update
+            setUserData(prev => ({
+                ...prev,
+                tasks: [...(prev.tasks || []), optimisticTask]
+            }));
+
+            try {
+                await db.addTask(userId, data);
+                // Refresh to get real ID
+                refreshData();
+            } catch (e) {
+                console.error("Add task failed", e);
+                // Revert
+                setUserData(prev => ({
+                    ...prev,
+                    tasks: prev.tasks.filter(t => t.id !== tempId)
+                }));
+            }
+        },
+        update: async (id, updates) => {
+            if (viewMode === 'guest') return;
+            
+            // Snapshot for revert
+            const previousTasks = userData.tasks;
+            
+            // Optimistic Update
+            setUserData(prev => ({
+                ...prev,
+                tasks: prev.tasks.map(t => t.id === id ? { ...t, ...updates } : t)
+            }));
+
+            try {
+                await db.updateTask(id, updates);
+                // Silent refresh to ensure consistency
+                refreshData();
+            } catch (e) {
+                console.error("Update task failed", e);
+                // Revert
+                setUserData(prev => ({
+                    ...prev,
+                    tasks: previousTasks
+                }));
+            }
+        },
+        delete: async (id) => {
+            if (viewMode === 'guest') return;
+            
+            const previousTasks = userData.tasks;
+            
+            // Optimistic
+            setUserData(prev => ({
+                ...prev,
+                tasks: prev.tasks.filter(t => t.id !== id)
+            }));
+
+            try {
+                await db.deleteTask(id);
+                refreshData();
+            } catch (e) {
+                console.error("Delete task failed", e);
+                setUserData(prev => ({
+                    ...prev,
+                    tasks: previousTasks
+                }));
+            }
+        }
+    };
     // Goals
     const goalsActions = createCRUD('goals', db.addGoal.bind(db), db.updateGoal.bind(db), db.deleteGoal.bind(db));
     // Notes
@@ -158,6 +245,8 @@ export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
         setUserData,
         totalXP,
         level,
+        xpRequiredForNextLevel,
+        xpProgressInLevel,
 
         // Actions
         updateSkillLevel,

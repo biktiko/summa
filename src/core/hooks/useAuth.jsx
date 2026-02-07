@@ -1,13 +1,14 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useState, useEffect, createContext, useContext } from 'react';
-import { 
-    signInWithEmailAndPassword, 
-    createUserWithEmailAndPassword, 
-    signOut, 
-    onAuthStateChanged, 
-    GoogleAuthProvider, 
+import {
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged,
+    GoogleAuthProvider,
     signInWithPopup,
     sendEmailVerification,
-    updateProfile 
+    updateProfile
 } from "firebase/auth";
 import { auth } from '../services/firebase';
 import { db } from '../services/db';
@@ -27,8 +28,8 @@ export const AuthProvider = ({ children }) => {
                     // Sync Firestore User
                     // We pass displayName as fallback name, but if doc exists, it's ignored.
                     const profile = await db.initUserAfterAuth(
-                        firebaseUser.uid, 
-                        firebaseUser.email, 
+                        firebaseUser.uid,
+                        firebaseUser.email,
                         firebaseUser.displayName || 'User'
                     );
                     setUser(profile);
@@ -58,7 +59,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await updateProfile(userCredential.user, { displayName: name });
-            
+
             try {
                 await sendEmailVerification(userCredential.user);
                 console.log("✅ Verification email sent to:", email);
@@ -67,10 +68,10 @@ export const AuthProvider = ({ children }) => {
                 // We don't throw here to allow the user to be created, but we should probably inform UI?
                 // For now, logging is enough to debug.
             }
-            
+
             // Explicitly create doc immediately so UI works instantly
             await db.initUserAfterAuth(userCredential.user.uid, email, name);
-            
+
             return true;
         } catch (e) {
             console.error(e);

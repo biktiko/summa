@@ -187,8 +187,7 @@ const SkillTree = ({ skills, updateSkillLevel, addNewSkill, updateSkillDetails, 
         }
     };
 
-    // Group skills by category
-    const categories = [...new Set(skills.map(s => s.category))];
+
 
     return (
         <div className={`space-y-6`}>

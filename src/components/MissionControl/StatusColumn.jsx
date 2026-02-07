@@ -1,0 +1,145 @@
+import React, { useState, useEffect } from 'react';
+import { Maximize2, X, MoreVertical } from 'lucide-react';
+import { TaskCard } from './TaskCard';
+
+export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings, suggestedTags }) => {
+    const [page, setPage] = useState(0);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [isExpanded, setIsExpanded] = useState(false); // Windowed Mode State
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Windowed Mode Escape Key Handler
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') setIsExpanded(false);
+        };
+        if (isExpanded) window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isExpanded]);
+
+    const TASKS_PER_PAGE = isMobile ? 4 : 6;
+
+    const filteredTasks = moduleTasks.filter(t => t.status === status);
+    const totalPages = Math.ceil(filteredTasks.length / TASKS_PER_PAGE);
+    const visibleTasks = filteredTasks.slice(page * TASKS_PER_PAGE, (page + 1) * TASKS_PER_PAGE);
+
+    // Reset page if out of bounds (e.g. searching reduced count)
+    if (page > 0 && page >= totalPages) {
+        setPage(0);
+    }
+
+    return (
+        <>
+            <div className="flex-1 min-w-[300px] bg-neutral-900/20 rounded-2xl p-2 md:p-4 border border-white/5 flex flex-col min-h-[500px]">
+                <div className={`hidden md:flex items-center justify-between mb-4 pb-2 border-b border-${color}-500/20`}>
+                    <h3 className={`text-xs font-black uppercase tracking-widest text-${color}-500`}>{title}</h3>
+                    <div className="flex items-center gap-3">
+                         <span className="text-[10px] font-mono text-neutral-500">{filteredTasks.length}</span>
+                         <button 
+                            onClick={() => setIsExpanded(true)}
+                            className="hidden md:block text-neutral-500 hover:text-white transition-colors"
+                            title="Open Grid View"
+                         >
+                             <Maximize2 className="w-3 h-3" />
+                         </button>
+                    </div>
+                </div>
+
+                <div className="space-y-2 md:space-y-3 overflow-y-auto flex-1 pr-1 md:pr-2 custom-scrollbar">
+                    {visibleTasks.map((task, index) => (
+                        <TaskCard
+                            key={task.id}
+                            task={task}
+                            viewMode={viewMode}
+                            editingId={editingId}
+                            editData={editData}
+                            setEditData={setEditData}
+                            startEdit={startEdit}
+                            saveEdit={saveEdit}
+                            setEditingId={setEditingId}
+                            updateStatus={updateStatus}
+                            deleteTaskId={deleteTaskId}
+                            toggleSubtask={toggleSubtask}
+                            settings={settings}
+                            suggestedTags={suggestedTags}
+                            index={page * TASKS_PER_PAGE + index}
+                        />
+                    ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4 mt-2 border-t border-white/5">
+                        <button
+                            onClick={() => setPage(Math.max(0, page - 1))}
+                            disabled={page === 0}
+                            className="p-1 rounded bg-neutral-900 text-neutral-500 disabled:opacity-30 hover:text-white"
+                        >
+                            &lt;
+                        </button>
+                        <span className="text-[10px] text-neutral-500">Page {page + 1} of {totalPages}</span>
+                        <button
+                            onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                            disabled={page === totalPages - 1}
+                            className="p-1 rounded bg-neutral-900 text-neutral-500 disabled:opacity-30 hover:text-white"
+                        >
+                            &gt;
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* Windowed / Grid Mode Overlay */}
+            {isExpanded && (
+                <div className="fixed inset-0 z-[100] bg-black/20 backdrop-blur-3xl p-6 md:p-12 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if(e.target === e.currentTarget) setIsExpanded(false); }}>
+                    <div className="max-w-7xl mx-auto">
+                        <div className="flex items-center justify-between mb-8 bg-transparent z-20 py-4 border-b border-white/10">
+                            <div className="flex items-center gap-4">
+                                <h2 className={`text-2xl font-black uppercase tracking-tighter text-${color}-500`}>{title}</h2>
+                                <span className="bg-white/10 px-2 py-0.5 rounded text-xs font-mono text-white">{filteredTasks.length} Tasks</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-neutral-500 hover:text-white transition-all">
+                                    <MoreVertical className="w-4 h-4" />
+                                </button>
+                                <button 
+                                    onClick={() => setIsExpanded(false)}
+                                    className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all shadow-lg"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredTasks.map((task, index) => (
+                                <TaskCard
+                                    key={task.id}
+                                    task={task}
+                                    viewMode={viewMode}
+                                    editingId={editingId}
+                                    editData={editData}
+                                    setEditData={setEditData}
+                                    startEdit={startEdit}
+                                    saveEdit={saveEdit}
+                                    setEditingId={setEditingId}
+                                    updateStatus={updateStatus}
+                                    deleteTaskId={deleteTaskId}
+                                    toggleSubtask={toggleSubtask}
+                                    settings={settings}
+                                    suggestedTags={suggestedTags}
+                                    index={index}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};

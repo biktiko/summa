@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Circle, Clock, Calendar, Repeat, Plus, Trash2, Edit2, X, AlertCircle, Eye, EyeOff, Calendar as CalendarIcon } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Calendar, Repeat, Plus, Trash2, Edit2, X, AlertCircle, Eye, EyeOff, Zap, Coins, Calendar as CalendarIcon } from 'lucide-react';
 import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, getUserProfile, updateEvent, deleteEvent } from '../../core/services/googleCalendar';
 
 const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility }) => {
@@ -9,7 +9,10 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
     const [userEmail, setUserEmail] = useState('');
 
     // Filter protocols for this specific module
-    const moduleProtocols = protocols ? protocols.filter(p => p.moduleId === moduleId) : [];
+    const moduleProtocols = React.useMemo(() => 
+        protocols ? protocols.filter(p => p.moduleId === moduleId) : [], 
+        [protocols, moduleId]
+    );
 
     const [formData, setFormData] = useState({
         title: '',
@@ -184,7 +187,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                     { recurrence }
                 );
 
-                const result = await addEventToCalendar(event);
+                await addEventToCalendar(event);
                 // We need to save the googleEventId to the new item. 
                 // Since actions.add is likely async and might not return the ID immediately or we can't patch it easily without a refetch,
                 // we'll rely on the `add` action potentially returning the new item or ID in a real app.
@@ -193,18 +196,18 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                 // Let's just create the event. If `actions.add` returns the object, we should update it with the event ID.
                 // For now, in this architecture, we might miss saving the ID if we don't handle it carefully.
                 
-                // CRITICAL FIX: The original code didn't save the Google Event ID back to the database!
-                // We need to assume actions.add returns the new item.
-                
-                // But wait, the previous code block was:
-                // await actions.add(data);
-                // if (calendar...) addEvent... await addEventToCalendar(event)
-                
-                // It didn't save the ID? Ah, checking TaskBoard, it did:
-                // `await actions.add({ ...newTask, googleEventId: result.id })`
-                
-                // So I need to modify the Add logic above to include the ID *if* we created an event.
-                // I will restructure this block.
+                 // CRITICAL FIX: The original code didn't save the Google Event ID back to the database!
+                 // We need to assume actions.add returns the new item.
+                 
+                 // But wait, the previous code block was:
+                 // await actions.add(data);
+                 // if (calendar...) addEvent... await addEventToCalendar(event)
+                 
+                 // It didn't save the ID? Ah, checking TaskBoard, it did:
+                 // `await actions.add({ ...newTask, googleEventId: result.id })`
+                 
+                 // So I need to modify the Add logic above to include the ID *if* we created an event.
+                 // I will restructure this block.
             } catch (e) {
                  console.error("Failed to sync to calendar", e);
             }
@@ -241,8 +244,8 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                         { recurrence }
                     );
                     
-                    const result = await addEventToCalendar(event);
-                    if (result) googleEventId = result.id;
+                    const eventResult = await addEventToCalendar(event);
+                    if (eventResult) googleEventId = eventResult.id;
                  } catch (e) {
                       console.error("Calendar Sync Error", e);
                  }
@@ -309,19 +312,36 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
         if (protocol.isCompleted) return; // Already done
 
         const today = new Date().toISOString().split('T')[0];
+        const newStreak = (protocol.streak || 0) + 1;
+
+        // Calculate Dynamic Rewards
+        let xp = 0;
+        let coins = 0;
+
+        if (protocol.frequency === 'daily') {
+            xp = 5 + newStreak; 
+            coins = Math.round(newStreak / 7);
+        } else {
+            // Non-daily
+            xp = 10 + newStreak;
+            coins = Math.round(newStreak / 5);
+        }
+        
+        // Cap XP to 30 max
+        if (xp > 30) xp = 30;
 
         // Update protocol state
         await actions.update(protocol.id, {
             isCompleted: true,
             lastCompletedDate: today,
-            streak: (protocol.streak || 0) + 1
+            streak: newStreak
         });
 
         // Award XP/Coins
         if (processTask) {
             await processTask({
-                xpReward: protocol.xpReward,
-                coinReward: protocol.coinReward
+                xpReward: xp,
+                coinReward: coins
             });
         }
     };
@@ -331,7 +351,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
     return (
         <div className={`h-full flex flex-col`}>
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-                <div>
+                <div className="hidden md:block">
                     <h3 className="text-xl font-black text-white uppercase tracking-wider">🔄 Routines</h3>
                     <p className="text-xs text-neutral-500 font-mono">Daily Operations & Habits</p>
                 </div>
@@ -435,7 +455,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                 </div>
 
                                 {viewMode === 'admin' && (
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button onClick={() => startEdit(protocol)} className="p-1.5 hover:bg-white/10 rounded text-neutral-500 hover:text-white">
                                             <Edit2 className="w-3 h-3" />
                                         </button>
@@ -539,24 +559,11 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-2">XP Reward</label>
-                                    <input
-                                        type="number"
-                                        className="w-full bg-neutral-900 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500 transition-colors"
-                                        value={formData.xpReward}
-                                        onChange={e => setFormData({ ...formData, xpReward: parseInt(e.target.value) || 0 })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-2">Coin Reward</label>
-                                    <input
-                                        type="number"
-                                        className="w-full bg-neutral-900 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-yellow-500 transition-colors"
-                                        value={formData.coinReward}
-                                        onChange={e => setFormData({ ...formData, coinReward: parseInt(e.target.value) || 0 })}
-                                    />
+                            <div className="p-4 bg-neutral-900/50 rounded-xl border border-white/5 text-center">
+                                <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Rewards are automatically calculated based on streak & frequency.</p>
+                                <div className="flex justify-center gap-4 mt-2">
+                                    <span className="text-xs font-bold text-blue-500 flex items-center gap-1"><Zap className="w-3 h-3" /> Auto XP</span>
+                                    <span className="text-xs font-bold text-yellow-500 flex items-center gap-1"><Coins className="w-3 h-3" /> Auto Coins</span>
                                 </div>
                             </div>
 

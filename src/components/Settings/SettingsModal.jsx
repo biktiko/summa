@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { X, Save, User, Palette, Upload, Lock, CheckCircle2, Copy } from 'lucide-react';
 
 const SettingsModal = ({ isOpen, onClose, userData, updateUser }) => {
-    if (!isOpen) return null;
-
     const [activeTab, setActiveTab] = useState('profile');
     const [localData, setLocalData] = useState({
         // Profile
@@ -14,6 +12,7 @@ const SettingsModal = ({ isOpen, onClose, userData, updateUser }) => {
         city: userData.city || '',
         bio: userData.bio || '',
         avatar: userData.avatar || '',
+        username: userData.username || '',
 
         // Theme
         themeColor: userData.themeColor || '#3b82f6', // Default blue-500
@@ -26,6 +25,8 @@ const SettingsModal = ({ isOpen, onClose, userData, updateUser }) => {
         gameplaySettings: userData.gameplaySettings || { xp: true, coins: true },
         hiddenModules: userData.hiddenModules || []
     });
+
+    if (!isOpen) return null;
 
     const handleSave = () => {
         updateUser(localData);
@@ -445,8 +446,6 @@ const SettingsModal = ({ isOpen, onClose, userData, updateUser }) => {
                                                                 setLocalData({ ...localData, hiddenModules: currentHidden.filter(id => id !== modId) });
                                                             } else {
                                                                 // Hide (check if at least one remains)
-                                                                const activeCount = 4 - currentHidden.length; // Approximate
-                                                                // Better: count how many are NOT hidden from the list
                                                                 const allModules = ['career', 'finance', 'health', 'network'];
                                                                 const currentlyActive = allModules.filter(m => !currentHidden.includes(m));
                                                                 if (currentlyActive.length <= 1 && currentlyActive.includes(modId)) {

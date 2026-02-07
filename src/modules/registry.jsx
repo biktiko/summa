@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { Target, Activity, Globe, Coins, ShieldAlert, Sliders } from 'lucide-react';
 import CareerModule from './Career/CareerModule';

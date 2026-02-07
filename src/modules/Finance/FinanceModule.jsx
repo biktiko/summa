@@ -17,25 +17,28 @@ import GoalsBoard from '../../components/MissionControl/GoalsBoard';
 
 // --- Helper Components ---
 
-const StatCard = ({ title, amount, subtext, icon: Icon, color, isNegative, onClick, formatMoney }) => (
-    <div onClick={onClick} className={`bg-neutral-900/40 border border-white/5 p-6 rounded-2xl flex items-start justify-between relative overflow-hidden group cursor-pointer hover:border-white/10 transition-all`}>
-        <div className={`absolute top-0 right-0 p-24 rounded-full blur-3xl opacity-10 transition-opacity group-hover:opacity-20`} style={{ backgroundColor: color }} />
-        <div className="relative z-10">
-            <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-1">{title}</h3>
-            <div className="text-2xl font-black text-white mb-2">
-                {formatMoney ? formatMoney(amount) : `$${amount.toLocaleString()}`}
-            </div>
-            {subtext && (
-                <div className={`flex items-center gap-1 text-[10px] font-bold opacity-70`}>
-                    <span style={{ color: isNegative ? '#ef4444' : '#10b981' }}>{subtext}</span>
+const StatCard = ({ title, amount, subtext, icon, color, isNegative, onClick, formatMoney }) => {
+    const Icon = icon;
+    return (
+        <div onClick={onClick} className={`bg-neutral-900/40 border border-white/5 p-6 rounded-2xl flex items-start justify-between relative overflow-hidden group cursor-pointer hover:border-white/10 transition-all`}>
+            <div className={`absolute top-0 right-0 p-24 rounded-full blur-3xl opacity-10 transition-opacity group-hover:opacity-20`} style={{ backgroundColor: color }} />
+            <div className="relative z-10">
+                <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-1">{title}</h3>
+                <div className="text-2xl font-black text-white mb-2">
+                    {formatMoney ? formatMoney(amount) : `$${amount.toLocaleString()}`}
                 </div>
-            )}
+                {subtext && (
+                    <div className={`flex items-center gap-1 text-[10px] font-bold opacity-70`}>
+                        <span style={{ color: isNegative ? '#ef4444' : '#10b981' }}>{subtext}</span>
+                    </div>
+                )}
+            </div>
+            <div className={`p-3 rounded-xl bg-black/40 border border-white/10 ${isNegative ? 'text-red-500' : 'text-white'}`} style={{ color: color }}>
+                <Icon className="w-6 h-6" />
+            </div>
         </div>
-        <div className={`p-3 rounded-xl bg-black/40 border border-white/10 ${isNegative ? 'text-red-500' : 'text-white'}`} style={{ color: color }}>
-            <Icon className="w-6 h-6" />
-        </div>
-    </div>
-);
+    );
+};
 
 const BudgetRow = ({ item, isExpense, onEdit, onDelete, currencySymbol = '$' }) => {
     // Calculations
@@ -135,20 +138,25 @@ const FinanceModule = ({
     });
 
     // --- Data Processing (Month-Aware) ---
-    const transactions = userData.transactions || [];
-    const categories = userData.categories || [];
+    // --- Data Processing (Month-Aware) ---
+    const transactions = useMemo(() => userData.transactions || [], [userData.transactions]);
+    const categories = useMemo(() => userData.categories || [], [userData.categories]);
     
     const currentMonthKey = selectedDate.toISOString().slice(0, 7); // "YYYY-MM"
 
     // 1. Month Actuals
-    const monthTransactions = transactions.filter(t => t.createdAt.startsWith(currentMonthKey));
+    const monthTransactions = useMemo(() => 
+        transactions.filter(t => t.createdAt.startsWith(currentMonthKey)),
+        [transactions, currentMonthKey]
+    );
+    
     const monthActualIncome = monthTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
     const monthActualExpense = monthTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
-    const monthNetBalance = monthActualIncome - monthActualExpense;
+    // monthNetBalance removed (unused)
 
     // 2. Global Budget (Projected/Baseline)
-    const incomeCategories = categories.filter(c => c.type === 'income');
-    const expenseCategories = categories.filter(c => c.type === 'expense');
+    const incomeCategories = useMemo(() => categories.filter(c => c.type === 'income'), [categories]);
+    const expenseCategories = useMemo(() => categories.filter(c => c.type === 'expense'), [categories]);
 
     const calculateMonthlyProjection = (items) => items.reduce((acc, item) => {
         // Filter by Active Month
@@ -163,7 +171,7 @@ const FinanceModule = ({
     const projectedMonthlyIncome = calculateMonthlyProjection(incomeCategories);
     const projectedMonthlyExpense = calculateMonthlyProjection(expenseCategories);
     const projectedFreeCashFlow = projectedMonthlyIncome - projectedMonthlyExpense;
-    const burnRateDaily = projectedMonthlyExpense / 30;
+    // burnRateDaily removed (unused)
 
     // 3. Analytics Data Source Switcher
     const activeIncome = analyticsSource === 'actual' ? monthActualIncome : projectedMonthlyIncome;
