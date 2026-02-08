@@ -51,8 +51,11 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
                 <>
                     <div className="fixed inset-0 z-10 bg-transparent" onClick={saveEdit} />
                     <div className="space-y-4 z-20 relative bg-[#0A0A0A] p-4 rounded-lg border border-blue-500/30 w-full max-h-[75vh] overflow-y-auto custom-scrollbar shadow-2xl" onClick={e => e.stopPropagation()}>
-                    <div className="bg-[#0A0A0A] z-10 pb-2 border-b border-white/5 mb-4">
-                        <h4 className="text-xs font-black uppercase tracking-widest text-blue-500">Edit Mission</h4>
+                    <div className="bg-[#0A0A0A] pb-2 border-b border-white/5 mb-4 flex justify-between items-center">
+                        <h4 className="text-xs font-black uppercase tracking-widest text-blue-500">Edit Task</h4>
+                        <button onClick={saveEdit} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded font-bold text-xs uppercase hover:bg-blue-500 shadow-lg shadow-blue-500/20">
+                            <Save className="w-3 h-3" /> Save
+                        </button>
                     </div>
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Task Title</label>
@@ -253,7 +256,7 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
                     {/* Progress Fields */}
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Progress Tracking</label>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                              <input
                                 type="number"
                                 className="w-full bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
@@ -269,7 +272,7 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
                                 onChange={e => setEditData({ ...editData, targetValue: e.target.value })}
                             />
                             <input
-                                className="w-full bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
+                                className="col-span-2 md:col-span-1 w-full bg-black/40 border border-blue-500/30 rounded p-2 text-xs text-white outline-none focus:border-blue-500"
                                 placeholder="Unit"
                                 value={editData.unit}
                                 onChange={e => setEditData({ ...editData, unit: e.target.value })}
@@ -326,50 +329,30 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
             </>
             ) : (
                 <>
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="flex flex-col">
-                            <span className="text-[9px] font-mono text-neutral-600 uppercase mb-1">#{task.sequenceNumber || (index !== undefined ? index + 1 : (task.id || '').slice(0, 4))}</span>
-                            <h4 className="text-sm font-bold text-neutral-200 leading-tight pr-6">{task.title}</h4>
-                        </div>
-                        <div className="flex gap-1 items-center">
-                            <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
-                                task.priority === 'high' ? 'text-red-500 border-red-500/30 bg-red-500/10' :
-                                task.priority === 'low' ? 'text-blue-500 border-blue-500/30 bg-blue-500/10' :
-                                'text-yellow-500 border-yellow-500/30 bg-yellow-500/10'
-                            }`}>
-                                {task.priority || 'Medium'}
-                            </span>
-                            {task.difficulty && (
-                                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
-                                    task.difficulty === 'hard' ? 'text-purple-500 border-purple-500/30 bg-purple-500/10' :
-                                    task.difficulty === 'easy' ? 'text-green-500 border-green-500/30 bg-green-500/10' :
-                                    'text-neutral-500 border-neutral-500/30 bg-neutral-500/10'
-                                }`}>
-                                    {task.difficulty}
-                                </span>
-                            )}
-
-                            {/* Mobile Actions (Inline) */}
-                            <div className="md:hidden flex items-center gap-1 ml-1 border-l border-white/10 pl-1">
+                    <div className="flex flex-col relative w-full">
+                        {/* Mobile Header: ID & Actions */}
+                        {/* Explicitly separate row for ID and Actions to ensure Title has full width below */}
+                        <div className="flex md:hidden items-center justify-between w-full mb-3 z-10 relative">
+                             <span className="text-[9px] font-mono text-neutral-600 uppercase">#{task.sequenceNumber || (index !== undefined ? index + 1 : (task.id || '').slice(0, 4))}</span>
+                             
+                             <div className="flex items-center gap-1">
                                 {task.status !== 'done' && (
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); updateStatus(task, 'done'); }}
-                                        className="p-1 text-green-500 bg-green-500/10 rounded border border-green-500/20"
+                                        className="p-1.5 text-green-500 bg-white/5 rounded-lg border border-green-500/20 active:scale-95 transition-transform"
                                     >
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <CheckCircle2 className="w-4 h-4" />
                                     </button>
                                 )}
                                 <div className="relative group/mobile-menu">
                                     <button 
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            // Toggle logic here might be tricky without state, but css hover works for now or simple click
                                         }}
-                                        className="p-1 text-neutral-400 bg-white/5 rounded border border-white/10"
+                                        className="p-1.5 text-neutral-400 bg-white/5 rounded-lg border border-white/10 active:scale-95 transition-transform"
                                     >
-                                        <MoreVertical className="w-3.5 h-3.5" />
+                                        <MoreVertical className="w-4 h-4" />
                                     </button>
-                                    {/* Mobile Menu Dropdown */}
                                     <div className="absolute right-0 top-full mt-1 w-32 bg-neutral-900 border border-white/10 rounded-lg shadow-xl overflow-hidden z-20 hidden group-hover/mobile-menu:block">
                                         <div className="p-1 space-y-0.5">
                                             {task.status !== 'todo' && <button onClick={(e) => { e.stopPropagation(); updateStatus(task, 'todo'); }} className="w-full text-left px-2 py-1 text-[10px] text-neutral-400 hover:text-white hover:bg-white/10 rounded">To Do</button>}
@@ -380,73 +363,103 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                             </div>
                         </div>
-                    </div>
 
-                    <div className="flex flex-wrap gap-1 mb-3">
-                        {(task.tags || []).map((tag, idx) => (
-                            <span key={idx} className={`text-[9px] px-1.5 py-0.5 rounded ${tag.color}`}>
-                                {tag.text}
-                            </span>
-                        ))}
-                    </div>
+                        {/* Title Row (Mobile: Full Width, Desktop: Standard) */}
+                        <div className="flex flex-col w-full mb-2 z-0">
+                             {/* Desktop ID (Hidden on Mobile as it is in header above) */}
+                             <span className="hidden md:block text-[9px] font-mono text-neutral-600 uppercase mb-0.5">#{task.sequenceNumber || (index !== undefined ? index + 1 : (task.id || '').slice(0, 4))}</span>
+                             <h4 className="text-sm font-bold text-neutral-200 leading-tight break-words w-full">{task.title}</h4>
+                        </div>
+                        
+                        {/* Tags */}
+                         <div className="flex flex-wrap gap-1">
+                            {(task.tags || []).map((tag, idx) => (
+                                <span key={idx} className={`text-[9px] px-1.5 py-0.5 rounded ${tag.color}`}>
+                                    {tag.text}
+                                </span>
+                            ))}
+                        </div>
 
-                    <div className="space-y-2 text-xs text-neutral-400">
-                        {task.targetValue > 0 && (
-                            <div className="space-y-1">
-                                <div className="flex justify-between text-[10px] uppercase font-bold tracking-wider">
+                        {/* Progress Bar if active */}
+                         {task.targetValue > 0 && (
+                            <div className="space-y-1 mt-2">
+                                <div className="flex justify-between text-[10px] uppercase font-bold tracking-wider text-neutral-500">
                                     <span>Progress</span>
                                     <span>{progress.toFixed(0)}%</span>
                                 </div>
                                 <div className="h-1 bg-white/10 rounded-full overflow-hidden">
                                     <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${progress}%` }} />
                                 </div>
-                                <div className="text-[10px] text-right font-mono text-neutral-500">
-                                    {task.currentValue} / {task.targetValue} {task.unit}
-                                </div>
                             </div>
                         )}
-
-                        {task.deadline && (
-                            <div className="flex items-center gap-1.5 text-neutral-500">
-                                <Calendar className="w-3 h-3" />
-                                <span className="text-[10px]">{task.deadline}</span>
-                            </div>
-                        )}
-
-                        {task.link && (
-                            <a 
-                                href={task.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors w-max"
-                                onClick={e => e.stopPropagation()}
-                            >
-                                <ExternalLink className="w-3 h-3" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">{task.linkName || 'External Link'}</span>
-                            </a>
-                        )}
-
-                        {(task.xpReward > 0 || task.coinReward > 0) && (
-                            <div className="flex items-center gap-2 pt-1 border-t border-white/5">
-                                {task.xpReward > 0 && (!settings || settings.xp !== false) && (
-                                   <div className="flex items-center gap-1 text-blue-400">
-                                      <Zap className="w-3 h-3" />
-                                      <span className="text-[10px] font-bold">{task.xpReward} XP</span>
-                                   </div>
+                        
+                        {/* Footer Info Row */}
+                        <div className="flex flex-wrap items-end justify-between gap-2 mt-2 pt-2 border-t border-white/5">
+                             {/* Left: Deadline / Link */}
+                            <div className="flex items-center gap-3">
+                                {task.deadline && (
+                                    <div className="flex items-center gap-1.5 text-neutral-500">
+                                        <Calendar className="w-3 h-3" />
+                                        <span className="text-[10px]">{task.deadline}</span>
+                                    </div>
                                 )}
-                                {task.coinReward > 0 && (!settings || settings.coins !== false) && (
-                                   <div className="flex items-center gap-1 text-yellow-400">
-                                      <Coins className="w-3 h-3" />
-                                      <span className="text-[10px] font-bold">{task.coinReward}</span>
-                                   </div>
+                                 {task.link && (
+                                    <a 
+                                        href={task.link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors"
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        <ExternalLink className="w-3 h-3" />
+                                        <span className="text-[10px] font-bold uppercase tracking-wider truncate max-w-[100px]">{task.linkName || 'Link'}</span>
+                                    </a>
                                 )}
                             </div>
-                        )}
 
+                            {/* Right: Badges & Rewards */}
+                            <div className="flex items-center gap-2 ml-auto">
+                                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                                    task.priority === 'high' ? 'text-red-500 border-red-500/30 bg-red-500/10' :
+                                    task.priority === 'low' ? 'text-blue-500 border-blue-500/30 bg-blue-500/10' :
+                                    'text-yellow-500 border-yellow-500/30 bg-yellow-500/10'
+                                }`}>
+                                    {task.priority || 'Medium'}
+                                </span>
+                                {task.difficulty && (
+                                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                                        task.difficulty === 'hard' ? 'text-purple-500 border-purple-500/30 bg-purple-500/10' :
+                                        task.difficulty === 'easy' ? 'text-green-500 border-green-500/30 bg-green-500/10' :
+                                        'text-neutral-500 border-neutral-500/30 bg-neutral-500/10'
+                                    }`}>
+                                        {task.difficulty}
+                                    </span>
+                                )}
+                                
+                                {(task.xpReward > 0 || task.coinReward > 0) && (
+                                     <div className="flex items-center gap-2 ml-1 pl-2 border-l border-white/10">
+                                        {task.xpReward > 0 && (!settings || settings.xp !== false) && (
+                                           <div className="flex items-center gap-1 text-blue-400">
+                                              <Zap className="w-3 h-3" />
+                                              <span className="text-[10px] font-bold">{task.xpReward}</span>
+                                           </div>
+                                        )}
+                                        {task.coinReward > 0 && (!settings || settings.coins !== false) && (
+                                           <div className="flex items-center gap-1 text-yellow-400">
+                                              <Coins className="w-3 h-3" />
+                                              <span className="text-[10px] font-bold">{task.coinReward}</span>
+                                           </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                         {/* Subtasks (Collapsible/Inline) */}
                         {task.subtasks && task.subtasks.length > 0 && (
-                             <div className="space-y-1 bg-white/5 p-2 rounded-lg">
+                             <div className="space-y-1 bg-white/5 p-2 rounded-lg mt-2">
                                 <div className="text-[10px] uppercase font-bold text-neutral-500 mb-1">Subtasks</div>
                                 {task.subtasks.map((sub, idx) => (
                                     <div key={sub.id || idx} className="flex items-center gap-2 group/sub">

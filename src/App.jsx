@@ -21,18 +21,35 @@ import SettingsModule from './components/Settings/SettingsModule';
 const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
   const { userData, loading, level, viewMode, toggleViewMode, xpProgressInLevel, xpRequiredForNextLevel } = system;
 
-  // Filter Modules based on Privacy/Visibility
+  // Filter Modules based on Privacy/Visibility & Sort
   const visibleModules = useMemo(() => {
-    return MODULES.filter(m => {
+    const defaultOrder = ['tasks', 'finance', 'blog', 'career', 'health', 'network'];
+    const order = userData?.moduleOrder || defaultOrder;
+
+    const filtered = MODULES.filter(m => {
         if (m.id === 'settings') return false; 
         if (viewMode === 'guest') {
             const privacy = userData?.modulePrivacy?.[m.id];
             // Explicitly check if enabled is strictly false
             if (privacy && privacy.enabled === false) return false;
         } else {
-             if (userData?.hiddenModules?.includes(m.id)) return false;
+             if (userData?.hiddenModules) {
+                 if (userData.hiddenModules.includes(m.id)) return false;
+             } else {
+                 // Default Hidden for new users (if no preferences set)
+                 if (['health', 'network'].includes(m.id)) return false;
+             }
         }
         return true;
+    });
+
+    return filtered.sort((a, b) => {
+        const indexA = order.indexOf(a.id);
+        const indexB = order.indexOf(b.id);
+        // If not in order array, put at end
+        const valA = indexA === -1 ? 999 : indexA;
+        const valB = indexB === -1 ? 999 : indexB;
+        return valA - valB;
     });
   }, [userData, viewMode]);
   
@@ -41,6 +58,7 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
   const [currentModuleView, setCurrentModuleView] = useState('dashboard'); 
   const [activeTaskTab, setActiveTaskTab] = useState('missions');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [activeMobileMenu, setActiveMobileMenu] = useState(false);
 
   // Initialize Active Tab - synced safely
   useEffect(() => {
@@ -74,9 +92,11 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
       // keep view
     } else {
       const defaultViews = {
-        career: 'profile',
+        career: 'portfolio',
         finance: 'dashboard',
         health: 'dashboard',
+        tasks: 'dashboard',
+        blog: 'dashboard'
       };
       setCurrentModuleView(defaultViews[newModuleId] || 'dashboard');
     }
@@ -132,10 +152,10 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
         if (swipeMode === 'internal') {
             // Define internal view structure for each module
             const viewMaps = {
-                career: ['profile', 'tasks', 'notes', ...(viewMode === 'admin' ? ['settings'] : [])],
+                career: ['portfolio', ...(viewMode === 'admin' ? ['settings'] : [])],
                 finance: ['dashboard', 'tasks', 'notes'],
-                health: ['dashboard', 'tasks', 'notes'],
-                network: ['dashboard'] // Assuming network is simple for now
+                health: ['dashboard'],
+                network: ['dashboard']
             };
 
             const currentViews = viewMaps[activeTabId] || [];
@@ -155,8 +175,8 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
 
         // --- MODE 3: SECTIONS (Mission Tabs) ---
         if (swipeMode === 'sections') {
-            // Only applies if we are in the 'tasks' view for most modules (or similar operative views)
-            if (currentModuleView === 'tasks') {
+            // Check if we are in the 'Tasks' module OR 'tasks' view of another module (legacy)
+            if (activeTabId === 'tasks' || currentModuleView === 'tasks') {
                 const tabs = ['protocol', 'missions', 'goals'];
                 const currentIndex = tabs.indexOf(activeTaskTab);
                 
@@ -427,19 +447,53 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
 
       {/* --- Bottom Navigation (Mobile) --- */}
       {showDetailNav && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0A0A0A]/90 backdrop-blur-xl border-t border-white/5 z-50 flex items-center justify-around p-2 pb-6">
-            {visibleModules.map(module => (
-            <button
-                key={module.id}
-                onClick={() => handleModuleChange(module.id)}
-                className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${activeTabId === module.id ? 'text-white' : 'text-neutral-500'}`}
-                style={activeTabId === module.id ? { color: themeColor } : {}}
+        <>
+             {/* Extended Mobile Menu */}
+            {activeMobileMenu && visibleModules.length > 5 && (
+                 <div className="md:hidden fixed bottom-20 right-2 w-48 bg-[#0A0A0A] border border-white/10 rounded-xl shadow-2xl p-1 z-50 animate-in slide-in-from-bottom-5 space-y-1">
+                    {visibleModules.slice(4).map(module => (
+                        <button
+                            key={module.id}
+                            onClick={() => { handleModuleChange(module.id); setActiveMobileMenu(false); }}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${activeTabId === module.id ? 'bg-white/10 text-white' : 'text-neutral-500 hover:text-white'}`}
+                            style={activeTabId === module.id ? { color: themeColor } : {}}
+                        >
+                             <module.icon className="w-4 h-4" />
+                             <span>{module.label}</span>
+                        </button>
+                    ))}
+                 </div>
+            )}
+
+            <nav 
+                className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0A0A0A]/90 backdrop-blur-xl border-t border-white/5 z-50 grid p-2 pb-6 gap-1"
+                style={{ gridTemplateColumns: `repeat(${Math.min(visibleModules.length > 5 ? 5 : visibleModules.length, 5)}, 1fr)` }}
             >
-                <module.icon className={`w-5 h-5 mb-1 ${activeTabId === module.id && 'scale-110 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]'}`} />
-                <span className="text-[9px] font-black uppercase tracking-wider">{module.label}</span>
-            </button>
-            ))}
-        </nav>
+                {visibleModules.slice(0, visibleModules.length > 5 ? 4 : 5).map(module => (
+                <button
+                    key={module.id}
+                    onClick={() => { handleModuleChange(module.id); setActiveMobileMenu(false); }}
+                    className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${activeTabId === module.id ? 'text-white' : 'text-neutral-500'}`}
+                    style={activeTabId === module.id ? { color: themeColor } : {}}
+                >
+                    <module.icon className={`w-5 h-5 mb-1 ${activeTabId === module.id && 'scale-110 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]'}`} />
+                    <span className="text-[9px] font-black uppercase tracking-wider truncate w-full text-center">{module.label}</span>
+                </button>
+                ))}
+                
+                 {visibleModules.length > 5 && (
+                     <button
+                        onClick={() => setActiveMobileMenu(!activeMobileMenu)}
+                        className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${activeMobileMenu ? 'text-white bg-white/5' : 'text-neutral-500'}`}
+                    >
+                        <div className="w-5 h-5 mb-1 flex items-center justify-center">
+                            <Menu className="w-5 h-5" />
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-wider">More</span>
+                    </button>
+                 )}
+            </nav>
+        </>
       )}
 
       {/* --- Footer --- */}

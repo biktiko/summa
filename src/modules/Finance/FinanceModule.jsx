@@ -10,11 +10,6 @@ import {
     PieChart as RePieChart, Pie, Cell, Legend, BarChart, Bar
 } from 'recharts';
 
-import TaskBoard from '../../components/MissionControl/TaskBoard';
-import NotesBoard from '../../components/MissionControl/NotesBoard';
-import DailyProtocol from '../../components/MissionControl/DailyProtocol';
-import GoalsBoard from '../../components/MissionControl/GoalsBoard';
-
 // --- Helper Components ---
 
 const StatCard = ({ title, amount, subtext, icon, color, isNegative, onClick, formatMoney }) => {
@@ -97,10 +92,9 @@ const CURRENCIES = {
 const FinanceModule = ({
     userData,
     updateUser,
-    tasksActions, notesActions, transactionsActions, categoriesActions, protocolsActions, goalsActions,
-    viewMode, processTask,
-    activeView, setActiveView,
-    missionTab, setMissionTab
+    transactionsActions, categoriesActions,
+    viewMode,
+    activeView, setActiveView
 }) => {
 
 
@@ -137,7 +131,6 @@ const FinanceModule = ({
         date: new Date().toISOString().split('T')[0]
     });
 
-    // --- Data Processing (Month-Aware) ---
     // --- Data Processing (Month-Aware) ---
     const transactions = useMemo(() => userData.transactions || [], [userData.transactions]);
     const categories = useMemo(() => userData.categories || [], [userData.categories]);
@@ -263,10 +256,10 @@ const FinanceModule = ({
     return (
         <div className="animate-in fade-in duration-500 pb-20 h-full flex flex-col">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-white/5 pb-6 mb-8 gap-4">
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-white/5 pb-2 md:pb-6 mb-4 md:mb-8 gap-4">
                 <div>
                     <div className="flex items-center gap-4">
-                        <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-white mb-2" style={{ textShadow: '0 0 30px rgba(16, 185, 129, 0.3)' }}>Finance</h1>
+                        {/* No Title Here */}
                         
                         {/* Currency Selector */}
                         <div className="relative group">
@@ -297,46 +290,44 @@ const FinanceModule = ({
                     </div>
                 </div>
 
-                <div className="flex bg-neutral-900/50 p-1 rounded-lg border border-white/5 self-start md:self-auto overflow-x-auto">
-                    {['dashboard', 'tasks', 'notes'].map(tab => (
+                {/* Navigation Tabs - Match Task/Portfolio Style */}
+                 <div className="flex bg-neutral-900/50 p-1 rounded-lg border border-white/5 overflow-x-auto no-scrollbar w-full md:w-auto self-start md:self-end">
+                    {[
+                        { id: 'budget', label: 'Planning', color: 'bg-yellow-600 text-white shadow-lg' },
+                        { id: 'overview', label: 'Analytics', color: 'bg-green-600 text-white shadow-lg' },
+                        { id: 'history', label: 'History', color: 'bg-blue-600 text-white shadow-lg' }
+                    ].map(t => (
                         <button
-                            key={tab}
-                            onClick={() => setActiveView(tab)}
-                            className={`px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === tab ? 'bg-green-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+                            key={t.id}
+                            onClick={() => setDashboardTab(t.id)}
+                            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${dashboardTab === t.id ? t.color : 'text-neutral-500 hover:text-white'}`}
                         >
-                            {tab}
+                            {t.label}
                         </button>
                     ))}
                 </div>
             </div>
 
             {/* Content Switcher */}
-            {activeView === 'dashboard' && (
-                <div className="flex-1 flex flex-col">
-                    {/* Dashboard Nav */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-white/5 pb-1 mb-8 gap-4">
-                        <div className="flex items-center gap-8 overflow-x-auto w-full md:w-auto">
-                             {[
-                                { id: 'budget', label: 'Planning', color: 'text-yellow-500' },
-                                { id: 'overview', label: 'Analytics', color: 'text-green-500' },
-                                { id: 'history', label: 'History', color: 'text-blue-500' }
-                            ].map(t => (
-                                <button
-                                    key={t.id}
-                                    onClick={() => setDashboardTab(t.id)}
-                                    className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${dashboardTab === t.id ? t.color : 'text-neutral-500 hover:text-white'}`}
-                                >
-                                    {t.label}
-                                    {dashboardTab === t.id && <div className={`absolute bottom-0 left-0 w-full h-0.5 rounded-t-full bg-current`} />}
-                                </button>
-                            ))}
+            <div className="flex-1 flex flex-col">
+                    {/* Dashboard Nav - Replaced by Top Header Nav */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between pb-1 mb-8 gap-4">
+                        <div className="hidden md:flex items-center gap-8 overflow-x-auto w-full md:w-auto">
+                            {/* Hidden on desktop too as they are now in header? Or keep as sub-nav? 
+                                User asked for "same style as Portfolio", which has them in header. 
+                                So we should probably remove this secondary nav or make it just for the toggle if any.
+                                Actually, in the previous code, this was the primary way to switch tabs. 
+                                Now we have the buttons in the header (lines 294-308).
+                                So we can remove this block or hide it. 
+                                Let's remove the duplicate tabs and keep the analytics source toggle.
+                            */}
                         </div>
                         
                         {/* Source Toggle for Analytics */}
                         {dashboardTab === 'overview' && (
-                            <div className="flex bg-neutral-900 rounded-lg p-1 border border-white/5 mb-1 self-start md:self-auto">
-                                <button onClick={() => setAnalyticsSource('actual')} className={`px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'actual' ? 'bg-green-600 text-white' : 'text-neutral-500'}`}>Actuals</button>
-                                <button onClick={() => setAnalyticsSource('budget')} className={`px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'budget' ? 'bg-yellow-600 text-white' : 'text-neutral-500'}`}>Budget Plan</button>
+                            <div className="flex bg-neutral-900 rounded-lg p-1 border border-white/5 mb-1 self-start md:self-auto w-full md:w-auto">
+                                <button onClick={() => setAnalyticsSource('actual')} className={`flex-1 md:flex-none px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'actual' ? 'bg-green-600 text-white' : 'text-neutral-500'}`}>Actuals</button>
+                                <button onClick={() => setAnalyticsSource('budget')} className={`flex-1 md:flex-none px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'budget' ? 'bg-yellow-600 text-white' : 'text-neutral-500'}`}>Budget Plan</button>
                             </div>
                         )}
                     </div>
@@ -557,77 +548,8 @@ const FinanceModule = ({
                              </div>
                          </div>
                      )}
-                </div>
-            )}
+            </div>
 
-            {activeView === 'tasks' && (
-                <div className="flex-1 min-h-[600px] flex flex-col">
-                    {/* Mission Control Tabs */}
-                    <div className="flex items-center gap-6 mb-8 border-b border-white/5 pb-1">
-                        <button
-                            onClick={() => setMissionTab('protocol')}
-                            className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${missionTab === 'protocol' ? 'text-purple-500' : 'text-neutral-500 hover:text-white'}`}
-                        >
-                            Routine
-                            {missionTab === 'protocol' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-500 rounded-t-full" />}
-                        </button>
-                        <button
-                            onClick={() => setMissionTab('missions')}
-                            className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${missionTab === 'missions' ? 'text-blue-500' : 'text-neutral-500 hover:text-white'}`}
-                        >
-                            Tasks
-                            {missionTab === 'missions' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 rounded-t-full" />}
-                        </button>
-                        <button
-                            onClick={() => setMissionTab('goals')}
-                            className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${missionTab === 'goals' ? 'text-yellow-500' : 'text-neutral-500 hover:text-white'}`}
-                        >
-                            Strategic Goals
-                            {missionTab === 'goals' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-yellow-500 rounded-t-full" />}
-                        </button>
-                    </div>
-
-                    {/* Tab Content */}
-                    <div className="flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        {missionTab === 'protocol' ? (
-                             <DailyProtocol
-                                 protocols={userData.protocols}
-                                 actions={protocolsActions}
-                                 moduleId="finance"
-                                 viewMode={viewMode}
-                                 processTask={processTask}
-                                 settings={userData.gameplaySettings}
-                             />
-                        ) : missionTab === 'missions' ? (
-                             <TaskBoard
-                                tasks={userData.tasks}
-                                actions={tasksActions}
-                                moduleId="finance"
-                                viewMode={viewMode}
-                                processTask={processTask}
-                                settings={userData.gameplaySettings}
-                            /> 
-                        ) : (
-                             <GoalsBoard
-                                 goals={userData.goals}
-                                 tasks={userData.tasks}
-                                 actions={goalsActions}
-                                 viewMode={viewMode}
-                                 processTask={processTask}
-                                 moduleId="finance"
-                             />
-                        )}
-                    </div>
-                 </div>
-            )}
-             {activeView === 'notes' && (
-                  <NotesBoard
-                  notes={userData.notes}
-                  actions={notesActions}
-                  moduleId="finance"
-                  viewMode={viewMode}
-              />
-            )}
 
             {/* --- MODALS --- */}
 
@@ -801,21 +723,20 @@ const FinanceModule = ({
                                     <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Date</label>
                                     <input
                                         type="date"
-                                        className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm text-white outline-none"
+                                        className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm text-white focus:border-green-500 outline-none"
                                         value={newTransaction.date}
                                         onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
                                     />
                                 </div>
                             </div>
 
-                            <button type="submit" className="w-full py-3 bg-white text-black font-bold uppercase rounded-xl hover:bg-neutral-200 transition-colors mt-2">
-                                Save Transaction
+                            <button type="submit" className="w-full py-3 bg-white text-black font-bold uppercase rounded-xl hover:bg-neutral-200 transition-colors mt-4">
+                                Log Transaction
                             </button>
                         </form>
                      </div>
                 </div>
             )}
-
         </div>
     );
 };

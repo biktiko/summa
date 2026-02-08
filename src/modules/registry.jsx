@@ -1,20 +1,36 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react';
-import { Target, Activity, Globe, Coins, ShieldAlert, Sliders } from 'lucide-react';
-import CareerModule from './Career/CareerModule';
+import { Target, Activity, Globe, Coins, Sliders, CheckSquare, FileText, LayoutDashboard } from 'lucide-react';
+import PortfolioModule from './Portfolio/PortfolioModule';
 import HealthModule from './Health/HealthModule';
 import SettingsModule from '../components/Settings/SettingsModule';
 import FinanceModule from './Finance/FinanceModule';
+import TasksModule from './Tasks/TasksModule';
+import BlogModule from './Blog/BlogModule';
 
 
 const NetworkModule = () => <div className="p-8 text-neutral-500 font-mono uppercase">Network Module // Offline</div>;
 
 export const MODULES = [
     {
-        id: 'career',
-        label: 'Career',
-        icon: Target,
-        component: CareerModule,
+        id: 'tasks',
+        label: 'Tasks',
+        icon: CheckSquare,
+        component: TasksModule,
+        description: 'Mission Control & Strategic Goals'
+    },
+    {
+        id: 'blog',
+        label: 'Blog',
+        icon: FileText, // Used to be Notes
+        component: BlogModule,
+        description: 'Personal Knowledge Base'
+    },
+    {
+        id: 'career', // Keeping ID as career for data compatibility
+        label: 'Portfolio',
+        icon: LayoutDashboard, // Was Target
+        component: PortfolioModule,
         description: 'Skill Trees & Project Management'
     },
     {

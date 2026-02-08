@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Circle, Clock, Calendar, Repeat, Plus, Trash2, Edit2, X, AlertCircle, Eye, EyeOff, Zap, Coins, Calendar as CalendarIcon } from 'lucide-react';
 import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, getUserProfile, updateEvent, deleteEvent } from '../../core/services/googleCalendar';
 
-const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility }) => {
+const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [isCalendarConnected, setIsCalendarConnected] = useState(false);
@@ -10,14 +10,17 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
     // Filter protocols for this specific module
     const moduleProtocols = React.useMemo(() => 
-        protocols ? protocols.filter(p => p.moduleId === moduleId) : [], 
+        protocols ? protocols.filter(p => {
+            if (moduleId && p.moduleId !== moduleId) return false;
+            return true;
+        }) : [], 
         [protocols, moduleId]
     );
 
     const [formData, setFormData] = useState({
         title: '',
-        frequency: 'daily', // daily, weekly, monthly, specific_days
-        specificDays: [], // 0-6 (Sun-Sat)
+        frequency: 'daily',
+        specificDays: [], 
         time: '',
         xpReward: 10,
         coinReward: 5,
@@ -25,7 +28,13 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
         addToCalendar: true
     });
 
-
+    const checkLanguageMatch = (text, lang) => {
+        if (!text || !lang || lang === 'none') return null;
+        if (lang === 'english') return /^[a-zA-Z0-9\s.,!?'"-\(\)\[\]]+$/.test(text);
+        if (lang === 'russian') return /[а-яА-Я]/.test(text);
+        if (lang === 'armenian') return /[\u0530-\u058F]/.test(text);
+        return null;
+    };
 
     const daysOfWeek = [
         { id: 0, label: 'Sun', short: 'S' },
@@ -38,22 +47,17 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
     ];
 
     useEffect(() => {
-        // Init Google Calendar
         const init = async () => {
             try {
-                // Note: This might fail if Client ID is missing, but we'll try
                 await initGoogleCalendar();
                 const signedIn = isSignedIn();
                 setIsCalendarConnected(signedIn);
-
                 if (signedIn) {
                     const profile = await getUserProfile();
-                    if (profile && profile.email) {
-                        setUserEmail(profile.email);
-                    }
+                    if (profile && profile.email) setUserEmail(profile.email);
                 }
             } catch (e) {
-                console.log("Calendar init failed (likely missing Client ID or script load error)", e);
+                console.log("Calendar init failed", e);
             }
         };
         init();
@@ -64,12 +68,9 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
             await signInToGoogle();
             setIsCalendarConnected(true);
             const profile = await getUserProfile();
-            if (profile && profile.email) {
-                setUserEmail(profile.email);
-            }
+            if (profile && profile.email) setUserEmail(profile.email);
         } catch (e) {
             console.error("Sign in failed", e);
-            alert("Failed to connect Google Calendar. Check console for details (Client ID missing?).");
         }
     };
 
@@ -80,28 +81,20 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
             for (const p of moduleProtocols) {
                 if (p.isCompleted && p.lastCompletedDate !== today) {
-                    // It's a new day, check if we should reset
                     let shouldReset = false;
-
                     if (p.frequency === 'daily') shouldReset = true;
                     else if (p.frequency === 'weekly') {
                         const lastDate = new Date(p.lastCompletedDate);
                         const diffTime = Math.abs(new Date() - lastDate);
                         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
                         if (diffDays >= 7) shouldReset = true;
                     }
-
-                    if (shouldReset) {
-                        await actions.update(p.id, { isCompleted: false });
-                    }
+                    if (shouldReset) await actions.update(p.id, { isCompleted: false });
                 }
             }
         };
 
-        if (viewMode === 'admin') {
-            checkResets();
-        }
+        if (viewMode === 'admin') checkResets();
     }, [moduleProtocols, viewMode, actions]);
 
 
@@ -118,35 +111,22 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
         };
 
         if (editingId) {
-            // Edit Mode - Sync Calendar
+            // Edit Mode
             const existingProtocol = moduleProtocols.find(p => p.id === editingId);
             if (existingProtocol && existingProtocol.googleEventId && isCalendarConnected) {
                  try {
-                     // For simplicity, we are just updating details. Changing recurrence is strictly hard here,
-                     // but we'll try to update basic info. If frequency changed, it might desync.
-                     // A fuller solution involves deleting and recreating if frequency changes.
-                     
-                     // Let's recreate if frequency/time changes? Or just update text?
-                     // For now, let's just update title/desc.
-                     
-                     // Construct a date object (arbitrary today) for update reference
                     const today = new Date();
                     let updateTime = today;
                     if (formData.time) {
                         const [hours, minutes] = formData.time.split(':');
                         updateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
                     }
-
                      const eventUpdate = createEventObject(
                         `${formData.title} [Routine]`,
                         `Routine: ${formData.description || ''}\nFrequency: ${formData.frequency}`,
                         updateTime,
                         30
                     );
-                    
-                    // Note: Recurrence rules cannot always be patched easily if changed.
-                    // Ideally we should delete and recreate if frequency changed.
-                    
                     await updateEvent(existingProtocol.googleEventId, eventUpdate);
                  } catch (e) {
                      console.error("Failed to update routine calendar event", e);
@@ -154,82 +134,19 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
             }
             await actions.update(editingId, data);
         } else {
-            await actions.add(data);
-        }
-
-        // Add New Event logic (Moved down for separation)
-        if (!editingId && isCalendarConnected && formData.time && formData.addToCalendar) {
-             try {
-                // Construct a date object for today at the specified time
-                const today = new Date();
-                const [hours, minutes] = formData.time.split(':');
-                today.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-
-                let recurrence = [];
-                if (formData.frequency === 'daily') {
-                    recurrence.push('RRULE:FREQ=DAILY');
-                } else if (formData.frequency === 'weekly') {
-                    recurrence.push('RRULE:FREQ=WEEKLY');
-                } else if (formData.frequency === 'monthly') {
-                    recurrence.push('RRULE:FREQ=MONTHLY');
-                } else if (formData.frequency === 'specific_days' && formData.specificDays.length > 0) {
-                    const daysMap = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-                    const byDay = formData.specificDays.map(d => daysMap[d]).join(',');
-                    recurrence.push(`RRULE:FREQ=WEEKLY;BYDAY=${byDay}`);
-                }
-
-                const event = createEventObject(
-                    `${formData.title} [Routine]`,
-                    `Routine: ${formData.description || ''}\nFrequency: ${formData.frequency}`,
-                    today,
-                    30, // Default 30 min duration for routines
-                    [],
-                    { recurrence }
-                );
-
-                await addEventToCalendar(event);
-                // We need to save the googleEventId to the new item. 
-                // Since actions.add is likely async and might not return the ID immediately or we can't patch it easily without a refetch,
-                // we'll rely on the `add` action potentially returning the new item or ID in a real app.
-                // But `actions.add` here maps to `db.addItem` which returns the item.
-                // However, `actions.add` is passed from parent. 
-                // Let's just create the event. If `actions.add` returns the object, we should update it with the event ID.
-                // For now, in this architecture, we might miss saving the ID if we don't handle it carefully.
-                
-                 // CRITICAL FIX: The original code didn't save the Google Event ID back to the database!
-                 // We need to assume actions.add returns the new item.
-                 
-                 // But wait, the previous code block was:
-                 // await actions.add(data);
-                 // if (calendar...) addEvent... await addEventToCalendar(event)
-                 
-                 // It didn't save the ID? Ah, checking TaskBoard, it did:
-                 // `await actions.add({ ...newTask, googleEventId: result.id })`
-                 
-                 // So I need to modify the Add logic above to include the ID *if* we created an event.
-                 // I will restructure this block.
-            } catch (e) {
-                 console.error("Failed to sync to calendar", e);
-            }
-        }
-        
-        // Re-structure execution flow for ADD case to capture ID
-        if (!editingId) {
-             let googleEventId = null;
-             if (isCalendarConnected && formData.time && formData.addToCalendar) {
+            // Add Mode - Fix Double Creation
+            let googleEventId = null;
+            if (isCalendarConnected && formData.time && formData.addToCalendar) {
                  try {
-                     const today = new Date();
+                    const today = new Date();
                     const [hours, minutes] = formData.time.split(':');
                     today.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
                     let recurrence = [];
-                    if (formData.frequency === 'daily') {
-                        recurrence.push('RRULE:FREQ=DAILY');
-                    } else if (formData.frequency === 'weekly') {
-                        recurrence.push('RRULE:FREQ=WEEKLY');
-                    } else if (formData.frequency === 'monthly') {
-                        recurrence.push('RRULE:FREQ=MONTHLY');
-                    } else if (formData.frequency === 'specific_days' && formData.specificDays.length > 0) {
+                    if (formData.frequency === 'daily') recurrence.push('RRULE:FREQ=DAILY');
+                    else if (formData.frequency === 'weekly') recurrence.push('RRULE:FREQ=WEEKLY');
+                    else if (formData.frequency === 'monthly') recurrence.push('RRULE:FREQ=MONTHLY');
+                    else if (formData.frequency === 'specific_days' && formData.specificDays.length > 0) {
                         const daysMap = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
                         const byDay = formData.specificDays.map(d => daysMap[d]).join(',');
                         recurrence.push(`RRULE:FREQ=WEEKLY;BYDAY=${byDay}`);
@@ -249,15 +166,14 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                  } catch (e) {
                       console.error("Calendar Sync Error", e);
                  }
-             }
-             
-             await actions.add({ ...data, googleEventId });
+            }
+            // Single Action Call
+            await actions.add({ ...data, googleEventId });
         }
 
         resetForm();
     };
-    
-    // Helper for delete
+
     const handleDelete = async (id) => {
         const protocol = moduleProtocols.find(p => p.id === id);
         if (protocol && protocol.googleEventId && isCalendarConnected) {
@@ -309,35 +225,35 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
     };
 
     const handleComplete = async (protocol) => {
-        if (protocol.isCompleted) return; // Already done
+        if (protocol.isCompleted) return;
 
         const today = new Date().toISOString().split('T')[0];
         const newStreak = (protocol.streak || 0) + 1;
 
-        // Calculate Dynamic Rewards
-        let xp = 0;
-        let coins = 0;
-
-        if (protocol.frequency === 'daily') {
-            xp = 5 + newStreak; 
-            coins = Math.round(newStreak / 7);
-        } else {
-            // Non-daily
-            xp = 10 + newStreak;
-            coins = Math.round(newStreak / 5);
-        }
-        
-        // Cap XP to 30 max
+        // --- Improved Reward Logic ---
+        // Formula: 5 + (Streak - 1). Hard Cap Base at 30.
+        let xp = 5 + Math.max(0, newStreak - 1);
         if (xp > 30) xp = 30;
 
-        // Update protocol state
+        // Language Bonus (+5)
+        const primaryLanguage = settings?.primaryLanguage || 'none';
+        if (primaryLanguage !== 'none') {
+            const isMatch = checkLanguageMatch(protocol.title, primaryLanguage);
+            if (isMatch) xp += 5; // Max becomes 35
+        }
+
+        // Coins Formula: Every 7th day -> Coins = Streak / 7 (Max 4)
+        let coins = 0;
+        if (newStreak > 0 && newStreak % 7 === 0) {
+            coins = Math.min(4, Math.floor(newStreak / 7));
+        }
+
         await actions.update(protocol.id, {
             isCompleted: true,
             lastCompletedDate: today,
             streak: newStreak
         });
 
-        // Award XP/Coins
         if (processTask) {
             await processTask({
                 xpReward: xp,
@@ -350,47 +266,24 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
     return (
         <div className={`h-full flex flex-col`}>
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+                {/* Header Section */}
                 <div className="hidden md:block">
                     <h3 className="text-xl font-black text-white uppercase tracking-wider">🔄 Routines</h3>
                     <p className="text-xs text-neutral-500 font-mono">Daily Operations & Habits</p>
                 </div>
-                {viewMode === 'admin' && (
-                    <div className="flex items-center gap-2 self-start md:self-auto overflow-x-auto max-w-full pb-1">
-                        {!isCalendarConnected ? (
-                            <button
-                                onClick={connectCalendar}
-                                className="p-2 bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors"
-                                title="Connect Google Calendar"
-                            >
-                                <CalendarIcon className="w-4 h-4" />
-                            </button>
-                        ) : (
-                            <a
-                                href="https://calendar.google.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg group transition-all hover:bg-green-500/20"
-                            >
-                                <CalendarIcon className="w-3 h-3 text-green-500" />
-                                <span className="text-[10px] font-bold text-green-500 uppercase tracking-wider group-hover:underline">Open Calendar</span>
-                                {userEmail && <span className="text-[10px] text-neutral-500 border-l border-white/10 pl-2 ml-1 hidden sm:inline">{userEmail}</span>}
-                            </a>
-                        )}
-                        {toggleSectionVisibility && (
-                            <button
-                                onClick={toggleSectionVisibility}
-                                className={`p-2 rounded-lg transition-colors ${isSectionHidden ? 'bg-red-500/20 text-red-500' : 'bg-white/5 text-neutral-400 hover:text-white'}`}
-                            >
-                                {isSectionHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                        )}
-                        <button
-                            onClick={() => { resetForm(); setIsAdding(true); }}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
-                        >
-                            <Plus className="w-3 h-3" /> Add Routine
-                        </button>
+                 {viewMode === 'admin' && (
+                     <div className="flex items-center gap-2 self-start md:self-auto overflow-x-auto max-w-full pb-1">
+                         {/* Calendar Buttons ... (Keep existing) */}
+                         {!isCalendarConnected ? (
+                             <button onClick={connectCalendar} className="p-2 bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors" title="Connect Google Calendar"><CalendarIcon className="w-4 h-4" /></button>
+                         ) : (
+                             <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg group transition-all hover:bg-green-500/20"><CalendarIcon className="w-3 h-3 text-green-500" /><span className="text-[10px] font-bold text-green-500 uppercase tracking-wider group-hover:underline">Open Calendar</span></a>
+                         )}
+                         {toggleSectionVisibility && (
+                             <button onClick={toggleSectionVisibility} className={`p-2 rounded-lg transition-colors ${isSectionHidden ? 'bg-red-500/20 text-red-500' : 'bg-white/5 text-neutral-400 hover:text-white'}`}>{isSectionHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
+                         )}
+                         <button onClick={() => { resetForm(); setIsAdding(true); }} className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"><Plus className="w-3 h-3" /> Add Routine</button>
                     </div>
                 )}
             </div>
@@ -405,61 +298,71 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                 {moduleProtocols.map(protocol => (
                     <div
                         key={protocol.id}
-                        className={`group relative p-4 rounded-xl border transition-all ${protocol.isCompleted
-                            ? 'bg-emerald-900/10 border-emerald-500/20 opacity-60'
+                        className={`group relative p-3 rounded-2xl border transition-all ${protocol.isCompleted
+                            ? 'bg-emerald-900/10 border-emerald-500/20'
                             : 'bg-neutral-900/40 border-white/5 hover:border-blue-500/30'
                             }`}
                     >
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <button
-                                    onClick={() => handleComplete(protocol)}
-                                    disabled={protocol.isCompleted || viewMode === 'guest'}
-                                    className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${protocol.isCompleted
-                                        ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.4)]'
-                                        : 'bg-black/40 border-2 border-neutral-600 hover:border-blue-500 text-transparent'
-                                        }`}
-                                >
-                                    <CheckCircle2 className="w-4 h-4" />
-                                </button>
+                         <div className="flex items-center gap-4">
+                             {/* Check Button */}
+                             <button
+                                onClick={() => handleComplete(protocol)}
+                                disabled={protocol.isCompleted || viewMode === 'guest'}
+                                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shrink-0 ${protocol.isCompleted
+                                    ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                                    : 'bg-black/40 border border-neutral-700 hover:border-blue-500 text-neutral-500 hover:text-blue-500'
+                                    }`}
+                            >
+                                <CheckCircle2 className="w-6 h-6" />
+                            </button>
 
-                                <div>
-                                    <h4 className={`font-bold text-sm ${protocol.isCompleted ? 'text-emerald-500 line-through' : 'text-white'}`}>
-                                        {protocol.title}
-                                    </h4>
-                                    <div className="flex items-center gap-3 text-[10px] text-neutral-500 font-mono mt-1">
-                                        {protocol.time && (
-                                            <span className="flex items-center gap-1 text-blue-400">
-                                                <Clock className="w-3 h-3" /> {protocol.time}
-                                            </span>
-                                        )}
-                                        <span className="flex items-center gap-1">
-                                            <Repeat className="w-3 h-3" />
-                                            {protocol.frequency === 'specific_days'
-                                                ? protocol.specificDays.map(d => daysOfWeek[d].short).join(',')
-                                                : protocol.frequency}
-                                        </span>
-                                        {protocol.streak > 0 && (
-                                            <span className="text-yellow-500">
-                                                🔥 {protocol.streak} Day Streak
-                                            </span>
-                                        )}
-                                    </div>
+                            {/* Content */}
+                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                <h4 className={`font-bold text-base truncate ${protocol.isCompleted ? 'text-emerald-500' : 'text-neutral-200'}`}>
+                                    {protocol.title}
+                                </h4>
+                                <div className="flex items-center gap-2 text-[10px] text-neutral-500 font-bold uppercase tracking-wider mt-0.5">
+                                    <Repeat className="w-3 h-3" />
+                                    <span>
+                                        {protocol.frequency === 'specific_days'
+                                            ? protocol.specificDays.map(d => daysOfWeek[d].short).join(',')
+                                            : protocol.frequency}
+                                    </span>
+                                    {protocol.time && <span className="text-blue-500 ml-1">@ {protocol.time}</span>}
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3">
-                                <div className="flex flex-col items-end text-[9px] font-bold text-neutral-600 uppercase tracking-wider">
-                                    <span className="text-blue-500">+{protocol.xpReward} XP</span>
-                                    <span className="text-yellow-500">+{protocol.coinReward} G</span>
+                            {/* Stats & Actions */}
+                            <div className="flex items-center gap-3 shrink-0">
+                                
+                                {/* Streak */}
+                                <div className="flex items-center gap-1.5 px-2">
+                                    <span className="text-2xl drop-shadow-md">🔥</span>
+                                    <div className="flex flex-col items-start leading-none">
+                                        <span className="text-sm font-black text-yellow-500">{protocol.streak || 0}</span>
+                                        <span className="text-[7px] font-bold text-yellow-600 uppercase tracking-tighter">Day Streak</span>
+                                    </div>
+                                </div>
+                                
+                                {/* Divider */}
+                                <div className="w-px h-8 bg-white/5 mx-1 hidden sm:block" />
+
+                                {/* XP Reward */}
+                                <div className="text-xs font-black text-blue-500 tabular-nums bg-blue-500/10 px-2 py-1 rounded hidden sm:block">
+                                    +{5 + Math.max(0, (protocol.streak || 0))} XP
+                                </div>
+                                {/* Mobile XP (Compact) */}
+                                <div className="text-[10px] font-bold text-blue-500 sm:hidden">
+                                     +{5 + Math.max(0, (protocol.streak || 0))} XP
                                 </div>
 
+
                                 {viewMode === 'admin' && (
-                                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => startEdit(protocol)} className="p-1.5 hover:bg-white/10 rounded text-neutral-500 hover:text-white">
+                                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity ml-2 absolute top-2 right-2 md:static">
+                                        <button onClick={() => startEdit(protocol)} className="p-1 hover:bg-white/10 rounded text-neutral-400 hover:text-white">
                                             <Edit2 className="w-3 h-3" />
                                         </button>
-                                        <button onClick={() => handleDelete(protocol.id)} className="p-1.5 hover:bg-red-500/10 rounded text-neutral-500 hover:text-red-500">
+                                        <button onClick={() => handleDelete(protocol.id)} className="p-1 hover:bg-red-500/10 rounded text-neutral-400 hover:text-red-500">
                                             <Trash2 className="w-3 h-3" />
                                         </button>
                                     </div>

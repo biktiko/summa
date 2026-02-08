@@ -15,7 +15,7 @@ const TAG_COLORS = [
     { name: 'Gray', value: 'bg-neutral-500 text-white' },
 ];
 
-const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings }) => {
+const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings, updateUser, userXP }) => {
     const titleInputRef = useRef(null);
     const [isAdding, setIsAdding] = useState(false);
 
@@ -24,6 +24,24 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
             setTimeout(() => titleInputRef.current?.focus(), 10);
         }
     }, [isAdding]);
+
+    const checkLanguageMatch = (text, lang) => {
+        if (!text || !lang || lang === 'none') return null; // 'null' means not applicable
+        
+        // English: Strict Latin Check (as per request "only Latin letters")
+        if (lang === 'english') {
+             return /^[a-zA-Z0-9\s.,!?'"-\(\)\[\]]+$/.test(text);
+        }
+        // Russian: Contains Cyrillic
+        if (lang === 'russian') {
+             return /[а-яА-Я]/.test(text);
+        }
+        // Armenian: Contains Armenian
+        if (lang === 'armenian') {
+             return /[ա-ֆԱ-Ֆ]/.test(text);
+        }
+        return true; // For any other language, assume it matches
+    };
    
     // Filter tasks for this specific module
     const [filters, setFilters] = useState({ tags: [], priority: '', difficulty: '', dateStart: '', dateEnd: '', dateCreatedStart: '', dateCreatedEnd: '', search: '' });
@@ -58,8 +76,11 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
     const suggestedTags = Array.from(uniqueTagsMap.values());
     const allTags = suggestedTags.map(t => t.text);
 
+
     const moduleTasks = tasks.filter(t => {
-        if (t.moduleId !== moduleId) return false;
+        // If moduleId is provided, filter by it. If not (global view), show all.
+        if (moduleId && t.moduleId !== moduleId) return false;
+
         if (filters.priority && t.priority !== filters.priority) return false;
         if (filters.difficulty && t.difficulty !== filters.difficulty) return false;
         if (filters.search && !(t.title && t.title.toLowerCase().includes(filters.search.toLowerCase()))) return false;
@@ -146,6 +167,13 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
         if (task.description) xp += 5;
         if (task.tags) xp += (task.tags.length * 2);
 
+        // Language Bonus (Baked in)
+        const primaryLanguage = settings?.primaryLanguage || 'none';
+        if (primaryLanguage !== 'none' && task.title) {
+             const isMatch = checkLanguageMatch(task.title, primaryLanguage);
+             if (isMatch) xp += 10;
+        }
+
         return { xp, coins };
     };
 
@@ -191,6 +219,17 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
 
         const { xp, coins } = calculateProjectedRewards(newTask);
 
+        // --- Language Penalty Check ---
+        const primaryLanguage = settings?.primaryLanguage || 'none';
+        if (primaryLanguage !== 'none' && updateUser && userXP !== undefined) {
+            const isMatch = checkLanguageMatch(newTask.title, primaryLanguage);
+            if (isMatch === false) {
+                 // Apply Penalty
+                 console.log(`Language Mismatch (${primaryLanguage}). deducting 10 XP.`);
+                 await updateUser({ xp: Math.max(0, userXP - 10) });
+            }
+        }
+
         const taskToAdd = { 
             ...newTask, 
             xpReward: xp, // Auto-calculated
@@ -198,15 +237,34 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
             moduleId, 
             sequenceNumber: nextSeq,
             isSyncedToCalendar: false,
-            createdAt: new Date().toISOString(),
+            // Use toString() to preserve local timezone context for display logic that might rely on it, 
+            // or use a local-offset aware ISO string if needed. 
+            // The user requested respecting their +4 timezone.
+            createdAt: new Date().toString(), 
         };
 
-        // Reset Form
+        // Reset Form to Defaults (Low/Easy)
         setNewTask({
-            title: '', status: 'todo', priority: 'medium', description: '',
-            xpReward: 10, coinReward: 5, link: '', linkName: '', isHidden: false,
-            targetValue: 0, currentValue: 0, unit: '', tags: [], deadline: '',
-            startTime: '', endTime: '', reminderBefore: 10, addToCalendar: true
+            title: '', 
+            status: 'todo', 
+            priority: 'low', 
+            difficulty: 'easy', 
+            description: '',
+            xpReward: 10, 
+            coinReward: 5, 
+            link: '', 
+            linkName: '', 
+            isHidden: false,
+            targetValue: 0, 
+            currentValue: 0, 
+            unit: '', 
+            tags: [], 
+            deadline: '',
+            startTime: '', 
+            endTime: '', 
+            reminderBefore: 10, 
+            addToCalendar: true,
+            subtasks: []
         });
 
         // Background Processing
@@ -214,8 +272,10 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
             // Sync to Calendar
             if (isCalendarConnected && taskToAdd.deadline && taskToAdd.addToCalendar) {
                 try {
-                    // Parse date
-                    let startDate = new Date(taskToAdd.deadline);
+                    // Start with Local Date Parsing to avoid UTC shifts
+                    const [y, m, d] = taskToAdd.deadline.split('-').map(Number);
+                    let startDate = new Date(y, m - 1, d); // 00:00 Local Time
+                    
                     let duration = 60; // Default 60 mins
 
                     if (taskToAdd.startTime) {
@@ -224,8 +284,11 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
 
                         if (taskToAdd.endTime) {
                             const [eh, em] = taskToAdd.endTime.split(':');
-                            const endDate = new Date(taskToAdd.deadline);
+                            
+                            // End Date Base
+                            const endDate = new Date(y, m - 1, d);
                             endDate.setHours(parseInt(eh), parseInt(em), 0, 0);
+                            
                             const diffMs = endDate - startDate;
                             if (diffMs > 0) {
                                 duration = Math.floor(diffMs / 60000);
@@ -431,7 +494,7 @@ Link: ${updatedData.link || 'None'}
     return (
         <div className={`flex flex-col`}>
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-1 md:mb-6 gap-2 md:gap-4 -mx-4 px-4 md:mx-0 md:px-0">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-2">
                 <div className="flex items-center gap-3">
                     {/* Header Removed as per request */}
                 </div>
@@ -686,10 +749,12 @@ Link: ${updatedData.link || 'None'}
                     <>
                         <button
                             onClick={() => setIsAdding(true)}
-                            className="md:hidden w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-bold uppercase tracking-wider text-xs hover:bg-blue-500 transition-all shadow-lg flex items-center justify-center gap-2"
+                            className="md:hidden w-full bg-neutral-900/30 border border-white/10 text-neutral-400 hover:text-white px-4 py-3 rounded-xl font-black uppercase tracking-wider text-[10px] transition-all flex items-center justify-center gap-3 group active:scale-95 hover:bg-white/5 hover:border-white/20"
                         >
-                            <Plus className="w-4 h-4" />
-                            Add Mission
+                            <div className="bg-blue-500/20 text-blue-500 p-1 rounded-md group-hover:bg-blue-500 group-hover:text-white transition-colors shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                                <Plus className="w-4 h-4" />
+                            </div>
+                            <span>Create New Task</span>
                         </button>
                         
                         <div 
@@ -899,25 +964,31 @@ Link: ${updatedData.link || 'None'}
             {/* Board Columns - Mobile Navigation & Desktop Grid */}
             <div className="flex-1 pb-4 mb-8">
                 {/* Mobile View Selector */}
-                <div className="md:hidden flex items-center justify-between bg-neutral-900/50 p-1.5 rounded-xl border border-white/5 mb-4">
-                    <button
-                        onClick={() => setMobileColumnView('todo')}
-                        className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${mobileColumnView === 'todo' ? 'bg-blue-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
-                    >
-                        To Do <span className="ml-1 text-[9px] opacity-70">| {moduleTasks.filter(t => t.status === 'todo').length}</span>
-                    </button>
-                    <button
-                        onClick={() => setMobileColumnView('in_progress')}
-                        className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${mobileColumnView === 'in_progress' ? 'bg-yellow-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
-                    >
-                        In Progress <span className="ml-1 text-[9px] opacity-70">| {moduleTasks.filter(t => t.status === 'in_progress').length}</span>
-                    </button>
-                    <button
-                        onClick={() => setMobileColumnView('done')}
-                        className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${mobileColumnView === 'done' ? 'bg-green-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
-                    >
-                        Done <span className="ml-1 text-[9px] opacity-70">| {moduleTasks.filter(t => t.status === 'done').length}</span>
-                    </button>
+                <div className="md:hidden flex items-center bg-black/20 p-1 rounded-xl border border-white/5 mb-4">
+                    {['todo', 'in_progress', 'done'].map(status => {
+                        const isActive = mobileColumnView === status;
+                        const count = moduleTasks.filter(t => t.status === status).length;
+                        const config = {
+                            todo: { label: 'To Do', color: 'bg-blue-500' },
+                            in_progress: { label: 'Active', color: 'bg-yellow-500' },
+                            done: { label: 'Done', color: 'bg-green-500' }
+                        };
+                        const theme = config[status];
+                        
+                        return (
+                            <button
+                                key={status}
+                                onClick={() => setMobileColumnView(status)}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all relative ${isActive ? 'bg-white/5 text-white shadow-lg' : 'text-neutral-500 hover:text-neutral-300'}`}
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    {isActive && <div className={`w-1.5 h-1.5 rounded-full ${theme.color} shadow-[0_0_5px_rgba(255,255,255,0.5)]`} />}
+                                    <span className="text-[10px] font-black uppercase tracking-widest">{theme.label}</span>
+                                </div>
+                                <span className={`text-[10px] font-mono leading-none opacity-60`}>{count}</span>
+                            </button>
+                        );
+                    })}
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-6">

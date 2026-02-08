@@ -367,7 +367,6 @@ const SettingsModule = ({ userData, updateUser }) => {
                         <div className="space-y-3">
                             {[
                                 { id: 'modules', label: 'Switch Modules', desc: 'Swipe Left/Right to switch between Career, Finance, Health.' },
-                                { id: 'internal', label: 'Internal Navigation', desc: 'Swipe to switch between Portfolio, Tasks, Notes within a module.' },
                                 { id: 'sections', label: 'Section Windows', desc: 'Swipe to switch between Routine, Mission Tasks, and Goals in the Task view.' }
                             ].map((mode) => (
                                 <button
@@ -721,7 +720,11 @@ const SettingsModule = ({ userData, updateUser }) => {
             )}
 
             {activeTab === 'gameplay' && (
+                
+
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+
+                    
                     {/* Mechanics Section */}
                     <div className="space-y-4">
                         <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -729,6 +732,25 @@ const SettingsModule = ({ userData, updateUser }) => {
                             Game Mechanics
                         </h3>
                         <div className="space-y-3">
+            
+                            {/* Primary Language Setting */}
+                            <div className="bg-black/40 border border-white/5 p-4 rounded-xl flex items-center justify-between hover:bg-white/5 transition-colors">
+                                <div>
+                                    <h4 className="text-xs font-bold text-white mb-1">Primary Language (Gamification)</h4>
+                                    <p className="text-[10px] text-neutral-500">Bonus XP for matching language. Penalty for mismatch.</p>
+                                </div>
+                                <select
+                                    value={localData.gameplaySettings?.primaryLanguage || 'none'}
+                                    onChange={(e) => setLocalData({ ...localData, gameplaySettings: { ...localData.gameplaySettings, primaryLanguage: e.target.value } })}
+                                    className="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-white focus:border-blue-500/50 outline-none"
+                                >
+                                    <option value="none">No Language</option>
+                                    <option value="armenian">Armenian</option>
+                                    <option value="russian">Russian</option>
+                                    <option value="english">English</option>
+                                </select>
+                            </div>
+
                             <div className="bg-black/40 border border-white/5 p-4 rounded-xl flex items-center justify-between hover:bg-white/5 transition-colors">
                                 <div>
                                     <h4 className="text-xs font-bold text-white mb-1">Experience Points (XP)</h4>
@@ -753,6 +775,8 @@ const SettingsModule = ({ userData, updateUser }) => {
                                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localData.gameplaySettings?.coins !== false ? 'translate-x-5' : 'translate-x-0'}`} />
                                 </button>
                             </div>
+                            
+                   
                         </div>
                     </div>
 
@@ -763,50 +787,80 @@ const SettingsModule = ({ userData, updateUser }) => {
                         <div className="flex items-center justify-between">
                              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                                 <Palette className="w-4 h-4 text-purple-500" />
-                                Active Modules
+                                Active Modules & Ordering
                             </h3>
-                            <span className="text-[9px] bg-white/10 px-2 py-1 rounded text-neutral-400">Owner Only</span>
+                            <span className="text-[9px] bg-white/10 px-2 py-1 rounded text-neutral-400">Drag/Sort</span>
                         </div>
                        
-                        <p className="text-[10px] text-neutral-500 mb-2">Toggle modules off to hide them from your main navigation. At least one module must remain active.</p>
+                        <p className="text-[10px] text-neutral-500 mb-2">Toggle modules to hide them. Use arrows to reorder navigation.</p>
                         <div className="grid grid-cols-1 gap-3">
-                            {['career', 'finance', 'health', 'network'].map(modId => {
+                            {(localData.moduleOrder || ['tasks', 'finance', 'blog', 'career', 'health', 'network']).map((modId, index, arr) => {
                                 const isHidden = (localData.hiddenModules || []).includes(modId);
                                 return (
-                                    <div key={modId} className={`p-4 rounded-xl border transition-all flex items-center justify-between group ${!isHidden ? 'bg-white/5 border-white/10' : 'bg-black/40 border-white/5 opacity-60'}`}>
+                                    <div key={modId} className={`p-3 rounded-xl border transition-all flex items-center justify-between group ${!isHidden ? 'bg-white/5 border-white/10' : 'bg-black/40 border-white/5 opacity-60'}`}>
                                         <div className="flex items-center gap-3">
+                                            {/* ID Badge / Icon Placeholder */}
                                             <div className={`p-2 rounded-lg ${!isHidden ? 'bg-white/10 text-white' : 'bg-white/5 text-neutral-500'}`}>
-                                                {modId === 'career' && <Target className="w-4 h-4" />}
-                                                {modId === 'finance' && <Coins className="w-4 h-4" />}
-                                                {modId === 'health' && <Activity className="w-4 h-4" />}
-                                                {modId === 'network' && <Globe className="w-4 h-4" />}
+                                                <span className="text-[10px] font-black uppercase tracking-tighter w-4 h-4 flex items-center justify-center">
+                                                    {modId.substring(0,2)}
+                                                </span>
                                             </div>
                                             <div>
-                                                <span className="text-xs font-bold text-white capitalize">{modId}</span>
-                                                <p className="text-[9px] text-neutral-500">{!isHidden ? 'Active in Sidebar & Mobile' : 'Hidden from Navigation'}</p>
+                                                <span className="text-xs font-bold text-white capitalize">{modId === 'career' ? 'Portfolio' : modId}</span>
+                                                <p className="text-[9px] text-neutral-500">{!isHidden ? `#${index + 1} in Navigation` : 'Hidden'}</p>
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => {
-                                                const currentHidden = localData.hiddenModules || [];
-                                                if (isHidden) {
-                                                    // Unhide
-                                                    setLocalData({ ...localData, hiddenModules: currentHidden.filter(id => id !== modId) });
-                                                } else {
-                                                    // Hide (check if at least one remains)
-                                                    const allModules = ['career', 'finance', 'health', 'network'];
-                                                    const currentlyActive = allModules.filter(m => !currentHidden.includes(m));
-                                                    if (currentlyActive.length <= 1 && currentlyActive.includes(modId)) {
-                                                        alert("You must have at least one active module.");
-                                                        return;
+                                        
+                                        <div className="flex items-center gap-2">
+                                            {/* Reorder Buttons */}
+                                            <div className="flex flex-col gap-0.5 mr-2">
+                                                <button 
+                                                    onClick={() => {
+                                                        if (index === 0) return;
+                                                        const newOrder = [...arr];
+                                                        [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+                                                        setLocalData({ ...localData, moduleOrder: newOrder });
+                                                    }}
+                                                    disabled={index === 0}
+                                                    className="w-5 h-4 flex items-center justify-center rounded hover:bg-white/10 text-neutral-500 disabled:opacity-20"
+                                                >
+                                                    <span className="text-[8px]">▲</span>
+                                                </button>
+                                                <button
+                                                     onClick={() => {
+                                                        if (index === arr.length - 1) return;
+                                                        const newOrder = [...arr];
+                                                        [newOrder[index + 1], newOrder[index]] = [newOrder[index], newOrder[index + 1]];
+                                                        setLocalData({ ...localData, moduleOrder: newOrder });
+                                                    }}
+                                                    disabled={index === arr.length - 1}
+                                                    className="w-5 h-4 flex items-center justify-center rounded hover:bg-white/10 text-neutral-500 disabled:opacity-20"
+                                                >
+                                                     <span className="text-[8px]">▼</span>
+                                                </button>
+                                            </div>
+
+                                            <button
+                                                onClick={() => {
+                                                    const currentHidden = localData.hiddenModules || [];
+                                                    if (isHidden) {
+                                                        // Unhide
+                                                        setLocalData({ ...localData, hiddenModules: currentHidden.filter(id => id !== modId) });
+                                                    } else {
+                                                        // Hide (check if at least one remains)
+                                                        const enabledCount = arr.filter(m => !(localData.hiddenModules || []).includes(m)).length;
+                                                        if (enabledCount <= 1) {
+                                                            alert("You must have at least one active module.");
+                                                            return;
+                                                        }
+                                                        setLocalData({ ...localData, hiddenModules: [...currentHidden, modId] });
                                                     }
-                                                    setLocalData({ ...localData, hiddenModules: [...currentHidden, modId] });
-                                                }
-                                            }}
-                                            className={`text-[9px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${!isHidden ? 'bg-green-500/20 text-green-400 border border-green-500/20 hover:bg-green-500/30' : 'bg-neutral-800 text-neutral-500 border border-transparent hover:border-white/10 hover:text-neutral-400'}`}
-                                        >
-                                            {!isHidden ? 'Enabled' : 'Disabled'}
-                                        </button>
+                                                }}
+                                                className={`text-[9px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${!isHidden ? 'bg-green-500/20 text-green-400 border border-green-500/20 hover:bg-green-500/30' : 'bg-neutral-800 text-neutral-500 border border-transparent hover:border-white/10 hover:text-neutral-400'}`}
+                                            >
+                                                {!isHidden ? 'ON' : 'OFF'}
+                                            </button>
+                                        </div>
                                     </div>
                                 );
                             })}
