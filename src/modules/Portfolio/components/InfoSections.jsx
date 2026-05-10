@@ -73,7 +73,20 @@ const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, var
                 <div className="p-4 bg-white shadow-sm border border-slate-200/50 border border-blue-500/30 rounded-xl space-y-4 animate-in fade-in slide-in-from-top-2">
                     {fields.map(field => (
                         <div key={field.key} className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">{field.label}</label>
+                            <div className="flex justify-between items-center">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">{field.label}</label>
+                                {field.key === 'endDate' && (
+                                    <label className="flex items-center gap-1.5 cursor-pointer group">
+                                        <input 
+                                            type="checkbox"
+                                            className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30"
+                                            checked={!newItem[field.key]}
+                                            onChange={(e) => setNewItem({ ...newItem, [field.key]: e.target.checked ? '' : new Date().toISOString().slice(0, 7) })}
+                                        />
+                                        <span className="text-[9px] font-black text-slate-400 group-hover:text-blue-500 uppercase transition-colors">Present</span>
+                                    </label>
+                                )}
+                            </div>
                             {field.type === 'textarea' ? (
                                 <textarea
                                     className="w-full bg-white shadow-sm border border-slate-300 rounded-lg p-2 text-xs text-slate-500 focus:border-blue-500/50 outline-none min-h-[60px]"
@@ -97,7 +110,8 @@ const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, var
                             ) : (
                                 <input
                                     type={field.type || 'text'}
-                                    className="w-full bg-white shadow-sm border border-slate-300 rounded-lg p-2 text-sm text-slate-800 focus:border-blue-500/50 outline-none"
+                                    disabled={field.key === 'endDate' && !newItem[field.key]}
+                                    className={`w-full bg-white shadow-sm border border-slate-300 rounded-lg p-2 text-sm text-slate-800 focus:border-blue-500/50 outline-none transition-opacity ${field.key === 'endDate' && !newItem[field.key] ? 'opacity-30' : ''}`}
                                     value={newItem[field.key]}
                                     onChange={e => setNewItem({ ...newItem, [field.key]: e.target.value })}
                                 />
@@ -139,7 +153,20 @@ const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, var
                             <div className="space-y-4 z-10 relative flex-1">
                                 {fields.map(field => (
                                     <div key={field.key} className="space-y-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">{field.label}</label>
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">{field.label}</label>
+                                            {field.key === 'endDate' && (
+                                                <label className="flex items-center gap-1.5 cursor-pointer group">
+                                                    <input 
+                                                        type="checkbox"
+                                                        className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30"
+                                                        checked={!editData[field.key]}
+                                                        onChange={(e) => setEditData({ ...editData, [field.key]: e.target.checked ? '' : new Date().toISOString().slice(0, 7) })}
+                                                    />
+                                                    <span className="text-[9px] font-black text-slate-400 group-hover:text-blue-500 uppercase transition-colors">Present</span>
+                                                </label>
+                                            )}
+                                        </div>
                                         {field.type === 'textarea' ? (
                                             <textarea
                                                 className="w-full bg-white shadow-sm border border-blue-500/30 rounded p-2 text-xs text-slate-600 min-h-[60px] outline-none focus:border-blue-500"
@@ -162,7 +189,8 @@ const EditableList = ({ title, icon: Icon, items, actions, viewMode, fields, var
                                         ) : (
                                             <input
                                                 type={field.type || 'text'}
-                                                className="w-full bg-white shadow-sm border border-blue-500/30 rounded p-2 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
+                                                disabled={field.key === 'endDate' && !editData[field.key]}
+                                                className={`w-full bg-white shadow-sm border border-blue-500/30 rounded p-2 text-sm font-bold text-slate-800 outline-none focus:border-blue-500 transition-opacity ${field.key === 'endDate' && !editData[field.key] ? 'opacity-30' : ''}`}
                                                 value={editData[field.key]}
                                                 onChange={e => setEditData({ ...editData, [field.key]: e.target.value })}
                                             />

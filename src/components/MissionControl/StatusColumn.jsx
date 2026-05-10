@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Maximize2, X, MoreVertical } from 'lucide-react';
 import { TaskCard } from './TaskCard';
 
-export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings, suggestedTags }) => {
+export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, displayMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings, suggestedTags }) => {
     const [page, setPage] = useState(0);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [isExpanded, setIsExpanded] = useState(false); // Windowed Mode State
@@ -22,11 +22,22 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, edit
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isExpanded]);
 
-    const TASKS_PER_PAGE = isMobile ? 4 : 6;
+    const TASKS_PER_PAGE = isMobile ? 4 : (displayMode === 'list' ? (settings?.appearance?.listTasksPerPage || 20) : (settings?.appearance?.tasksPerPage || 6));
+    const paginationEnabled = displayMode === 'list' ? (settings?.appearance?.listPaginationEnabled === true) : (settings?.appearance?.paginationEnabled !== false);
 
-    const filteredTasks = moduleTasks.filter(t => t.status === status);
+    let filteredTasks = moduleTasks.filter(t => t.status === status);
+    
+    // For Done column, always sort by completion time descending
+    if (status === 'done') {
+        filteredTasks = [...filteredTasks].sort((a, b) => {
+            const timeA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+            const timeB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+            return timeB - timeA;
+        });
+    }
+
     const totalPages = Math.ceil(filteredTasks.length / TASKS_PER_PAGE);
-    const visibleTasks = filteredTasks.slice(page * TASKS_PER_PAGE, (page + 1) * TASKS_PER_PAGE);
+    const visibleTasks = paginationEnabled ? filteredTasks.slice(page * TASKS_PER_PAGE, (page + 1) * TASKS_PER_PAGE) : filteredTasks;
 
     // Reset page if out of bounds (e.g. searching reduced count)
     if (page > 0 && page >= totalPages) {
@@ -35,7 +46,7 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, edit
 
     return (
         <>
-            <div className="flex-1 min-w-[300px] bg-slate-100 rounded-2xl p-2 md:p-4 border border-slate-200 flex flex-col min-h-[500px]">
+            <div className={`flex-1 min-w-[300px] bg-slate-100 rounded-2xl p-2 md:p-4 border border-slate-200 flex flex-col ${displayMode === 'list' ? '' : 'min-h-[500px]'}`}>
                 <div className={`hidden md:flex items-center justify-between mb-4 pb-2 border-b border-${color}-500/20`}>
                     <h3 className={`text-xs font-black uppercase tracking-widest text-${color}-500`}>{title}</h3>
                     <div className="flex items-center gap-3">
@@ -50,12 +61,13 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, edit
                     </div>
                 </div>
 
-                <div className="space-y-2 md:space-y-3 overflow-y-auto flex-1 pr-1 md:pr-2 custom-scrollbar">
+                <div className={`space-y-2 md:space-y-3 overflow-y-auto flex-1 pr-1 md:pr-2 custom-scrollbar ${displayMode === 'list' ? 'space-y-1' : ''}`}>
                     {visibleTasks.map((task, index) => (
                         <TaskCard
                             key={task.id}
                             task={task}
                             viewMode={viewMode}
+                            displayMode={displayMode}
                             editingId={editingId}
                             editData={editData}
                             setEditData={setEditData}
@@ -73,7 +85,7 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, edit
                 </div>
 
                 {/* Pagination Controls */}
-                {totalPages > 1 && (
+                {paginationEnabled && totalPages > 1 && (
                     <div className="flex items-center justify-between pt-4 mt-2 border-t border-slate-200">
                         <button
                             onClick={() => setPage(Math.max(0, page - 1))}

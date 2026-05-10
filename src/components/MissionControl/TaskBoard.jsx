@@ -44,7 +44,14 @@ const TaskBoard = ({ tasks, actions, moduleId, projectId, viewMode, processTask,
     };
    
     // Filter tasks for this specific module
-    const [filters, setFilters] = useState({ tags: [], priority: '', difficulty: '', dateStart: '', dateEnd: '', dateCreatedStart: '', dateCreatedEnd: '', search: '' });
+    const [filters, setFilters] = useState(() => {
+        const saved = localStorage.getItem('summa_task_filters');
+        try {
+            return saved ? JSON.parse(saved) : { tags: [], priority: '', difficulty: '', dateStart: '', dateEnd: '', dateCreatedStart: '', dateCreatedEnd: '', search: '' };
+        } catch (e) {
+            return { tags: [], priority: '', difficulty: '', dateStart: '', dateEnd: '', dateCreatedStart: '', dateCreatedEnd: '', search: '' };
+        }
+    });
     const [isPriorityOpen, setIsPriorityOpen] = useState(false);
     const [isDifficultyOpen, setIsDifficultyOpen] = useState(false);
     const [isTagsOpen, setIsTagsOpen] = useState(false);
@@ -52,13 +59,54 @@ const TaskBoard = ({ tasks, actions, moduleId, projectId, viewMode, processTask,
     const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
     
     // Sort State
-    const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' }); // default newest first
+    const [sortConfig, setSortConfig] = useState(() => {
+        const saved = localStorage.getItem('summa_task_sort');
+        try {
+            return saved ? JSON.parse(saved) : { key: 'createdAt', direction: 'desc' };
+        } catch (e) {
+            return { key: 'createdAt', direction: 'desc' };
+        }
+    });
     const [isSortOpen, setIsSortOpen] = useState(false);
+    
+    // Display Mode State
+    const [displayMode, setDisplayMode] = useState(() => {
+        return localStorage.getItem('summa_task_display_mode') || 'board';
+    });
+
+    // Persist Settings
+    useEffect(() => {
+        localStorage.setItem('summa_task_filters', JSON.stringify(filters));
+    }, [filters]);
+
+    useEffect(() => {
+        localStorage.setItem('summa_task_sort', JSON.stringify(sortConfig));
+    }, [sortConfig]);
+
+    useEffect(() => {
+        localStorage.setItem('summa_task_display_mode', displayMode);
+    }, [displayMode]);
 
     // Get all unique tags from tasks (including color) - Case Insensitive
+    // 1. Filter tasks by Module and Project (Context)
+    const contextTasks = useMemo(() => {
+        return tasks.filter(t => {
+            // If moduleId is provided, filter by it. If not (global view), show all.
+            if (moduleId && t.moduleId !== moduleId) return false;
+            
+            // Project ID Filtering
+            if (projectId !== undefined) {
+                if (projectId === null && t.projectId) return false; // Hide project tasks from global view
+                if (projectId !== null && t.projectId !== projectId) return false; // Show only tasks for this project
+            }
+            return true;
+        });
+    }, [tasks, moduleId, projectId]);
+
+    // 2. Calculate unique tags from contextTasks (including color) - Case Insensitive
     const uniqueTagsMap = useMemo(() => {
         const map = new Map();
-        tasks.forEach(t => {
+        contextTasks.forEach(t => {
             if (t.tags) {
                 t.tags.forEach(tag => {
                     if (tag.text) {
@@ -71,86 +119,79 @@ const TaskBoard = ({ tasks, actions, moduleId, projectId, viewMode, processTask,
             }
         });
         return map;
-    }, [tasks]);
+    }, [contextTasks]);
 
     const suggestedTags = Array.from(uniqueTagsMap.values());
     const allTags = suggestedTags.map(t => t.text);
 
-
-    const moduleTasks = tasks.filter(t => {
-        // If moduleId is provided, filter by it. If not (global view), show all.
-        if (moduleId && t.moduleId !== moduleId) return false;
-        
-        // Project ID Filtering
-        if (projectId !== undefined) {
-            if (projectId === null && t.projectId) return false; // Hide project tasks from global view
-            if (projectId !== null && t.projectId !== projectId) return false; // Show only tasks for this project
-        }
-
-        if (filters.priority && t.priority !== filters.priority) return false;
-        if (filters.difficulty && t.difficulty !== filters.difficulty) return false;
-        if (filters.search && !(t.title && t.title.toLowerCase().includes(filters.search.toLowerCase()))) return false;
-        
-        // Date Filter
-        if (filters.dateStart || filters.dateEnd) {
-            if (!t.deadline) return false; // If no deadline, it doesn't match a date range
-            const taskDate = new Date(t.deadline).setHours(0,0,0,0);
+    // 3. Apply User Filters and Sorting to contextTasks
+    const moduleTasks = useMemo(() => {
+        return contextTasks.filter(t => {
+            if (filters.priority && t.priority !== filters.priority) return false;
+            if (filters.difficulty && t.difficulty !== filters.difficulty) return false;
+            if (filters.search && !(t.title && t.title.toLowerCase().includes(filters.search.toLowerCase()))) return false;
             
-            if (filters.dateStart) {
-                const startDate = new Date(filters.dateStart).setHours(0,0,0,0);
-                if (taskDate < startDate) return false;
+            // Date Filter
+            if (filters.dateStart || filters.dateEnd) {
+                if (!t.deadline) return false; // If no deadline, it doesn't match a date range
+                const taskDate = new Date(t.deadline).setHours(0,0,0,0);
+                
+                if (filters.dateStart) {
+                    const startDate = new Date(filters.dateStart).setHours(0,0,0,0);
+                    if (taskDate < startDate) return false;
+                }
+                if (filters.dateEnd) {
+                    const endDate = new Date(filters.dateEnd).setHours(0,0,0,0);
+                    if (taskDate > endDate) return false;
+                }
             }
-            if (filters.dateEnd) {
-                const endDate = new Date(filters.dateEnd).setHours(0,0,0,0);
-                if (taskDate > endDate) return false;
+
+            if (filters.tags.length > 0) {
+                if (!t.tags) return false;
+                // Case insensitive tag check
+                const taskTagTexts = t.tags.map(tag => tag.text.toLowerCase());
+                if (!filters.tags.some(filterTag => taskTagTexts.includes(filterTag.toLowerCase()))) return false;
             }
-        }
 
-        if (filters.tags.length > 0) {
-            if (!t.tags) return false;
-            // Case insensitive tag check
-            const taskTagTexts = t.tags.map(tag => tag.text.toLowerCase());
-            if (!filters.tags.some(filterTag => taskTagTexts.includes(filterTag.toLowerCase()))) return false;
-        }
-
-        // Created Date Filter
-        if (filters.dateCreatedStart || filters.dateCreatedEnd) {
-            const createdDate = new Date(t.createdAt || t.id.slice(0, 13) / 1000 * 1000).setHours(0,0,0,0); // Fallback to ID timestamp if createdAt missing
-             if (filters.dateCreatedStart) {
-                const startDate = new Date(filters.dateCreatedStart).setHours(0,0,0,0);
-                if (createdDate < startDate) return false;
+            // Created Date Filter
+            if (filters.dateCreatedStart || filters.dateCreatedEnd) {
+                const createdDate = new Date(t.createdAt || t.id.slice(0, 13) / 1000 * 1000).setHours(0,0,0,0); // Fallback to ID timestamp if createdAt missing
+                 if (filters.dateCreatedStart) {
+                    const startDate = new Date(filters.dateCreatedStart).setHours(0,0,0,0);
+                    if (createdDate < startDate) return false;
+                }
+                if (filters.dateCreatedEnd) {
+                    const endDate = new Date(filters.dateCreatedEnd).setHours(0,0,0,0);
+                    if (createdDate > endDate) return false;
+                }
             }
-            if (filters.dateCreatedEnd) {
-                const endDate = new Date(filters.dateCreatedEnd).setHours(0,0,0,0);
-                if (createdDate > endDate) return false;
+
+            return true;
+        }).sort((a, b) => {
+            const { key, direction } = sortConfig;
+            let va = a[key];
+            let vb = b[key];
+
+            // Specific Sort Logic
+            if (key === 'priority') {
+                const map = { high: 3, medium: 2, low: 1 };
+                va = map[a.priority] || 0;
+                vb = map[b.priority] || 0;
+            } else if (key === 'difficulty') {
+                const map = { hard: 3, medium: 2, easy: 1 };
+                va = map[a.difficulty] || 0;
+                vb = map[b.difficulty] || 0;
+            } else if (key === 'value') {
+                 // Sort by total calculated value (XP + Coins*Ratio)
+                 va = (a.xpReward || 0) + (a.coinReward || 0) * 10;
+                 vb = (b.xpReward || 0) + (b.coinReward || 0) * 10;
             }
-        }
 
-        return true;
-    }).sort((a, b) => {
-        const { key, direction } = sortConfig;
-        let va = a[key];
-        let vb = b[key];
-
-        // Specific Sort Logic
-        if (key === 'priority') {
-            const map = { high: 3, medium: 2, low: 1 };
-            va = map[a.priority] || 0;
-            vb = map[b.priority] || 0;
-        } else if (key === 'difficulty') {
-            const map = { hard: 3, medium: 2, easy: 1 };
-            va = map[a.difficulty] || 0;
-            vb = map[b.difficulty] || 0;
-        } else if (key === 'value') {
-             // Sort by total calculated value (XP + Coins*Ratio) - Let's just use XP for simplicity or sum
-             va = (a.xpReward || 0) + (a.coinReward || 0) * 10;
-             vb = (b.xpReward || 0) + (b.coinReward || 0) * 10;
-        }
-
-        if (va < vb) return direction === 'asc' ? -1 : 1;
-        if (va > vb) return direction === 'asc' ? 1 : -1;
-        return 0;
-    });
+            if (va < vb) return direction === 'asc' ? -1 : 1;
+            if (va > vb) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [contextTasks, filters, sortConfig]);
 
     // --- Reward Calculation Logic ---
     const calculateProjectedRewards = (task) => {
@@ -225,15 +266,21 @@ const TaskBoard = ({ tasks, actions, moduleId, projectId, viewMode, processTask,
 
         const { xp, coins } = calculateProjectedRewards(newTask);
 
-        // --- Language Penalty Check ---
-        const primaryLanguage = settings?.primaryLanguage || 'none';
-        if (primaryLanguage !== 'none' && updateUser && userXP !== undefined) {
-            const isMatch = checkLanguageMatch(newTask.title, primaryLanguage);
-            if (isMatch === false) {
-                 // Apply Penalty
-                 console.log(`Language Mismatch (${primaryLanguage}). deducting 10 XP.`);
-                 await updateUser({ xp: Math.max(0, userXP - 10) });
+        // --- XP Reward for Adding Task (+5) ---
+        if (updateUser && userXP !== undefined) {
+            let xpChange = 5;
+            
+            // --- Language Penalty Check (-10) ---
+            const primaryLanguage = settings?.primaryLanguage || 'none';
+            if (primaryLanguage !== 'none') {
+                const isMatch = checkLanguageMatch(newTask.title, primaryLanguage);
+                if (isMatch === false) {
+                    console.log(`Language Mismatch (${primaryLanguage}). deducting 10 XP.`);
+                    xpChange -= 10; // Result: -5 XP total if mismatched
+                }
             }
+            
+            await updateUser({ xp: Math.max(0, userXP + xpChange) });
         }
 
         const taskToAdd = { 
@@ -416,6 +463,13 @@ Link: ${updatedData.link || 'None'}
 
     const updateStatus = async (task, newStatus) => {
         const updates = { status: newStatus };
+        
+        // Save completion time
+        if (newStatus === 'done' && task.status !== 'done') {
+            updates.completedAt = new Date().toISOString();
+        } else if (newStatus !== 'done' && task.status === 'done') {
+            updates.completedAt = null;
+        }
 
         // If moving to done, apply bonus/penalty logic
         if (newStatus === 'done' && task.status !== 'done') {
@@ -472,6 +526,11 @@ Link: ${updatedData.link || 'None'}
              }
         }
 
+        // --- Task Deletion Penalty (-10 XP) ---
+        if (updateUser && userXP !== undefined) {
+            await updateUser({ xp: Math.max(0, userXP - 10) });
+        }
+
         await actions.delete(id);
     };
 
@@ -510,12 +569,29 @@ Link: ${updatedData.link || 'None'}
                     <div className="relative flex-1 md:flex-none">
                         <input
                             placeholder="Search..."
-                            className="w-full md:w-48 bg-white shadow-sm border border-slate-200/50 border border-slate-200 rounded-lg pl-8 pr-2 py-1.5 text-[10px] text-slate-800 outline-none focus:border-blue-500/50 placeholder:text-slate-400 transition-all font-mono"
+                            className="w-full md:w-48 bg-white shadow-sm border border-slate-200/50 border border-slate-200 rounded-lg pl-8 pr-8 py-1.5 text-[10px] text-slate-800 outline-none focus:border-blue-500/50 placeholder:text-slate-400 transition-all font-mono"
                             value={filters.search}
                             onChange={e => setFilters({ ...filters, search: e.target.value })}
                         />
-                        <Filter className="w-3 h-3 text-slate-500 absolute left-2.5 top-2" />
+                        <Filter className="w-3 h-3 text-slate-500 absolute left-2.5 top-2.5" />
+                        {filters.search && (
+                            <button 
+                                onClick={() => setFilters({ ...filters, search: '' })}
+                                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
                     </div>
+
+                    {/* View Mode Toggle */}
+                    <button
+                        onClick={() => setDisplayMode(prev => prev === 'board' ? 'list' : 'board')}
+                        className="p-1.5 bg-white shadow-sm border border-slate-200/50 border border-slate-200 rounded-lg text-slate-500 hover:text-blue-600 relative shrink-0 transition-colors"
+                        title={displayMode === 'board' ? 'Switch to List View' : 'Switch to Board View'}
+                    >
+                        {displayMode === 'board' ? <LayoutGrid className="w-4 h-4" /> : <MoreVertical className="w-4 h-4" />}
+                    </button>
 
                     {/* Mobile Filter Toggle */}
                     <button
@@ -631,30 +707,23 @@ Link: ${updatedData.link || 'None'}
 
                                 {isTagsOpen && (
                                     <div className="absolute top-full right-0 mt-2 w-48 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50">
-                                        <div className="p-2 max-h-48 overflow-y-auto custom-scrollbar space-y-1">
-                                            {allTags.length > 0 ? allTags.map(tag => (
-                                                <button
-                                                    key={tag}
-                                                    onClick={() => toggleTagFilter(tag)}
-                                                    className={`w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.tags.includes(tag) ? 'bg-blue-600 text-slate-800' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'}`}
-                                                >
-                                                    <span>{tag}</span>
-                                                    {filters.tags.includes(tag) && <CheckCircle2 className="w-3 h-3" />}
-                                                </button>
-                                            )) : (
-                                                <div className="text-[10px] text-slate-400 text-center py-2">No tags available</div>
-                                            )}
+                                        <div className="p-2 space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
+                                            {allTags.map(tag => {
+                                                const isSelected = filters.tags.includes(tag);
+                                                return (
+                                                    <button
+                                                        key={tag}
+                                                        onClick={() => toggleTagFilter(tag)}
+                                                        className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors flex items-center gap-2 ${isSelected ? 'bg-blue-600/10 text-blue-600' : 'text-slate-600 hover:bg-slate-100'}`}
+                                                    >
+                                                        <div className={`w-3 h-3 rounded border flex items-center justify-center ${isSelected ? 'border-blue-600 bg-blue-600' : 'border-slate-300'}`}>
+                                                            {isSelected && <Check className="w-2 h-2 text-white" />}
+                                                        </div>
+                                                        <span className="truncate">{tag}</span>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
-                                        {filters.tags.length > 0 && (
-                                            <div className="p-1 border-t border-slate-200 bg-white shadow-sm border border-slate-200/50">
-                                                <button
-                                                    onClick={() => setFilters({ ...filters, tags: [] })}
-                                                    className="w-full text-center py-1.5 text-[9px] text-red-400 hover:text-red-300 font-bold uppercase tracking-wider"
-                                                >
-                                                    Clear Filters
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
                                 )}
                             </div>
@@ -665,60 +734,64 @@ Link: ${updatedData.link || 'None'}
                             <div className="relative">
                                 <button
                                     onClick={() => { setIsDateFilterOpen(!isDateFilterOpen); setIsPriorityOpen(false); setIsTagsOpen(false); }}
-                                    className={`flex items-center gap-1 text-[10px] px-2 py-1.5 rounded hover:bg-slate-100 transition-colors whitespace-nowrap ${filters.dateStart || filters.dateEnd ? 'text-blue-400 font-bold' : 'text-slate-600 hover:text-blue-600'}`}
+                                    className="flex items-center gap-1 text-[10px] text-slate-600 hover:text-blue-600 px-2 py-1.5 rounded hover:bg-slate-100 transition-colors"
+                                    title="Filter by Date"
                                 >
-                                    <CalendarIcon className="w-3 h-3" />
-                                    <span className="hidden md:inline">{filters.dateStart || filters.dateEnd ? 'Date Range' : 'Dates'}</span>
-                                    <ChevronDown className="w-3 h-3" />
+                                     <CalendarIcon className={`w-3 h-3 ${(filters.dateStart || filters.dateEnd || filters.dateCreatedStart || filters.dateCreatedEnd) ? 'text-blue-500' : ''}`} />
                                 </button>
-
+                                
                                 {isDateFilterOpen && (
-                                    <div className="absolute top-full right-0 mt-2 w-64 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50 p-3">
-                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-800 mb-3 flex items-center gap-2">
-                                            <Filter className="w-3 h-3 text-blue-500" /> Filter by Date
-                                        </h4>
+                                    <div className="absolute top-full right-0 mt-2 w-64 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50 p-4 space-y-4">
                                         
-                                        <div className="space-y-3">
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {/* Deadline Range */}
-                                                <div className="space-y-1 col-span-2">
-                                                    <div className="text-[9px] text-blue-500 font-bold uppercase tracking-wider mb-1">Deadline Range</div>
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <input 
-                                                            type="date"
-                                                            className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-lg px-2 py-1.5 text-[10px] text-slate-800 outline-none focus:border-blue-500/50"
-                                                            value={filters.dateStart}
-                                                            onChange={(e) => setFilters({ ...filters, dateStart: e.target.value })}
-                                                        />
-                                                        <input 
-                                                            type="date"
-                                                            className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-lg px-2 py-1.5 text-[10px] text-slate-800 outline-none focus:border-blue-500/50"
-                                                            value={filters.dateEnd}
-                                                            onChange={(e) => setFilters({ ...filters, dateEnd: e.target.value })}
-                                                        />
-                                                    </div>
+                                        <div className="space-y-2">
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200 pb-1">Creation Date</h4>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="text-[9px] text-slate-400 block mb-1">From</label>
+                                                    <input 
+                                                        type="date" 
+                                                        value={filters.dateCreatedStart}
+                                                        onChange={e => setFilters({...filters, dateCreatedStart: e.target.value})}
+                                                        className="w-full bg-white shadow-sm border border-slate-200 rounded p-1.5 text-[10px] text-slate-700 outline-none focus:border-blue-500"
+                                                    />
                                                 </div>
-
-                                                {/* Created Date Range */}
-                                                <div className="space-y-1 col-span-2 border-t border-slate-200 pt-2">
-                                                    <div className="text-[9px] text-green-500 font-bold uppercase tracking-wider mb-1">Created Date Range</div>
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <input 
-                                                            type="date"
-                                                            className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-lg px-2 py-1.5 text-[10px] text-slate-800 outline-none focus:border-blue-500/50"
-                                                            value={filters.dateCreatedStart}
-                                                            onChange={(e) => setFilters({ ...filters, dateCreatedStart: e.target.value })}
-                                                        />
-                                                        <input 
-                                                            type="date"
-                                                            className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-lg px-2 py-1.5 text-[10px] text-slate-800 outline-none focus:border-blue-500/50"
-                                                            value={filters.dateCreatedEnd}
-                                                            onChange={(e) => setFilters({ ...filters, dateCreatedEnd: e.target.value })}
-                                                        />
-                                                    </div>
+                                                <div>
+                                                    <label className="text-[9px] text-slate-400 block mb-1">To</label>
+                                                    <input 
+                                                        type="date" 
+                                                        value={filters.dateCreatedEnd}
+                                                        onChange={e => setFilters({...filters, dateCreatedEnd: e.target.value})}
+                                                        className="w-full bg-white shadow-sm border border-slate-200 rounded p-1.5 text-[10px] text-slate-700 outline-none focus:border-blue-500"
+                                                    />
                                                 </div>
                                             </div>
+                                        </div>
 
+                                        <div className="space-y-2">
+                                             <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200 pb-1">Deadline</h4>
+                                             <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="text-[9px] text-slate-400 block mb-1">From</label>
+                                                    <input 
+                                                        type="date" 
+                                                        value={filters.dateStart}
+                                                        onChange={e => setFilters({...filters, dateStart: e.target.value})}
+                                                        className="w-full bg-white shadow-sm border border-slate-200 rounded p-1.5 text-[10px] text-slate-700 outline-none focus:border-blue-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] text-slate-400 block mb-1">To</label>
+                                                    <input 
+                                                        type="date" 
+                                                        value={filters.dateEnd}
+                                                        onChange={e => setFilters({...filters, dateEnd: e.target.value})}
+                                                        className="w-full bg-white shadow-sm border border-slate-200 rounded p-1.5 text-[10px] text-slate-700 outline-none focus:border-blue-500"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-2">
                                             {(filters.dateStart || filters.dateEnd || filters.dateCreatedStart || filters.dateCreatedEnd) && (
                                                 <button 
                                                     onClick={() => { setFilters({ ...filters, dateStart: '', dateEnd: '', dateCreatedStart: '', dateCreatedEnd: '' }); setIsDateFilterOpen(false); }}
@@ -837,6 +910,7 @@ Link: ${updatedData.link || 'None'}
                                 className="bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono"
                                 value={newTask.targetValue || ''}
                                 onChange={e => setNewTask({ ...newTask, targetValue: e.target.value })}
+                                onKeyDown={e => e.key === 'Enter' && handleAdd()}
                             />
                             <input
                                 type="number"
@@ -844,12 +918,14 @@ Link: ${updatedData.link || 'None'}
                                 className="bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono"
                                 value={newTask.currentValue || ''}
                                 onChange={e => setNewTask({ ...newTask, currentValue: e.target.value })}
+                                onKeyDown={e => e.key === 'Enter' && handleAdd()}
                             />
                             <input
                                 placeholder="Unit (e.g. pages)"
                                 className="bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono"
                                 value={newTask.unit}
                                 onChange={e => setNewTask({ ...newTask, unit: e.target.value })}
+                                onKeyDown={e => e.key === 'Enter' && handleAdd()}
                             />
                         </div>
 
@@ -869,12 +945,14 @@ Link: ${updatedData.link || 'None'}
                                     className="bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono uppercase"
                                     value={newTask.deadline}
                                     onChange={e => setNewTask({ ...newTask, deadline: e.target.value })}
+                                    onKeyDown={e => e.key === 'Enter' && handleAdd()}
                                 />
                                 <input
                                     placeholder="Link URL (Optional)"
                                     className="bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono"
                                     value={newTask.link}
                                     onChange={e => setNewTask({ ...newTask, link: e.target.value })}
+                                    onKeyDown={e => e.key === 'Enter' && handleAdd()}
                                 />
                             </div>
 
@@ -1007,6 +1085,7 @@ Link: ${updatedData.link || 'None'}
                             color="blue"
                             moduleTasks={moduleTasks}
                             viewMode={viewMode}
+                            displayMode={displayMode}
                             editingId={editingId}
                             editData={editData}
                             setEditData={setEditData}
@@ -1029,6 +1108,7 @@ Link: ${updatedData.link || 'None'}
                             color="yellow"
                             moduleTasks={moduleTasks}
                             viewMode={viewMode}
+                            displayMode={displayMode}
                             editingId={editingId}
                             editData={editData}
                             setEditData={setEditData}
@@ -1051,6 +1131,7 @@ Link: ${updatedData.link || 'None'}
                             color="green"
                             moduleTasks={moduleTasks}
                             viewMode={viewMode}
+                            displayMode={displayMode}
                             editingId={editingId}
                             editData={editData}
                             setEditData={setEditData}
@@ -1089,12 +1170,13 @@ Link: ${updatedData.link || 'None'}
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className={`grid gap-4 ${displayMode === 'list' ? 'grid-cols-1 max-w-2xl' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
                     {backlogTasks.map(task => (
                         <TaskCard
                             key={task.id}
                             task={task}
                             viewMode={viewMode}
+                            displayMode={displayMode}
                             editingId={editingId}
                             editData={editData}
                             setEditData={setEditData}

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Circle, Clock, Calendar, Repeat, Plus, Trash2, Edit2, X, AlertCircle, Eye, EyeOff, Zap, Coins, Calendar as CalendarIcon } from 'lucide-react';
 import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, getUserProfile, updateEvent, deleteEvent } from '../../core/services/googleCalendar';
+import ConfirmationModal from '../Common/ConfirmationModal';
 
 const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [isCalendarConnected, setIsCalendarConnected] = useState(false);
     const [userEmail, setUserEmail] = useState('');
+    const [itemToDelete, setItemToDelete] = useState(null);
 
     // Filter protocols for this specific module
     const moduleProtocols = React.useMemo(() => 
@@ -362,11 +364,11 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                         <button onClick={() => startEdit(protocol)} className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600">
                                             <Edit2 className="w-3 h-3" />
                                         </button>
-                                        <button onClick={() => handleDelete(protocol.id)} className="p-1 hover:bg-red-500/10 rounded text-slate-500 hover:text-red-500">
-                                            <Trash2 className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                )}
+                                        <button onClick={() => setItemToDelete(protocol.id)} className="p-1 hover:bg-red-500/10 rounded text-slate-500 hover:text-red-500">
+                                             <Trash2 className="w-3 h-3" />
+                                         </button>
+                                     </div>
+                                 )}
                             </div>
                         </div>
                     </div>
@@ -477,6 +479,16 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                     </div>
                 </div>
             )}
+
+            <ConfirmationModal
+                isOpen={!!itemToDelete}
+                onClose={() => setItemToDelete(null)}
+                onConfirm={() => handleDelete(itemToDelete)}
+                title="Delete Routine"
+                message="Are you sure you want to delete this routine? This action cannot be undone and will remove all streak data."
+                confirmText="Delete"
+                type="danger"
+            />
         </div>
     );
 };

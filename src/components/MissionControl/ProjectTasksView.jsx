@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import TaskBoard from './TaskBoard';
 import { Briefcase, Plus, FolderCheck, FolderOpen, Trash2 } from 'lucide-react';
 
-const ProjectTasksView = ({ projects, tasks, projectsActions, tasksActions, viewMode, processTask, updateUser, userXP }) => {
+const ProjectTasksView = ({ projects, tasks, projectsActions, tasksActions, viewMode, processTask, updateUser, userXP, settings }) => {
     const [selectedProjectId, setSelectedProjectId] = useState(projects?.[0]?.id || null);
     const [isAddingProject, setIsAddingProject] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
@@ -122,6 +122,7 @@ const ProjectTasksView = ({ projects, tasks, projectsActions, tasksActions, view
                                 userXP={userXP}
                                 isSectionHidden={false}
                                 toggleSectionVisibility={() => {}}
+                                settings={settings}
                             />
                         )}
                     </div>

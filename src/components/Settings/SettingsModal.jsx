@@ -23,7 +23,15 @@ const SettingsModal = ({ isOpen, onClose, userData, updateUser }) => {
 
         // Gameplay & Visibility
         gameplaySettings: userData.gameplaySettings || { xp: true, coins: true },
-        hiddenModules: userData.hiddenModules || []
+        hiddenModules: userData.hiddenModules || [],
+
+        // Appearance / Pagination
+        appearance: userData.appearance || {
+            paginationEnabled: true,
+            tasksPerPage: 6,
+            listPaginationEnabled: false,
+            listTasksPerPage: 20
+        }
     });
 
     if (!isOpen) return null;
@@ -89,6 +97,14 @@ const SettingsModal = ({ isOpen, onClose, userData, updateUser }) => {
                     >
                         <div className="flex items-center gap-2">
                             <CheckCircle2 className="w-4 h-4" /> Gameplay
+                        </div>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('appearance')}
+                        className={`px-6 py-4 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'appearance' ? 'text-slate-800 border-blue-500' : 'text-slate-500 border-transparent hover:text-blue-600'}`}
+                    >
+                        <div className="flex items-center gap-2">
+                            <Maximize2 className="w-4 h-4" /> Appearance
                         </div>
                     </button>
                 </div>
@@ -465,6 +481,98 @@ const SettingsModal = ({ isOpen, onClose, userData, updateUser }) => {
                                     })}
                                 </div>
                              </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'appearance' && (
+                        <div className="space-y-8">
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-blue-500/10 rounded-lg">
+                                        <Palette className="w-5 h-5 text-blue-500" />
+                                    </div>
+                                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Task Board Pagination</h3>
+                                </div>
+
+                                {/* Standard Mode (Board) */}
+                                <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">Standard Mode (Board)</h4>
+                                            <p className="text-[10px] text-slate-500 mt-1">Enable pagination for the column-based task board.</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setLocalData({
+                                                ...localData,
+                                                appearance: { ...localData.appearance, paginationEnabled: !localData.appearance.paginationEnabled }
+                                            })}
+                                            className={`w-12 h-6 rounded-full transition-all relative ${localData.appearance.paginationEnabled ? 'bg-blue-600 shadow-lg shadow-blue-500/20' : 'bg-slate-300'}`}
+                                        >
+                                            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${localData.appearance.paginationEnabled ? 'left-7' : 'left-1'}`} />
+                                        </button>
+                                    </div>
+
+                                    {localData.appearance.paginationEnabled && (
+                                        <div className="space-y-3 pt-4 border-t border-slate-200">
+                                            <label className="text-[10px] text-slate-500 font-bold uppercase block">Tasks per page (Desktop)</label>
+                                            <div className="flex items-center gap-4">
+                                                <input
+                                                    type="range"
+                                                    min="1"
+                                                    max="20"
+                                                    value={localData.appearance.tasksPerPage}
+                                                    onChange={e => setLocalData({
+                                                        ...localData,
+                                                        appearance: { ...localData.appearance, tasksPerPage: parseInt(e.target.value) }
+                                                    })}
+                                                    className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                                />
+                                                <span className="w-8 text-center text-xs font-mono font-bold bg-white shadow-sm border border-slate-200 py-1 rounded">{localData.appearance.tasksPerPage}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Short Mode (List) */}
+                                <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">Short Mode (List)</h4>
+                                            <p className="text-[10px] text-slate-500 mt-1">Enable pagination for the compact list view.</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setLocalData({
+                                                ...localData,
+                                                appearance: { ...localData.appearance, listPaginationEnabled: !localData.appearance.listPaginationEnabled }
+                                            })}
+                                            className={`w-12 h-6 rounded-full transition-all relative ${localData.appearance.listPaginationEnabled ? 'bg-blue-600 shadow-lg shadow-blue-500/20' : 'bg-slate-300'}`}
+                                        >
+                                            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${localData.appearance.listPaginationEnabled ? 'left-7' : 'left-1'}`} />
+                                        </button>
+                                    </div>
+
+                                    {localData.appearance.listPaginationEnabled && (
+                                        <div className="space-y-3 pt-4 border-t border-slate-200">
+                                            <label className="text-[10px] text-slate-500 font-bold uppercase block">Tasks per page</label>
+                                            <div className="flex items-center gap-4">
+                                                <input
+                                                    type="range"
+                                                    min="5"
+                                                    max="50"
+                                                    step="5"
+                                                    value={localData.appearance.listTasksPerPage}
+                                                    onChange={e => setLocalData({
+                                                        ...localData,
+                                                        appearance: { ...localData.appearance, listTasksPerPage: parseInt(e.target.value) }
+                                                    })}
+                                                    className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                                />
+                                                <span className="w-8 text-center text-xs font-mono font-bold bg-white shadow-sm border border-slate-200 py-1 rounded">{localData.appearance.listTasksPerPage}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>

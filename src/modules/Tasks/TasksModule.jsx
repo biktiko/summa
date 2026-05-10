@@ -60,12 +60,12 @@ const TasksModule = ({
                     <DailyProtocol
                         protocols={userData.protocols}
                         actions={protocolsActions}
-                        moduleId={null} // Global
+                        moduleId={null}
                         viewMode={viewMode}
                         processTask={processTask}
-                        isSectionHidden={false} 
+                        isSectionHidden={false}
                         toggleSectionVisibility={() => {}}
-                        settings={userData?.gameplaySettings}
+                        settings={userData}
                     />
                 ) : currentTab === 'missions' ? (
                     <TaskBoard
@@ -75,7 +75,7 @@ const TasksModule = ({
                         projectId={null} // Hide project tasks from general TaskBoard
                         viewMode={viewMode}
                         processTask={processTask}
-                        settings={userData.gameplaySettings}
+                        settings={userData}
                         isSectionHidden={false}
                         toggleSectionVisibility={() => {}}
                         updateUser={updateUser}
@@ -91,6 +91,7 @@ const TasksModule = ({
                         processTask={processTask}
                         updateUser={updateUser}
                         userXP={userData.xp}
+                        settings={userData}
                     />
                 ) : (
                     <GoalsBoard

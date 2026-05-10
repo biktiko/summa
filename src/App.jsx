@@ -126,8 +126,10 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
 
     if (isLeftSwipe || isRightSwipe) {       
         // Get Swipe Mode
-        const swipeMode = userData?.swipeMode || 'modules'; // 'modules', 'internal', 'sections'
+        const swipeMode = userData?.swipeMode || 'modules'; // 'modules', 'internal', 'sections', 'disabled'
         
+        if (swipeMode === 'disabled') return;
+
         console.log("Swipe Mode Detected:", swipeMode); // For Debugging
 
         // --- MODE 1: SWITCH MODULES ---

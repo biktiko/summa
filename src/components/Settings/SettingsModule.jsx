@@ -52,7 +52,15 @@ const SettingsModule = ({ userData, updateUser }) => {
 
         // Gameplay
         gameplaySettings: userData.gameplaySettings || { xp: true, coins: true, publicXP: false, publicCoins: false },
-        hiddenModules: userData.hiddenModules || []
+        hiddenModules: userData.hiddenModules || [],
+
+        // Appearance / Pagination
+        appearance: userData.appearance || {
+            paginationEnabled: true,
+            tasksPerPage: 6,
+            listPaginationEnabled: false,
+            listTasksPerPage: 20
+        }
     });
 
     useEffect(() => {
@@ -367,12 +375,13 @@ const SettingsModule = ({ userData, updateUser }) => {
                         <div className="space-y-3">
                             {[
                                 { id: 'modules', label: 'Switch Modules', desc: 'Swipe Left/Right to switch between Career, Finance, Health.' },
-                                { id: 'sections', label: 'Section Windows', desc: 'Swipe to switch between Routine, Mission Tasks, and Goals in the Task view.' }
+                                { id: 'sections', label: 'Section Windows', desc: 'Swipe to switch between Routine, Mission Tasks, and Goals in the Task view.' },
+                                { id: 'disabled', label: 'Disabled', desc: 'Disable swipe navigation entirely on mobile.' }
                             ].map((mode) => (
                                 <button
                                     key={mode.id}
                                     onClick={() => setLocalData({ ...localData, swipeMode: mode.id })}
-                                    className={`w-full text-left p-4 rounded-xl border transition-all flex items-center gap-4 ${localData.swipeMode === mode.id ? 'bg-slate-100 border border-slate-200 border-blue-500' : 'bg-transparent border-slate-300 hover:border-white/30'}`}
+                                    className={`w-full text-left p-4 rounded-xl border transition-all flex items-center gap-4 ${localData.swipeMode === mode.id ? 'bg-slate-100 border border-blue-500' : 'bg-transparent border-slate-300 hover:border-slate-400'}`}
                                 >
                                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${localData.swipeMode === mode.id ? 'border-blue-500' : 'border-neutral-500'}`}>
                                         {localData.swipeMode === mode.id && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
@@ -454,8 +463,98 @@ const SettingsModule = ({ userData, updateUser }) => {
                             </div>
                         </div>
                     </div>
+                    
+                    <hr className="border-slate-200" />
 
+                    <div>
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-blue-500/10 rounded-lg">
+                                <FileSpreadsheet className="w-5 h-5 text-blue-500" />
+                            </div>
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Task Board Pagination</h3>
+                        </div>
 
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Standard Mode */}
+                            <div className="p-6 rounded-2xl border border-slate-200 bg-white/50 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">Standard Mode (Board)</h4>
+                                        <p className="text-[10px] text-slate-500 mt-1">Enable pagination for the column-based task board.</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setLocalData({
+                                            ...localData,
+                                            appearance: { ...localData.appearance, paginationEnabled: !localData.appearance.paginationEnabled }
+                                        })}
+                                        className={`w-12 h-6 rounded-full transition-all relative ${localData.appearance.paginationEnabled ? 'bg-blue-600 shadow-lg shadow-blue-500/20' : 'bg-slate-300'}`}
+                                    >
+                                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${localData.appearance.paginationEnabled ? 'left-7' : 'left-1'}`} />
+                                    </button>
+                                </div>
+
+                                {localData.appearance.paginationEnabled && (
+                                    <div className="space-y-3 pt-4 border-t border-slate-200">
+                                        <label className="text-[10px] text-slate-500 font-bold uppercase block">Tasks per page (Desktop)</label>
+                                        <div className="flex items-center gap-4">
+                                            <input
+                                                type="range"
+                                                min="1"
+                                                max="20"
+                                                value={localData.appearance.tasksPerPage}
+                                                onChange={e => setLocalData({
+                                                    ...localData,
+                                                    appearance: { ...localData.appearance, tasksPerPage: parseInt(e.target.value) }
+                                                })}
+                                                className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                            />
+                                            <span className="w-8 text-center text-xs font-mono font-bold bg-white shadow-sm border border-slate-200 py-1 rounded">{localData.appearance.tasksPerPage}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Short Mode */}
+                            <div className="p-6 rounded-2xl border border-slate-200 bg-white/50 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">Short Mode (List)</h4>
+                                        <p className="text-[10px] text-slate-500 mt-1">Enable pagination for the compact list view.</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setLocalData({
+                                            ...localData,
+                                            appearance: { ...localData.appearance, listPaginationEnabled: !localData.appearance.listPaginationEnabled }
+                                        })}
+                                        className={`w-12 h-6 rounded-full transition-all relative ${localData.appearance.listPaginationEnabled ? 'bg-blue-600 shadow-lg shadow-blue-500/20' : 'bg-slate-300'}`}
+                                    >
+                                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${localData.appearance.listPaginationEnabled ? 'left-7' : 'left-1'}`} />
+                                    </button>
+                                </div>
+
+                                {localData.appearance.listPaginationEnabled && (
+                                    <div className="space-y-3 pt-4 border-t border-slate-200">
+                                        <label className="text-[10px] text-slate-500 font-bold uppercase block">Tasks per page</label>
+                                        <div className="flex items-center gap-4">
+                                            <input
+                                                type="range"
+                                                min="5"
+                                                max="50"
+                                                step="5"
+                                                value={localData.appearance.listTasksPerPage}
+                                                onChange={e => setLocalData({
+                                                    ...localData,
+                                                    appearance: { ...localData.appearance, listTasksPerPage: parseInt(e.target.value) }
+                                                })}
+                                                className="flex-1 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                            />
+                                            <span className="w-8 text-center text-xs font-mono font-bold bg-white shadow-sm border border-slate-200 py-1 rounded">{localData.appearance.listTasksPerPage}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 

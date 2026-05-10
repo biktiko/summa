@@ -12,7 +12,7 @@ const TAG_COLORS = [
     { name: 'Gray', value: 'bg-neutral-500 text-white' },
 ];
 
-export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings, suggestedTags, index }) => {
+export const TaskCard = ({ task, viewMode, displayMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings, suggestedTags, index }) => {
     // Skip hidden tasks for guests
     if (viewMode === 'guest' && task.isHidden) return null;
 
@@ -22,6 +22,18 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
     };
 
     const progress = calculateProgress(task.currentValue, task.targetValue);
+    
+    const formatCompletionTime = (isoString) => {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        const now = new Date();
+        const isToday = date.toDateString() === now.toDateString();
+        
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (isToday) return timeStr;
+        
+        return `${date.getDate().toString().padStart(2, '0')}.${(date.getMonth() + 1).toString().padStart(2, '0')} ${timeStr}`;
+    };
 
     const addTag = () => {
         if (editData.newTagText) {
@@ -46,7 +58,7 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
 
 
     return (
-        <div className={`group bg-white shadow-sm border border-slate-200 p-2 md:p-4 rounded-xl hover:border-blue-500/30 transition-all relative ${task.isHidden ? 'opacity-60 border-red-900/30' : ''}`}>
+        <div className={`group bg-white shadow-sm border border-slate-200 rounded-xl hover:border-blue-500/30 transition-all relative ${task.isHidden ? 'opacity-60 border-red-900/30' : ''} ${displayMode === 'list' && editingId !== task.id ? 'p-1.5 md:p-2' : 'p-2 md:p-4'}`}>
             {editingId === task.id ? (
                 <>
                     <div className="fixed inset-0 z-10 bg-transparent" onClick={saveEdit} />
@@ -63,6 +75,7 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
                             className="w-full bg-white shadow-sm border border-blue-500/30 rounded p-2 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
                             value={editData.title}
                             onChange={e => setEditData({ ...editData, title: e.target.value })}
+                            onKeyDown={e => e.key === 'Enter' && saveEdit()}
                             autoFocus
                         />
                     </div>
@@ -263,6 +276,7 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
                                 placeholder="Current"
                                 value={editData.currentValue}
                                 onChange={e => setEditData({ ...editData, currentValue: e.target.value })}
+                                onKeyDown={e => e.key === 'Enter' && saveEdit()}
                             />
                             <input
                                 type="number"
@@ -270,12 +284,14 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
                                 placeholder="Target"
                                 value={editData.targetValue}
                                 onChange={e => setEditData({ ...editData, targetValue: e.target.value })}
+                                onKeyDown={e => e.key === 'Enter' && saveEdit()}
                             />
                             <input
                                 className="col-span-2 md:col-span-1 w-full bg-white shadow-sm border border-blue-500/30 rounded p-2 text-xs text-slate-800 outline-none focus:border-blue-500"
                                 placeholder="Unit"
                                 value={editData.unit}
                                 onChange={e => setEditData({ ...editData, unit: e.target.value })}
+                                onKeyDown={e => e.key === 'Enter' && saveEdit()}
                             />
                         </div>
                     </div>
@@ -288,6 +304,7 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
                                 placeholder="https://..."
                                 value={editData.link || ''}
                                 onChange={e => setEditData({ ...editData, link: e.target.value })}
+                                onKeyDown={e => e.key === 'Enter' && saveEdit()}
                             />
                         </div>
                         <div className="space-y-1">
@@ -297,6 +314,7 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
                                 placeholder="Display Name"
                                 value={editData.linkName || ''}
                                 onChange={e => setEditData({ ...editData, linkName: e.target.value })}
+                                onKeyDown={e => e.key === 'Enter' && saveEdit()}
                             />
                         </div>
                     </div>
@@ -327,6 +345,41 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
                     </div>
                 </div>
             </>
+            ) : displayMode === 'list' ? (
+                <div className="flex items-center justify-between w-full h-8 md:h-10 px-1 md:px-2">
+                    <div className="flex items-center gap-2.5 overflow-hidden flex-1">
+                        {task.status !== 'done' ? (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); updateStatus(task, 'done'); }}
+                                className="w-5 h-5 rounded border border-slate-300 hover:border-blue-500 flex items-center justify-center text-transparent hover:text-blue-500 transition-all shrink-0 bg-white"
+                            >
+                                <Check className="w-3 h-3" />
+                            </button>
+                        ) : (
+                             <button 
+                                onClick={(e) => { e.stopPropagation(); updateStatus(task, 'todo'); }}
+                                className="w-5 h-5 rounded bg-blue-500 border border-blue-500 flex items-center justify-center text-white shrink-0 shadow-[0_0_8px_rgba(59,130,246,0.4)]"
+                            >
+                                <Check className="w-3 h-3" />
+                            </button>
+                        )}
+                        <h4 className={`text-xs md:text-sm font-bold truncate transition-all flex-1 ${task.status === 'done' ? 'text-slate-400 line-through' : 'text-slate-700 hover:text-blue-600 cursor-pointer'}`} onClick={(e) => { e.stopPropagation(); startEdit(task); }}>{task.title}</h4>
+                        
+                        {task.status === 'done' && task.completedAt && (
+                            <span className="text-[9px] text-slate-400 font-mono shrink-0">
+                                {formatCompletionTime(task.completedAt)}
+                            </span>
+                        )}
+                        {task.priority === 'high' && task.status !== 'done' && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" title="High Priority" />
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity ml-2 shrink-0">
+                        <button onClick={(e) => { e.stopPropagation(); startEdit(task); }} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteTaskId(task.id); }} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                </div>
             ) : (
                 <>
                     <div className="flex flex-col relative w-full">
@@ -403,6 +456,12 @@ export const TaskCard = ({ task, viewMode, editingId, editData, setEditData, sta
                                     <div className="flex items-center gap-1.5 text-slate-500">
                                         <Calendar className="w-3 h-3" />
                                         <span className="text-[10px]">{task.deadline}</span>
+                                    </div>
+                                )}
+                                 {task.status === 'done' && task.completedAt && (
+                                    <div className="flex items-center gap-1.5 text-slate-400 border-r border-slate-200 pr-3 mr-1">
+                                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                                        <span className="text-[9px] font-mono">{formatCompletionTime(task.completedAt)}</span>
                                     </div>
                                 )}
                                  {task.link && (
