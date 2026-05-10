@@ -8,14 +8,14 @@ const TAG_COLORS = [
     { name: 'Red', value: 'bg-red-500 text-white' },
     { name: 'Blue', value: 'bg-blue-500 text-white' },
     { name: 'Green', value: 'bg-green-500 text-white' },
-    { name: 'Yellow', value: 'bg-yellow-500 text-black' },
+    { name: 'Yellow', value: 'bg-amber-600 text-black' },
     { name: 'Purple', value: 'bg-purple-500 text-white' },
     { name: 'Pink', value: 'bg-pink-500 text-white' },
     { name: 'Orange', value: 'bg-orange-500 text-white' },
     { name: 'Gray', value: 'bg-neutral-500 text-white' },
 ];
 
-const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings, updateUser, userXP }) => {
+const TaskBoard = ({ tasks, actions, moduleId, projectId, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings, updateUser, userXP }) => {
     const titleInputRef = useRef(null);
     const [isAdding, setIsAdding] = useState(false);
 
@@ -80,6 +80,12 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
     const moduleTasks = tasks.filter(t => {
         // If moduleId is provided, filter by it. If not (global view), show all.
         if (moduleId && t.moduleId !== moduleId) return false;
+        
+        // Project ID Filtering
+        if (projectId !== undefined) {
+            if (projectId === null && t.projectId) return false; // Hide project tasks from global view
+            if (projectId !== null && t.projectId !== projectId) return false; // Show only tasks for this project
+        }
 
         if (filters.priority && t.priority !== filters.priority) return false;
         if (filters.difficulty && t.difficulty !== filters.difficulty) return false;
@@ -235,6 +241,7 @@ const TaskBoard = ({ tasks, actions, moduleId, viewMode, processTask, isSectionH
             xpReward: xp, // Auto-calculated
             coinReward: coins, // Auto-calculated
             moduleId, 
+            projectId,
             sequenceNumber: nextSeq,
             isSyncedToCalendar: false,
             // Use toString() to preserve local timezone context for display logic that might rely on it, 
@@ -503,17 +510,17 @@ Link: ${updatedData.link || 'None'}
                     <div className="relative flex-1 md:flex-none">
                         <input
                             placeholder="Search..."
-                            className="w-full md:w-48 bg-neutral-900/50 border border-white/5 rounded-lg pl-8 pr-2 py-1.5 text-[10px] text-white outline-none focus:border-blue-500/50 placeholder:text-neutral-600 transition-all font-mono"
+                            className="w-full md:w-48 bg-white shadow-sm border border-slate-200/50 border border-slate-200 rounded-lg pl-8 pr-2 py-1.5 text-[10px] text-slate-800 outline-none focus:border-blue-500/50 placeholder:text-slate-400 transition-all font-mono"
                             value={filters.search}
                             onChange={e => setFilters({ ...filters, search: e.target.value })}
                         />
-                        <Filter className="w-3 h-3 text-neutral-500 absolute left-2.5 top-2" />
+                        <Filter className="w-3 h-3 text-slate-500 absolute left-2.5 top-2" />
                     </div>
 
                     {/* Mobile Filter Toggle */}
                     <button
                         onClick={() => setIsMobileFiltersOpen(true)}
-                        className="md:hidden p-1.5 bg-neutral-900/50 border border-white/5 rounded-lg text-neutral-400 hover:text-white relative shrink-0"
+                        className="md:hidden p-1.5 bg-white shadow-sm border border-slate-200/50 border border-slate-200 rounded-lg text-slate-500 hover:text-blue-600 relative shrink-0"
                     >
                         <SlidersHorizontal className="w-4 h-4" />
                         {(filters.difficulty || filters.priority || filters.tags.length > 0 || filters.dateStart || filters.dateEnd) && (
@@ -523,13 +530,13 @@ Link: ${updatedData.link || 'None'}
 
                     {/* Desktop Filters (Hidden on Mobile) */}
                     <div className="hidden md:block w-full pb-2 md:pb-0">
-                        <div className="flex items-center gap-2 bg-neutral-900/50 p-1 rounded-lg border border-white/5 w-max md:w-auto">
+                        <div className="flex items-center gap-2 bg-white shadow-sm border border-slate-200/50 p-1 rounded-lg border border-slate-200 w-max md:w-auto">
                             
                             {/* Difficulty Filter */}
-                            <div className="relative border-r border-white/10 pr-2 mr-2">
+                            <div className="relative border-r border-slate-300 pr-2 mr-2">
                                 <button
                                     onClick={() => { setIsDifficultyOpen(!isDifficultyOpen); setIsPriorityOpen(false); setIsTagsOpen(false); setIsDateFilterOpen(false); }}
-                                    className="flex items-center gap-1 text-[10px] text-neutral-300 hover:text-white px-2 py-1.5 rounded hover:bg-white/5 transition-colors whitespace-nowrap"
+                                    className="flex items-center gap-1 text-[10px] text-slate-600 hover:text-blue-600 px-2 py-1.5 rounded hover:bg-slate-100 transition-colors whitespace-nowrap"
                                 >
                                     <span className="hidden md:inline">{filters.difficulty ? filters.difficulty.charAt(0).toUpperCase() + filters.difficulty.slice(1) : 'All Levels'}</span>
                                     <span className="md:hidden">{filters.difficulty ? filters.difficulty.charAt(0).toUpperCase() : 'Lvl'}</span>
@@ -537,12 +544,12 @@ Link: ${updatedData.link || 'None'}
                                 </button>
 
                                 {isDifficultyOpen && (
-                                    <div className="absolute top-full left-0 mt-2 w-32 bg-[#0A0A0A] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50">
+                                    <div className="absolute top-full left-0 mt-2 w-32 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50">
                                         <div className="p-1">
-                                            <button onClick={() => { setFilters({ ...filters, difficulty: '' }); setIsDifficultyOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.difficulty === '' ? 'bg-white/10 text-white' : 'text-neutral-400 hover:text-white hover:bg-white/5'}`}>All Diff.</button>
-                                            <button onClick={() => { setFilters({ ...filters, difficulty: 'easy' }); setIsDifficultyOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.difficulty === 'easy' ? 'bg-green-500/20 text-green-500' : 'text-neutral-400 hover:text-green-400 hover:bg-white/5'}`}>Easy</button>
-                                            <button onClick={() => { setFilters({ ...filters, difficulty: 'medium' }); setIsDifficultyOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-500' : 'text-neutral-400 hover:text-yellow-400 hover:bg-white/5'}`}>Medium</button>
-                                            <button onClick={() => { setFilters({ ...filters, difficulty: 'hard' }); setIsDifficultyOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.difficulty === 'hard' ? 'bg-purple-500/20 text-purple-500' : 'text-neutral-400 hover:text-purple-400 hover:bg-white/5'}`}>Hard</button>
+                                            <button onClick={() => { setFilters({ ...filters, difficulty: '' }); setIsDifficultyOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.difficulty === '' ? 'bg-slate-100 border border-slate-200 text-slate-800' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'}`}>All Diff.</button>
+                                            <button onClick={() => { setFilters({ ...filters, difficulty: 'easy' }); setIsDifficultyOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.difficulty === 'easy' ? 'bg-green-500/20 text-green-500' : 'text-slate-500 hover:text-green-400 hover:bg-slate-100'}`}>Easy</button>
+                                            <button onClick={() => { setFilters({ ...filters, difficulty: 'medium' }); setIsDifficultyOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.difficulty === 'medium' ? 'bg-amber-600/20 text-amber-600' : 'text-slate-500 hover:text-amber-600 hover:bg-slate-100'}`}>Medium</button>
+                                            <button onClick={() => { setFilters({ ...filters, difficulty: 'hard' }); setIsDifficultyOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.difficulty === 'hard' ? 'bg-purple-500/20 text-purple-500' : 'text-slate-500 hover:text-purple-400 hover:bg-slate-100'}`}>Hard</button>
                                         </div>
                                     </div>
                                 )}
@@ -551,7 +558,7 @@ Link: ${updatedData.link || 'None'}
                             <div className="relative">
                                 <button
                                     onClick={() => { setIsPriorityOpen(!isPriorityOpen); setIsTagsOpen(false); setIsDateFilterOpen(false); }}
-                                    className="flex items-center gap-1 text-[10px] text-neutral-300 hover:text-white px-2 py-1.5 rounded hover:bg-white/5 transition-colors whitespace-nowrap"
+                                    className="flex items-center gap-1 text-[10px] text-slate-600 hover:text-blue-600 px-2 py-1.5 rounded hover:bg-slate-100 transition-colors whitespace-nowrap"
                                 >
                                     <span className="hidden md:inline">{filters.priority ? filters.priority.charAt(0).toUpperCase() + filters.priority.slice(1) : 'All Priorities'}</span>
                                     <span className="md:hidden">{filters.priority ? filters.priority.charAt(0).toUpperCase() : 'Pri'}</span>
@@ -559,30 +566,30 @@ Link: ${updatedData.link || 'None'}
                                 </button>
 
                                 {isPriorityOpen && (
-                                    <div className="absolute top-full left-0 mt-2 w-32 bg-[#0A0A0A] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50">
+                                    <div className="absolute top-full left-0 mt-2 w-32 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50">
                                         <div className="p-1">
-                                            <button onClick={() => { setFilters({ ...filters, priority: '' }); setIsPriorityOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.priority === '' ? 'bg-white/10 text-white' : 'text-neutral-400 hover:text-white hover:bg-white/5'}`}>All Priorities</button>
-                                            <button onClick={() => { setFilters({ ...filters, priority: 'high' }); setIsPriorityOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.priority === 'high' ? 'bg-red-500/20 text-red-500' : 'text-neutral-400 hover:text-red-400 hover:bg-white/5'}`}>High</button>
-                                            <button onClick={() => { setFilters({ ...filters, priority: 'medium' }); setIsPriorityOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.priority === 'medium' ? 'bg-yellow-500/20 text-yellow-500' : 'text-neutral-400 hover:text-yellow-400 hover:bg-white/5'}`}>Medium</button>
-                                            <button onClick={() => { setFilters({ ...filters, priority: 'low' }); setIsPriorityOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.priority === 'low' ? 'bg-blue-500/20 text-blue-500' : 'text-neutral-400 hover:text-blue-400 hover:bg-white/5'}`}>Low</button>
+                                            <button onClick={() => { setFilters({ ...filters, priority: '' }); setIsPriorityOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.priority === '' ? 'bg-slate-100 border border-slate-200 text-slate-800' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'}`}>All Priorities</button>
+                                            <button onClick={() => { setFilters({ ...filters, priority: 'high' }); setIsPriorityOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.priority === 'high' ? 'bg-red-500/20 text-red-500' : 'text-slate-500 hover:text-red-400 hover:bg-slate-100'}`}>High</button>
+                                            <button onClick={() => { setFilters({ ...filters, priority: 'medium' }); setIsPriorityOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.priority === 'medium' ? 'bg-amber-600/20 text-amber-600' : 'text-slate-500 hover:text-amber-600 hover:bg-slate-100'}`}>Medium</button>
+                                            <button onClick={() => { setFilters({ ...filters, priority: 'low' }); setIsPriorityOpen(false); }} className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.priority === 'low' ? 'bg-blue-500/20 text-blue-500' : 'text-slate-500 hover:text-blue-400 hover:bg-slate-100'}`}>Low</button>
                                         </div>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="w-px h-3 bg-white/10" />
+                            <div className="w-px h-3 bg-slate-100 border border-slate-200" />
 
                             {/* Sort Toggle */}
                             <div className="relative">
                                 <button
                                     onClick={() => { setIsSortOpen(!isSortOpen); setIsDateFilterOpen(false); setIsPriorityOpen(false); }}
-                                    className="flex items-center gap-1 text-[10px] text-neutral-300 hover:text-white px-2 py-1.5 rounded hover:bg-white/5 transition-colors"
+                                    className="flex items-center gap-1 text-[10px] text-slate-600 hover:text-blue-600 px-2 py-1.5 rounded hover:bg-slate-100 transition-colors"
                                     title="Sort Tasks"
                                 >
                                     <ArrowUpDown className="w-3 h-3" />
                                 </button>
                                 {isSortOpen && (
-                                    <div className="absolute top-full left-0 mt-2 w-40 bg-[#0A0A0A] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50 p-1">
+                                    <div className="absolute top-full left-0 mt-2 w-40 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50 p-1">
                                         {[
                                             { id: 'priority', label: 'Priority' },
                                             { id: 'difficulty', label: 'Difficulty' },
@@ -599,7 +606,7 @@ Link: ${updatedData.link || 'None'}
                                                     })); 
                                                     setIsSortOpen(false); 
                                                 }}
-                                                className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors flex justify-between ${sortConfig.key === opt.id ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-white hover:bg-white/5'}`}
+                                                className={`w-full text-left px-3 py-2 text-[10px] font-bold rounded-lg transition-colors flex justify-between ${sortConfig.key === opt.id ? 'bg-blue-600 text-slate-800' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'}`}
                                             >
                                                 {opt.label}
                                                 {sortConfig.key === opt.id && <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>}
@@ -609,13 +616,13 @@ Link: ${updatedData.link || 'None'}
                                 )}
                             </div>
 
-                            <div className="w-px h-3 bg-white/10" />
+                            <div className="w-px h-3 bg-slate-100 border border-slate-200" />
 
                             {/* Tags Filter */}
                             <div className="relative">
                                 <button
                                     onClick={() => { setIsTagsOpen(!isTagsOpen); setIsPriorityOpen(false); setIsDateFilterOpen(false); }}
-                                    className="flex items-center gap-1 text-[10px] text-neutral-300 hover:text-white px-2 py-1.5 rounded hover:bg-white/5 transition-colors whitespace-nowrap"
+                                    className="flex items-center gap-1 text-[10px] text-slate-600 hover:text-blue-600 px-2 py-1.5 rounded hover:bg-slate-100 transition-colors whitespace-nowrap"
                                 >
                                     <span className="hidden md:inline">{filters.tags.length > 0 ? `${filters.tags.length} Tags` : 'All Tags'}</span>
                                     <span className="md:hidden">{filters.tags.length > 0 ? `${filters.tags.length}` : 'Tag'}</span>
@@ -623,23 +630,23 @@ Link: ${updatedData.link || 'None'}
                                 </button>
 
                                 {isTagsOpen && (
-                                    <div className="absolute top-full right-0 mt-2 w-48 bg-[#0A0A0A] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50">
+                                    <div className="absolute top-full right-0 mt-2 w-48 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50">
                                         <div className="p-2 max-h-48 overflow-y-auto custom-scrollbar space-y-1">
                                             {allTags.length > 0 ? allTags.map(tag => (
                                                 <button
                                                     key={tag}
                                                     onClick={() => toggleTagFilter(tag)}
-                                                    className={`w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.tags.includes(tag) ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-white hover:bg-white/5'}`}
+                                                    className={`w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold rounded-lg transition-colors ${filters.tags.includes(tag) ? 'bg-blue-600 text-slate-800' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'}`}
                                                 >
                                                     <span>{tag}</span>
                                                     {filters.tags.includes(tag) && <CheckCircle2 className="w-3 h-3" />}
                                                 </button>
                                             )) : (
-                                                <div className="text-[10px] text-neutral-600 text-center py-2">No tags available</div>
+                                                <div className="text-[10px] text-slate-400 text-center py-2">No tags available</div>
                                             )}
                                         </div>
                                         {filters.tags.length > 0 && (
-                                            <div className="p-1 border-t border-white/5 bg-neutral-900/50">
+                                            <div className="p-1 border-t border-slate-200 bg-white shadow-sm border border-slate-200/50">
                                                 <button
                                                     onClick={() => setFilters({ ...filters, tags: [] })}
                                                     className="w-full text-center py-1.5 text-[9px] text-red-400 hover:text-red-300 font-bold uppercase tracking-wider"
@@ -653,12 +660,12 @@ Link: ${updatedData.link || 'None'}
                             </div>
 
                             {/* Date Filter */}
-                            <div className="w-px h-3 bg-white/10" />
+                            <div className="w-px h-3 bg-slate-100 border border-slate-200" />
 
                             <div className="relative">
                                 <button
                                     onClick={() => { setIsDateFilterOpen(!isDateFilterOpen); setIsPriorityOpen(false); setIsTagsOpen(false); }}
-                                    className={`flex items-center gap-1 text-[10px] px-2 py-1.5 rounded hover:bg-white/5 transition-colors whitespace-nowrap ${filters.dateStart || filters.dateEnd ? 'text-blue-400 font-bold' : 'text-neutral-300 hover:text-white'}`}
+                                    className={`flex items-center gap-1 text-[10px] px-2 py-1.5 rounded hover:bg-slate-100 transition-colors whitespace-nowrap ${filters.dateStart || filters.dateEnd ? 'text-blue-400 font-bold' : 'text-slate-600 hover:text-blue-600'}`}
                                 >
                                     <CalendarIcon className="w-3 h-3" />
                                     <span className="hidden md:inline">{filters.dateStart || filters.dateEnd ? 'Date Range' : 'Dates'}</span>
@@ -666,8 +673,8 @@ Link: ${updatedData.link || 'None'}
                                 </button>
 
                                 {isDateFilterOpen && (
-                                    <div className="absolute top-full right-0 mt-2 w-64 bg-[#0A0A0A] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50 p-3">
-                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-3 flex items-center gap-2">
+                                    <div className="absolute top-full right-0 mt-2 w-64 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50 p-3">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-800 mb-3 flex items-center gap-2">
                                             <Filter className="w-3 h-3 text-blue-500" /> Filter by Date
                                         </h4>
                                         
@@ -679,13 +686,13 @@ Link: ${updatedData.link || 'None'}
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <input 
                                                             type="date"
-                                                            className="w-full bg-neutral-900 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none focus:border-blue-500/50"
+                                                            className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-lg px-2 py-1.5 text-[10px] text-slate-800 outline-none focus:border-blue-500/50"
                                                             value={filters.dateStart}
                                                             onChange={(e) => setFilters({ ...filters, dateStart: e.target.value })}
                                                         />
                                                         <input 
                                                             type="date"
-                                                            className="w-full bg-neutral-900 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none focus:border-blue-500/50"
+                                                            className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-lg px-2 py-1.5 text-[10px] text-slate-800 outline-none focus:border-blue-500/50"
                                                             value={filters.dateEnd}
                                                             onChange={(e) => setFilters({ ...filters, dateEnd: e.target.value })}
                                                         />
@@ -693,18 +700,18 @@ Link: ${updatedData.link || 'None'}
                                                 </div>
 
                                                 {/* Created Date Range */}
-                                                <div className="space-y-1 col-span-2 border-t border-white/5 pt-2">
+                                                <div className="space-y-1 col-span-2 border-t border-slate-200 pt-2">
                                                     <div className="text-[9px] text-green-500 font-bold uppercase tracking-wider mb-1">Created Date Range</div>
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <input 
                                                             type="date"
-                                                            className="w-full bg-neutral-900 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none focus:border-blue-500/50"
+                                                            className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-lg px-2 py-1.5 text-[10px] text-slate-800 outline-none focus:border-blue-500/50"
                                                             value={filters.dateCreatedStart}
                                                             onChange={(e) => setFilters({ ...filters, dateCreatedStart: e.target.value })}
                                                         />
                                                         <input 
                                                             type="date"
-                                                            className="w-full bg-neutral-900 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none focus:border-blue-500/50"
+                                                            className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-lg px-2 py-1.5 text-[10px] text-slate-800 outline-none focus:border-blue-500/50"
                                                             value={filters.dateCreatedEnd}
                                                             onChange={(e) => setFilters({ ...filters, dateCreatedEnd: e.target.value })}
                                                         />
@@ -731,7 +738,7 @@ Link: ${updatedData.link || 'None'}
                     {viewMode === 'admin' && (
                          <button
                             onClick={toggleSectionVisibility}
-                            className={`p-2 rounded-lg ml-2 transition-all border border-white/5 ${isSectionHidden ? 'text-red-500 bg-red-900/20 hover:bg-red-900/40' : 'text-neutral-600 hover:text-white bg-neutral-900/50'}`}
+                            className={`p-2 rounded-lg ml-2 transition-all border border-slate-200 ${isSectionHidden ? 'text-red-500 bg-red-900/20 hover:bg-red-900/40' : 'text-slate-400 hover:text-blue-600 bg-white shadow-sm border border-slate-200/50'}`}
                             title={isSectionHidden ? "Show Section" : "Hide Section"}
                         >
                             {isSectionHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -749,9 +756,9 @@ Link: ${updatedData.link || 'None'}
                     <>
                         <button
                             onClick={() => setIsAdding(true)}
-                            className="md:hidden w-full bg-neutral-900/30 border border-white/10 text-neutral-400 hover:text-white px-4 py-3 rounded-xl font-black uppercase tracking-wider text-[10px] transition-all flex items-center justify-center gap-3 group active:scale-95 hover:bg-white/5 hover:border-white/20"
+                            className="md:hidden w-full bg-white shadow-sm border border-slate-200/30 border border-slate-300 text-slate-500 hover:text-blue-600 px-4 py-3 rounded-xl font-black uppercase tracking-wider text-[10px] transition-all flex items-center justify-center gap-3 group active:scale-95 hover:bg-slate-100 hover:border-slate-300"
                         >
-                            <div className="bg-blue-500/20 text-blue-500 p-1 rounded-md group-hover:bg-blue-500 group-hover:text-white transition-colors shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                            <div className="bg-blue-500/20 text-blue-500 p-1 rounded-md group-hover:bg-blue-500 group-hover:text-blue-600 transition-colors shadow-[0_0_10px_rgba(59,130,246,0.2)]">
                                 <Plus className="w-4 h-4" />
                             </div>
                             <span>Create New Task</span>
@@ -759,26 +766,26 @@ Link: ${updatedData.link || 'None'}
                         
                         <div 
                             onClick={() => setIsAdding(true)} 
-                            className="hidden md:flex items-center gap-3 bg-neutral-900/50 border border-white/5 rounded-xl p-3 text-neutral-500 cursor-text hover:bg-neutral-900/80 hover:border-white/10 transition-all group"
+                            className="hidden md:flex items-center gap-3 bg-white shadow-sm border border-slate-200/50 border border-slate-200 rounded-xl p-3 text-slate-500 cursor-text hover:bg-white shadow-sm border border-slate-200/80 hover:border-slate-300 transition-all group"
                         >
                             <div className="bg-blue-500/10 p-1 rounded group-hover:bg-blue-500/20 text-blue-500 transition-colors">
                                 <Plus className="w-4 h-4" />
                             </div>
-                            <span className="font-mono text-xs uppercase tracking-wider group-hover:text-neutral-300">Create new mission...</span>
+                            <span className="font-mono text-xs uppercase tracking-wider group-hover:text-slate-600">Create new mission...</span>
                         </div>
                     </>
                 )}
 
                 {/* Desktop & Expanded Mobile: Full Form */}
                 {isAdding && (
-                    <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-xl p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200 relative z-10">
+                    <div className="bg-white border border-slate-200 shadow-md backdrop-blur-md border border-slate-300 rounded-xl p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200 relative z-10">
                         {/* Header: Title & Main Actions */}
                         <div className="flex gap-3 mb-4 items-start">
                             <div className="relative flex-1 group">
                                 <input
                                     ref={titleInputRef}
                                     placeholder="Enter mission objectives..."
-                                    className="w-full bg-black/60 border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm md:text-base text-white focus:border-blue-500 focus:bg-black/80 outline-none font-bold tracking-wide transition-all shadow-inner"
+                                    className="w-full bg-white border border-slate-200 shadow-md border border-slate-300 rounded-xl pl-4 pr-12 py-3 text-sm md:text-base text-slate-800 focus:border-blue-500 focus:bg-white/80 outline-none font-bold tracking-wide transition-all shadow-inner"
                                     value={newTask.title}
                                     onChange={e => setNewTask({ ...newTask, title: e.target.value })}
                                     onKeyDown={e => e.key === 'Enter' && handleAdd()}
@@ -793,7 +800,7 @@ Link: ${updatedData.link || 'None'}
                             </div>
                             <button 
                                 onClick={() => setIsAdding(false)}
-                                className="p-3 bg-white/5 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-xl border border-white/5 transition-all"
+                                className="p-3 bg-slate-50 hover:bg-slate-200 text-slate-500 hover:text-blue-600 rounded-xl border border-slate-200 transition-all"
                                 title="Cancel"
                             >
                                 <X className="w-5 h-5" />
@@ -803,7 +810,7 @@ Link: ${updatedData.link || 'None'}
                         {/* Compact Settings Grid */}
                         <div className="grid grid-cols-2 gap-4 mb-3">
                             <select
-                                className="bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-[10px] text-white focus:border-blue-500/50 outline-none font-mono uppercase h-9"
+                                className="bg-white shadow-sm border border-slate-300 rounded-lg px-2 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono uppercase h-9"
                                 value={newTask.priority}
                                 onChange={e => setNewTask({ ...newTask, priority: e.target.value })}
                             >
@@ -812,7 +819,7 @@ Link: ${updatedData.link || 'None'}
                                 <option value="high">Pri: Critical</option>
                             </select>
                             <select
-                                className="bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-[10px] text-white focus:border-blue-500/50 outline-none font-mono uppercase h-9"
+                                className="bg-white shadow-sm border border-slate-300 rounded-lg px-2 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono uppercase h-9"
                                 value={newTask.difficulty}
                                 onChange={e => setNewTask({ ...newTask, difficulty: e.target.value })}
                             >
@@ -827,20 +834,20 @@ Link: ${updatedData.link || 'None'}
                             <input
                                 type="number"
                                 placeholder="Target"
-                                className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-blue-500/50 outline-none font-mono"
+                                className="bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono"
                                 value={newTask.targetValue || ''}
                                 onChange={e => setNewTask({ ...newTask, targetValue: e.target.value })}
                             />
                             <input
                                 type="number"
                                 placeholder="Current"
-                                className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-blue-500/50 outline-none font-mono"
+                                className="bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono"
                                 value={newTask.currentValue || ''}
                                 onChange={e => setNewTask({ ...newTask, currentValue: e.target.value })}
                             />
                             <input
                                 placeholder="Unit (e.g. pages)"
-                                className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-blue-500/50 outline-none font-mono"
+                                className="bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono"
                                 value={newTask.unit}
                                 onChange={e => setNewTask({ ...newTask, unit: e.target.value })}
                             />
@@ -850,7 +857,7 @@ Link: ${updatedData.link || 'None'}
                         <div className="space-y-3">
                             <textarea
                                 placeholder="Task Description (Optional)"
-                                className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-xs text-neutral-300 focus:border-blue-500/50 outline-none min-h-[60px] font-mono resize-none"
+                                className="w-full bg-white shadow-sm border border-slate-300 rounded-lg p-3 text-xs text-slate-600 focus:border-blue-500/50 outline-none min-h-[60px] font-mono resize-none"
                                 value={newTask.description}
                                 onChange={e => setNewTask({ ...newTask, description: e.target.value })}
                             />
@@ -859,21 +866,21 @@ Link: ${updatedData.link || 'None'}
                             <div className="grid grid-cols-2 gap-2">
                                 <input
                                     type="date"
-                                    className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-blue-500/50 outline-none font-mono uppercase"
+                                    className="bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono uppercase"
                                     value={newTask.deadline}
                                     onChange={e => setNewTask({ ...newTask, deadline: e.target.value })}
                                 />
                                 <input
                                     placeholder="Link URL (Optional)"
-                                    className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-blue-500/50 outline-none font-mono"
+                                    className="bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono"
                                     value={newTask.link}
                                     onChange={e => setNewTask({ ...newTask, link: e.target.value })}
                                 />
                             </div>
 
                              {/* Tags Selection in Creation */}
-                             <div className="space-y-2 pt-2 border-t border-white/5">
-                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Tags</label>
+                             <div className="space-y-2 pt-2 border-t border-slate-200">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tags</label>
                                 
                                 {/* Quick Add Tags */}
                                 {suggestedTags.length > 0 && (
@@ -885,7 +892,7 @@ Link: ${updatedData.link || 'None'}
                                                     ...newTask,
                                                     tags: [...newTask.tags, { text: tag.text, color: tag.color }]
                                                 })}
-                                                className={`text-[9px] px-2 py-1 rounded border border-white/10 hover:border-white/30 transition-all ${tag.color} opacity-80 hover:opacity-100 flex items-center gap-1`}
+                                                className={`text-[9px] px-2 py-1 rounded border border-slate-300 hover:border-white/30 transition-all ${tag.color} opacity-80 hover:opacity-100 flex items-center gap-1`}
                                             >
                                                 {tag.text} <Plus className="w-2 h-2" />
                                             </button>
@@ -907,7 +914,7 @@ Link: ${updatedData.link || 'None'}
                                 </div>
                                 <div className="flex gap-1" onKeyDown={e => e.stopPropagation()}>
                                     <input
-                                        className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-[10px] text-white focus:border-blue-500/50 outline-none"
+                                        className="flex-1 bg-white shadow-sm border border-slate-300 rounded px-2 py-1 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none"
                                         placeholder="New Tag..."
                                         onKeyDown={e => {
                                             if (e.key === 'Enter' && e.target.value) {
@@ -931,7 +938,7 @@ Link: ${updatedData.link || 'None'}
                             <div className="space-y-2">
                                 <input
                                     placeholder="Add subtask (Press Enter)..."
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-blue-500/50 outline-none font-mono"
+                                    className="w-full bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none font-mono"
                                     onKeyDown={e => {
                                         if (e.key === 'Enter' && e.target.value) {
                                             setNewTask({
@@ -943,9 +950,9 @@ Link: ${updatedData.link || 'None'}
                                     }}
                                 />
                                 {newTask.subtasks?.length > 0 && (
-                                    <div className="space-y-1 pl-2 border-l-2 border-white/5">
+                                    <div className="space-y-1 pl-2 border-l-2 border-slate-200">
                                         {newTask.subtasks.map((st, i) => (
-                                            <div key={i} className="text-[10px] text-neutral-400 flex items-center justify-between group/st">
+                                            <div key={i} className="text-[10px] text-slate-500 flex items-center justify-between group/st">
                                                 <span>— {st.text}</span>
                                                 <button onClick={() => {
                                                     const newSt = [...newTask.subtasks];
@@ -964,13 +971,13 @@ Link: ${updatedData.link || 'None'}
             {/* Board Columns - Mobile Navigation & Desktop Grid */}
             <div className="flex-1 pb-4 mb-8">
                 {/* Mobile View Selector */}
-                <div className="md:hidden flex items-center bg-black/20 p-1 rounded-xl border border-white/5 mb-4">
+                <div className="md:hidden flex items-center bg-white/20 p-1 rounded-xl border border-slate-200 mb-4">
                     {['todo', 'in_progress', 'done'].map(status => {
                         const isActive = mobileColumnView === status;
                         const count = moduleTasks.filter(t => t.status === status).length;
                         const config = {
                             todo: { label: 'To Do', color: 'bg-blue-500' },
-                            in_progress: { label: 'Active', color: 'bg-yellow-500' },
+                            in_progress: { label: 'Active', color: 'bg-amber-600' },
                             done: { label: 'Done', color: 'bg-green-500' }
                         };
                         const theme = config[status];
@@ -979,7 +986,7 @@ Link: ${updatedData.link || 'None'}
                             <button
                                 key={status}
                                 onClick={() => setMobileColumnView(status)}
-                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all relative ${isActive ? 'bg-white/5 text-white shadow-lg' : 'text-neutral-500 hover:text-neutral-300'}`}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all relative ${isActive ? 'bg-slate-50 text-slate-800 shadow-lg' : 'text-slate-500 hover:text-slate-600'}`}
                             >
                                 <div className="flex items-center gap-1.5">
                                     {isActive && <div className={`w-1.5 h-1.5 rounded-full ${theme.color} shadow-[0_0_5px_rgba(255,255,255,0.5)]`} />}
@@ -1061,12 +1068,12 @@ Link: ${updatedData.link || 'None'}
             </div>
 
             {/* Backlog Section */}
-            <div className="border-t border-white/5 pt-8">
+            <div className="border-t border-slate-200 pt-8">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                        <Archive className="w-5 h-5 text-neutral-500" />
-                        <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-wider">Backlog</h3>
-                        <span className="text-[10px] font-mono text-neutral-600">{backlogTasks.length} Tasks</span>
+                        <Archive className="w-5 h-5 text-slate-500" />
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Backlog</h3>
+                        <span className="text-[10px] font-mono text-slate-400">{backlogTasks.length} Tasks</span>
                         {viewMode === 'admin' && (
                             <button
                                 onClick={() => {
@@ -1074,7 +1081,7 @@ Link: ${updatedData.link || 'None'}
                                     setIsAdding(true);
                                     window.scrollTo({ top: 0, behavior: 'smooth' });
                                 }}
-                                className="ml-4 flex items-center gap-1 px-2 py-1 bg-neutral-800 text-neutral-300 rounded hover:bg-neutral-700 transition-all text-[10px] font-bold uppercase tracking-wider"
+                                className="ml-4 flex items-center gap-1 px-2 py-1 bg-slate-200 text-slate-600 rounded hover:bg-neutral-700 transition-all text-[10px] font-bold uppercase tracking-wider"
                             >
                                 <Plus className="w-3 h-3" /> Add Mission
                             </button>
@@ -1103,19 +1110,19 @@ Link: ${updatedData.link || 'None'}
                     ))}
 
                     {backlogTasks.length === 0 && (
-                        <div className="col-span-full py-8 text-center border border-dashed border-white/5 rounded-xl">
-                            <p className="text-xs text-neutral-600">No tasks in backlog.</p>
+                        <div className="col-span-full py-8 text-center border border-dashed border-slate-200 rounded-xl">
+                            <p className="text-xs text-slate-400">No tasks in backlog.</p>
                         </div>
                     )}
                 </div>
             </div>
             {/* Mobile Filter Drawer */}
             {isMobileFiltersOpen && (
-                <div className="md:hidden fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="absolute bottom-0 left-0 right-0 bg-[#0A0A0A] border-t border-white/10 rounded-t-2xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
+                <div className="md:hidden fixed inset-0 z-[100] bg-white border border-slate-200 shadow-md backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="absolute bottom-0 left-0 right-0 bg-white shadow-xl border border-slate-200 border-t border-slate-300 rounded-t-2xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-black uppercase tracking-tighter text-white">Filters</h3>
-                            <button onClick={() => setIsMobileFiltersOpen(false)} className="p-2 bg-neutral-900 rounded-lg text-neutral-400 hover:text-white">
+                            <h3 className="text-lg font-black uppercase tracking-tighter text-slate-800">Filters</h3>
+                            <button onClick={() => setIsMobileFiltersOpen(false)} className="p-2 bg-white shadow-sm border border-slate-200 rounded-lg text-slate-500 hover:text-blue-600">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -1123,7 +1130,7 @@ Link: ${updatedData.link || 'None'}
                         <div className="space-y-2">
                             {/* Difficulty */}
                             <div className="space-y-1.5">
-                                <label className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Difficulty</label>
+                                <label className="text-xs text-slate-500 font-bold uppercase tracking-widest">Difficulty</label>
                                 <div className="grid grid-cols-3 gap-2">
                                     {['easy', 'medium', 'hard'].map(lvl => (
                                         <button
@@ -1131,8 +1138,8 @@ Link: ${updatedData.link || 'None'}
                                             onClick={() => setFilters({ ...filters, difficulty: filters.difficulty === lvl ? '' : lvl })}
                                             className={`py-3 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all ${
                                                 filters.difficulty === lvl 
-                                                ? (lvl === 'easy' ? 'bg-green-500/20 border-green-500 text-green-500' : lvl === 'medium' ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500' : 'bg-purple-500/20 border-purple-500 text-purple-500')
-                                                : 'bg-neutral-900 border-white/5 text-neutral-400 hover:bg-white/5'
+                                                ? (lvl === 'easy' ? 'bg-green-500/20 border-green-500 text-green-500' : lvl === 'medium' ? 'bg-amber-600/20 border-amber-600 text-amber-600' : 'bg-purple-500/20 border-purple-500 text-purple-500')
+                                                : 'bg-white shadow-sm border border-slate-200 border-slate-200 text-slate-500 hover:bg-slate-100'
                                             }`}
                                         >
                                             {lvl}
@@ -1143,7 +1150,7 @@ Link: ${updatedData.link || 'None'}
 
                             {/* Priority */}
                             <div className="space-y-1.5">
-                                <label className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Priority</label>
+                                <label className="text-xs text-slate-500 font-bold uppercase tracking-widest">Priority</label>
                                 <div className="grid grid-cols-3 gap-2">
                                     {['low', 'medium', 'high'].map(pri => (
                                         <button
@@ -1151,8 +1158,8 @@ Link: ${updatedData.link || 'None'}
                                             onClick={() => setFilters({ ...filters, priority: filters.priority === pri ? '' : pri })}
                                             className={`py-3 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all ${
                                                 filters.priority === pri 
-                                                ? (pri === 'low' ? 'bg-blue-500/20 border-blue-500 text-blue-500' : pri === 'medium' ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500' : 'bg-red-500/20 border-red-500 text-red-500')
-                                                : 'bg-neutral-900 border-white/5 text-neutral-400 hover:bg-white/5'
+                                                ? (pri === 'low' ? 'bg-blue-500/20 border-blue-500 text-blue-500' : pri === 'medium' ? 'bg-amber-600/20 border-amber-600 text-amber-600' : 'bg-red-500/20 border-red-500 text-red-500')
+                                                : 'bg-white shadow-sm border border-slate-200 border-slate-200 text-slate-500 hover:bg-slate-100'
                                             }`}
                                         >
                                             {pri}
@@ -1163,7 +1170,7 @@ Link: ${updatedData.link || 'None'}
 
                              {/* Tags */}
                              <div className="space-y-1.5">
-                                <label className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Tags</label>
+                                <label className="text-xs text-slate-500 font-bold uppercase tracking-widest">Tags</label>
                                 <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1 custom-scrollbar">
                                     {allTags.map(tag => (
                                         <button
@@ -1171,36 +1178,36 @@ Link: ${updatedData.link || 'None'}
                                             onClick={() => toggleTagFilter(tag)}
                                             className={`px-3 py-2 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-2 ${
                                                 filters.tags.includes(tag) 
-                                                ? 'bg-blue-600 border-blue-500 text-white' 
-                                                : 'bg-neutral-900 border-white/5 text-neutral-400 hover:bg-white/5'
+                                                ? 'bg-blue-600 border-blue-500 text-slate-800' 
+                                                : 'bg-white shadow-sm border border-slate-200 border-slate-200 text-slate-500 hover:bg-slate-100'
                                             }`}
                                         >
                                             {tag}
                                             {filters.tags.includes(tag) && <CheckCircle2 className="w-3 h-3" />}
                                         </button>
                                     ))}
-                                    {allTags.length === 0 && <span className="text-neutral-600 text-[10px italic">No tags found.</span>}
+                                    {allTags.length === 0 && <span className="text-slate-400 text-[10px italic">No tags found.</span>}
                                 </div>
                              </div>
 
                              {/* Date Range */}
                              <div className="space-y-1.5">
-                                <label className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Date Range</label>
+                                <label className="text-xs text-slate-500 font-bold uppercase tracking-widest">Date Range</label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <span className="text-[9px] text-neutral-600 uppercase font-bold block mb-1">From</span>
+                                        <span className="text-[9px] text-slate-400 uppercase font-bold block mb-1">From</span>
                                         <input 
                                             type="date"
-                                            className="w-full bg-neutral-900 border border-white/10 rounded-lg px-3 py-3 text-xs text-white outline-none focus:border-blue-500"
+                                            className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-lg px-3 py-3 text-xs text-slate-800 outline-none focus:border-blue-500"
                                             value={filters.dateStart}
                                             onChange={(e) => setFilters({ ...filters, dateStart: e.target.value })}
                                         />
                                     </div>
                                     <div>
-                                         <span className="text-[9px] text-neutral-600 uppercase font-bold block mb-1">To</span>
+                                         <span className="text-[9px] text-slate-400 uppercase font-bold block mb-1">To</span>
                                          <input 
                                             type="date"
-                                            className="w-full bg-neutral-900 border border-white/10 rounded-lg px-3 py-3 text-xs text-white outline-none focus:border-blue-500"
+                                            className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-lg px-3 py-3 text-xs text-slate-800 outline-none focus:border-blue-500"
                                             value={filters.dateEnd}
                                             onChange={(e) => setFilters({ ...filters, dateEnd: e.target.value })}
                                         />
@@ -1209,10 +1216,10 @@ Link: ${updatedData.link || 'None'}
                              </div>
 
                              {/* Actions */}
-                             <div className="pt-4 flex items-center gap-3 sticky bottom-0 bg-[#0A0A0A] pb-2 border-t border-white/5 mt-4">
+                             <div className="pt-4 flex items-center gap-3 sticky bottom-0 bg-white shadow-xl border border-slate-200 pb-2 border-t border-slate-200 mt-4">
                                 <button 
                                     onClick={() => { setFilters({ ...filters, tags: [], priority: '', difficulty: '', dateStart: '', dateEnd: '' }); }}
-                                    className="flex-1 py-3 bg-neutral-800 text-neutral-400 font-bold uppercase tracking-wider rounded-xl hover:bg-neutral-700 transition-all text-xs"
+                                    className="flex-1 py-3 bg-slate-200 text-slate-500 font-bold uppercase tracking-wider rounded-xl hover:bg-neutral-700 transition-all text-xs"
                                 >
                                     Reset
                                 </button>

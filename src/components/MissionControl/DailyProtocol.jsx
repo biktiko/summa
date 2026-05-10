@@ -269,19 +269,19 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 {/* Header Section */}
                 <div className="hidden md:block">
-                    <h3 className="text-xl font-black text-white uppercase tracking-wider">🔄 Routines</h3>
-                    <p className="text-xs text-neutral-500 font-mono">Daily Operations & Habits</p>
+                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-wider">🔄 Routines</h3>
+                    <p className="text-xs text-slate-500 font-mono">Daily Operations & Habits</p>
                 </div>
                  {viewMode === 'admin' && (
                      <div className="flex items-center gap-2 self-start md:self-auto overflow-x-auto max-w-full pb-1">
                          {/* Calendar Buttons ... (Keep existing) */}
                          {!isCalendarConnected ? (
-                             <button onClick={connectCalendar} className="p-2 bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg transition-colors" title="Connect Google Calendar"><CalendarIcon className="w-4 h-4" /></button>
+                             <button onClick={connectCalendar} className="p-2 bg-slate-50 hover:bg-slate-200 text-slate-500 hover:text-blue-600 rounded-lg transition-colors" title="Connect Google Calendar"><CalendarIcon className="w-4 h-4" /></button>
                          ) : (
                              <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg group transition-all hover:bg-green-500/20"><CalendarIcon className="w-3 h-3 text-green-500" /><span className="text-[10px] font-bold text-green-500 uppercase tracking-wider group-hover:underline">Open Calendar</span></a>
                          )}
                          {toggleSectionVisibility && (
-                             <button onClick={toggleSectionVisibility} className={`p-2 rounded-lg transition-colors ${isSectionHidden ? 'bg-red-500/20 text-red-500' : 'bg-white/5 text-neutral-400 hover:text-white'}`}>{isSectionHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
+                             <button onClick={toggleSectionVisibility} className={`p-2 rounded-lg transition-colors ${isSectionHidden ? 'bg-red-500/20 text-red-500' : 'bg-slate-50 text-slate-500 hover:text-blue-600'}`}>{isSectionHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
                          )}
                          <button onClick={() => { resetForm(); setIsAdding(true); }} className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"><Plus className="w-3 h-3" /> Add Routine</button>
                     </div>
@@ -290,8 +290,8 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
             <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
                 {moduleProtocols.length === 0 && !isAdding && (
-                    <div className="text-center py-12 border border-dashed border-white/10 rounded-xl">
-                        <p className="text-neutral-500 text-sm">No active protocols initialized.</p>
+                    <div className="text-center py-12 border border-dashed border-slate-300 rounded-xl">
+                        <p className="text-slate-500 text-sm">No active protocols initialized.</p>
                     </div>
                 )}
 
@@ -300,7 +300,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                         key={protocol.id}
                         className={`group relative p-3 rounded-2xl border transition-all ${protocol.isCompleted
                             ? 'bg-emerald-900/10 border-emerald-500/20'
-                            : 'bg-neutral-900/40 border-white/5 hover:border-blue-500/30'
+                            : 'bg-white shadow-sm border border-slate-200/40 border-slate-200 hover:border-blue-500/30'
                             }`}
                     >
                          <div className="flex items-center gap-4">
@@ -310,7 +310,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                 disabled={protocol.isCompleted || viewMode === 'guest'}
                                 className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shrink-0 ${protocol.isCompleted
                                     ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                                    : 'bg-black/40 border border-neutral-700 hover:border-blue-500 text-neutral-500 hover:text-blue-500'
+                                    : 'bg-white shadow-sm border border-neutral-700 hover:border-blue-500 text-slate-500 hover:text-blue-500'
                                     }`}
                             >
                                 <CheckCircle2 className="w-6 h-6" />
@@ -318,10 +318,10 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
                             {/* Content */}
                             <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                <h4 className={`font-bold text-base truncate ${protocol.isCompleted ? 'text-emerald-500' : 'text-neutral-200'}`}>
+                                <h4 className={`font-bold text-base truncate ${protocol.isCompleted ? 'text-emerald-500' : 'text-slate-700'}`}>
                                     {protocol.title}
                                 </h4>
-                                <div className="flex items-center gap-2 text-[10px] text-neutral-500 font-bold uppercase tracking-wider mt-0.5">
+                                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
                                     <Repeat className="w-3 h-3" />
                                     <span>
                                         {protocol.frequency === 'specific_days'
@@ -339,13 +339,13 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                 <div className="flex items-center gap-1.5 px-2">
                                     <span className="text-2xl drop-shadow-md">🔥</span>
                                     <div className="flex flex-col items-start leading-none">
-                                        <span className="text-sm font-black text-yellow-500">{protocol.streak || 0}</span>
+                                        <span className="text-sm font-black text-amber-600">{protocol.streak || 0}</span>
                                         <span className="text-[7px] font-bold text-yellow-600 uppercase tracking-tighter">Day Streak</span>
                                     </div>
                                 </div>
                                 
                                 {/* Divider */}
-                                <div className="w-px h-8 bg-white/5 mx-1 hidden sm:block" />
+                                <div className="w-px h-8 bg-slate-50 mx-1 hidden sm:block" />
 
                                 {/* XP Reward */}
                                 <div className="text-xs font-black text-blue-500 tabular-nums bg-blue-500/10 px-2 py-1 rounded hidden sm:block">
@@ -359,10 +359,10 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
                                 {viewMode === 'admin' && (
                                     <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity ml-2 absolute top-2 right-2 md:static">
-                                        <button onClick={() => startEdit(protocol)} className="p-1 hover:bg-white/10 rounded text-neutral-400 hover:text-white">
+                                        <button onClick={() => startEdit(protocol)} className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600">
                                             <Edit2 className="w-3 h-3" />
                                         </button>
-                                        <button onClick={() => handleDelete(protocol.id)} className="p-1 hover:bg-red-500/10 rounded text-neutral-400 hover:text-red-500">
+                                        <button onClick={() => handleDelete(protocol.id)} className="p-1 hover:bg-red-500/10 rounded text-slate-500 hover:text-red-500">
                                             <Trash2 className="w-3 h-3" />
                                         </button>
                                     </div>
@@ -375,20 +375,20 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
             {/* Add/Edit Modal */}
             {isAdding && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-md bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-2xl p-8">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-md bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-3xl shadow-2xl p-8">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-black text-white uppercase tracking-wider">
+                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-wider">
                                 {editingId ? 'Edit Routine' : 'New Routine'}
                             </h3>
-                            <button onClick={resetForm} className="text-neutral-500 hover:text-white"><X className="w-5 h-5" /></button>
+                            <button onClick={resetForm} className="text-slate-500 hover:text-blue-600"><X className="w-5 h-5" /></button>
                         </div>
 
                         <form onSubmit={handleSave} className="space-y-6">
                             <div>
-                                <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-2">Routine Name</label>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Routine Name</label>
                                 <input
-                                    className="w-full bg-neutral-900 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+                                    className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500 transition-colors"
                                     value={formData.title}
                                     onChange={e => setFormData({ ...formData, title: e.target.value })}
                                     placeholder="e.g. Morning Stretch"
@@ -398,9 +398,9 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-2">Frequency</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Frequency</label>
                                     <select
-                                        className="w-full bg-neutral-900 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+                                        className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500 transition-colors"
                                         value={formData.frequency}
                                         onChange={e => setFormData({ ...formData, frequency: e.target.value })}
                                     >
@@ -411,10 +411,10 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-2">Time (Optional)</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Time (Optional)</label>
                                     <input
                                         type="time"
-                                        className="w-full bg-neutral-900 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+                                        className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500 transition-colors"
                                         value={formData.time}
                                         onChange={e => setFormData({ ...formData, time: e.target.value })}
                                     />
@@ -422,8 +422,8 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                             </div>
 
                             {isCalendarConnected && (
-                                <label className="flex items-center gap-3 cursor-pointer group p-3 bg-neutral-900/50 rounded-xl border border-white/5 hover:border-white/20 transition-all">
-                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${formData.addToCalendar ? 'bg-green-500 border-green-500' : 'border-white/20 bg-black/40 group-hover:border-white/40'}`}>
+                                <label className="flex items-center gap-3 cursor-pointer group p-3 bg-white shadow-sm border border-slate-200/50 rounded-xl border border-slate-200 hover:border-slate-300 transition-all">
+                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${formData.addToCalendar ? 'bg-green-500 border-green-500' : 'border-slate-300 bg-white shadow-sm group-hover:border-white/40'}`}>
                                         {formData.addToCalendar && <CheckCircle2 className="w-4 h-4 text-black" />}
                                     </div>
                                     <input
@@ -433,17 +433,17 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                         onChange={e => setFormData({ ...formData, addToCalendar: e.target.checked })}
                                     />
                                     <div className="flex flex-col">
-                                        <span className={`text-xs font-bold uppercase tracking-wider ${formData.addToCalendar ? 'text-green-500' : 'text-neutral-400'}`}>
+                                        <span className={`text-xs font-bold uppercase tracking-wider ${formData.addToCalendar ? 'text-green-500' : 'text-slate-500'}`}>
                                             Sync to Google Calendar
                                         </span>
-                                        <span className="text-[10px] text-neutral-600">Automatically creates recurring event</span>
+                                        <span className="text-[10px] text-slate-400">Automatically creates recurring event</span>
                                     </div>
                                 </label>
                             )}
 
                             {formData.frequency === 'specific_days' && (
                                 <div>
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-2">Active Days</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Active Days</label>
                                     <div className="flex justify-between gap-1">
                                         {daysOfWeek.map(day => (
                                             <button
@@ -451,8 +451,8 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                                 type="button"
                                                 onClick={() => toggleDay(day.id)}
                                                 className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${formData.specificDays.includes(day.id)
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-neutral-900 text-neutral-500 hover:bg-neutral-800'
+                                                    ? 'bg-blue-600 text-slate-800'
+                                                    : 'bg-white shadow-sm border border-slate-200 text-slate-500 hover:bg-slate-200'
                                                     }`}
                                             >
                                                 {day.short}
@@ -462,11 +462,11 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                 </div>
                             )}
 
-                            <div className="p-4 bg-neutral-900/50 rounded-xl border border-white/5 text-center">
-                                <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Rewards are automatically calculated based on streak & frequency.</p>
+                            <div className="p-4 bg-white shadow-sm border border-slate-200/50 rounded-xl border border-slate-200 text-center">
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Rewards are automatically calculated based on streak & frequency.</p>
                                 <div className="flex justify-center gap-4 mt-2">
                                     <span className="text-xs font-bold text-blue-500 flex items-center gap-1"><Zap className="w-3 h-3" /> Auto XP</span>
-                                    <span className="text-xs font-bold text-yellow-500 flex items-center gap-1"><Coins className="w-3 h-3" /> Auto Coins</span>
+                                    <span className="text-xs font-bold text-amber-600 flex items-center gap-1"><Coins className="w-3 h-3" /> Auto Coins</span>
                                 </div>
                             </div>
 

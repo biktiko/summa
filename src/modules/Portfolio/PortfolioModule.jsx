@@ -44,10 +44,10 @@ const AboutMeSection = ({ userData, updateUser, viewMode, isSectionHidden, toggl
         <div className={`space-y-4`}>
              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                     <div className="p-2 bg-neutral-800 rounded-lg text-neutral-400">
+                     <div className="p-2 bg-slate-200 rounded-lg text-slate-500">
                         <User className="w-5 h-5" />
                      </div>
-                     <h3 className="text-sm font-black uppercase tracking-widest text-neutral-300">About Me</h3>
+                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-600">About Me</h3>
                      {viewMode === 'admin' && isSectionHidden && (
                         <span className="text-[9px] font-bold text-red-500 uppercase border border-red-900/50 px-2 py-0.5 rounded bg-red-900/20">Hidden Section</span>
                      )}
@@ -55,7 +55,7 @@ const AboutMeSection = ({ userData, updateUser, viewMode, isSectionHidden, toggl
                 {viewMode === 'admin' && (
                     <button
                         onClick={toggleSectionVisibility}
-                        className={`p-2 rounded-lg transition-all ${isSectionHidden ? 'text-red-500 bg-red-900/20 hover:bg-red-900/40' : 'text-neutral-600 hover:text-white'}`}
+                        className={`p-2 rounded-lg transition-all ${isSectionHidden ? 'text-red-500 bg-red-900/20 hover:bg-red-900/40' : 'text-slate-400 hover:text-blue-600'}`}
                         title={isSectionHidden ? "Show Section" : "Hide Section"}
                     >
                         {isSectionHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -65,14 +65,14 @@ const AboutMeSection = ({ userData, updateUser, viewMode, isSectionHidden, toggl
              
              {viewMode === 'admin' ? (
                  <textarea
-                    className="w-full bg-neutral-900/30 border border-white/5 rounded-xl p-4 text-sm text-neutral-300 focus:border-blue-500/50 outline-none min-h-[100px] leading-relaxed resize-none"
+                    className="w-full bg-white shadow-sm border border-slate-200/30 border border-slate-200 rounded-xl p-4 text-sm text-slate-600 focus:border-blue-500/50 outline-none min-h-[100px] leading-relaxed resize-none"
                     placeholder="Write a brief professional bio..."
                     value={localBio}
                     onChange={handleChange}
                     onBlur={handleBlur}
                  />
              ) : (
-                 <div className="bg-neutral-900/30 border border-white/5 rounded-xl p-6 text-sm text-neutral-300 leading-relaxed whitespace-pre-wrap">
+                 <div className="bg-white shadow-sm border border-slate-200/30 border border-slate-200 rounded-xl p-6 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
                      {userData.bio}
                  </div>
              )}
@@ -93,37 +93,37 @@ const PortfolioSettings = ({ sectionOrder, setSectionOrder, isSectionVisible, to
 
     return (
         <div className="max-w-2xl mx-auto space-y-4 animate-in fade-in zoom-in-95 duration-300">
-            <div className="bg-neutral-900/50 border border-white/10 rounded-2xl p-6">
-                <h3 className="text-lg font-black uppercase tracking-tight text-white mb-2">Portfolio Configuration</h3>
-                <p className="text-xs text-neutral-500 mb-6">Manage visibility and order of your portfolio sections.</p>
+            <div className="bg-white shadow-sm border border-slate-200/50 border border-slate-300 rounded-2xl p-6">
+                <h3 className="text-lg font-black uppercase tracking-tight text-slate-800 mb-2">Portfolio Configuration</h3>
+                <p className="text-xs text-slate-500 mb-6">Manage visibility and order of your portfolio sections.</p>
 
                 <div className="space-y-2">
                     {sectionOrder.map((key, index) => (
-                        <div key={key} className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-xl hover:border-white/10 transition-all group">
+                        <div key={key} className="flex items-center justify-between p-3 bg-white shadow-sm border border-slate-200 rounded-xl hover:border-slate-300 transition-all group">
                             <div className="flex items-center gap-3">
-                                <span className="text-[10px] font-mono text-neutral-600 w-4">{index + 1}</span>
-                                <span className="text-sm font-bold text-neutral-300 uppercase tracking-wide">{SECTION_LABELS[key] || key}</span>
+                                <span className="text-[10px] font-mono text-slate-400 w-4">{index + 1}</span>
+                                <span className="text-sm font-bold text-slate-600 uppercase tracking-wide">{SECTION_LABELS[key] || key}</span>
                             </div>
                             
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => toggleSectionVisibility(key)}
-                                    className={`p-2 rounded-lg transition-all ${!isSectionVisible(key) ? 'text-red-500 bg-red-900/10' : 'text-neutral-500 bg-white/5'}`}
+                                    className={`p-2 rounded-lg transition-all ${!isSectionVisible(key) ? 'text-red-500 bg-red-900/10' : 'text-slate-500 bg-slate-50'}`}
                                 >
                                     {!isSectionVisible(key) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
-                                <div className="h-4 w-px bg-white/10 mx-1" />
+                                <div className="h-4 w-px bg-slate-100 border border-slate-200 mx-1" />
                                 <button 
                                     onClick={() => move(index, -1)} 
                                     disabled={index === 0}
-                                    className="p-2 text-neutral-500 hover:text-white disabled:opacity-30 disabled:hover:text-neutral-500"
+                                    className="p-2 text-slate-500 hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500"
                                 >
                                     <ArrowUp className="w-4 h-4" />
                                 </button>
                                 <button 
                                     onClick={() => move(index, 1)} 
                                     disabled={index === sectionOrder.length - 1}
-                                    className="p-2 text-neutral-500 hover:text-white disabled:opacity-30 disabled:hover:text-neutral-500"
+                                    className="p-2 text-slate-500 hover:text-blue-600 disabled:opacity-30 disabled:hover:text-slate-500"
                                 >
                                     <ArrowDown className="w-4 h-4" />
                                 </button>
@@ -217,15 +217,15 @@ const PortfolioModule = ({
                             <FileText className="w-6 h-6 text-blue-500" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Curriculum Vitae & Portfolio</h3>
-                            <p className="text-xs text-neutral-500">Official professional record.</p>
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Curriculum Vitae & Portfolio</h3>
+                            <p className="text-xs text-slate-500">Official professional record.</p>
                         </div>
                         {viewMode === 'admin' && !isSectionVisible('cv') && (
                             <span className="text-[9px] font-bold text-red-500 uppercase border border-red-900/50 px-2 py-0.5 rounded bg-red-900/20">Hidden Section</span>
                         )}
                     </div>
                     {viewMode === 'admin' && (
-                        <button onClick={() => toggleSectionVisibility('cv')} className={`p-2 rounded-lg transition-all ${!isSectionVisible('cv') ? 'text-red-500 bg-red-900/20 hover:bg-red-900/40' : 'text-neutral-600 hover:text-white'}`} title={!isSectionVisible('cv') ? "Show Section" : "Hide Section"}>
+                        <button onClick={() => toggleSectionVisibility('cv')} className={`p-2 rounded-lg transition-all ${!isSectionVisible('cv') ? 'text-red-500 bg-red-900/20 hover:bg-red-900/40' : 'text-slate-400 hover:text-blue-600'}`} title={!isSectionVisible('cv') ? "Show Section" : "Hide Section"}>
                             {!isSectionVisible('cv') ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                     )}
@@ -233,32 +233,32 @@ const PortfolioModule = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {showResumeCard && (
-                            <div className="bg-neutral-900/30 border border-white/5 rounded-2xl p-6 flex flex-col justify-between">
+                            <div className="bg-white shadow-sm border border-slate-200/30 border border-slate-200 rounded-2xl p-6 flex flex-col justify-between">
                                 <div>
-                                    <h4 className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-4">Resume File</h4>
+                                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Resume File</h4>
                                     {userData.cvLink && userData.cvLink !== '#' ? (
-                                        <div className="flex items-center gap-3 p-4 bg-black/40 border border-white/10 rounded-xl group hover:border-blue-500/30 transition-all">
+                                        <div className="flex items-center gap-3 p-4 bg-white shadow-sm border border-slate-300 rounded-xl group hover:border-blue-500/30 transition-all">
                                             <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
                                                 <FileText className="w-5 h-5" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-xs font-bold text-white truncate">{userData.cvName || 'My_Resume.pdf'}</div>
-                                                <div className="text-[10px] text-neutral-500 font-mono uppercase">PDF / DOC Document</div>
+                                                <div className="text-xs font-bold text-slate-800 truncate">{userData.cvName || 'My_Resume.pdf'}</div>
+                                                <div className="text-[10px] text-slate-500 font-mono uppercase">PDF / DOC Document</div>
                                             </div>
                                             <div className="flex items-center gap-1">
-                                                <a href={userData.cvLink} download={userData.cvName || 'Resume'} className="p-2 text-neutral-400 hover:text-white hover:bg-white/5 rounded-lg transition-all" title="Download">
+                                                <a href={userData.cvLink} download={userData.cvName || 'Resume'} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-all" title="Download">
                                                     <Download className="w-4 h-4" />
                                                 </a>
                                                 {viewMode === 'admin' && (
-                                                    <button onClick={() => updateUser({ cvLink: '#', cvName: '' })} className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all" title="Remove">
+                                                    <button onClick={() => updateUser({ cvLink: '#', cvName: '' })} className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all" title="Remove">
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
                                                 )}
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="text-center py-8 border border-dashed border-white/10 rounded-xl bg-white/5">
-                                            <p className="text-xs text-neutral-500 mb-2">No resume uploaded</p>
+                                        <div className="text-center py-8 border border-dashed border-slate-300 rounded-xl bg-slate-50">
+                                            <p className="text-xs text-slate-500 mb-2">No resume uploaded</p>
                                             {viewMode === 'admin' && (
                                                 <label className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-500 transition-all text-xs font-bold uppercase tracking-wider">
                                                     <Download className="w-4 h-4" /> Upload File
@@ -280,36 +280,36 @@ const PortfolioModule = ({
                         )}
 
                         {showLinksCard && (
-                            <div className="bg-neutral-900/30 border border-white/5 rounded-2xl p-6 flex flex-col">
-                                <h4 className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-4">Portfolio Links</h4>
+                            <div className="bg-white shadow-sm border border-slate-200/30 border border-slate-200 rounded-2xl p-6 flex flex-col">
+                                <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Portfolio Links</h4>
                                 <div className="space-y-2 flex-1">
                                     {userData.portfolioLinks && userData.portfolioLinks.length > 0 ? (
                                         userData.portfolioLinks.map(link => (
-                                            <div key={link.id} className="flex items-center justify-between p-3 bg-black/40 border border-white/10 rounded-xl group hover:border-blue-500/30 transition-all">
-                                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-xs font-bold text-neutral-300 hover:text-blue-400 transition-colors">
-                                                    <Globe className="w-4 h-4 text-neutral-500 group-hover:text-blue-500 transition-colors" /> {link.name}
+                                            <div key={link.id} className="flex items-center justify-between p-3 bg-white shadow-sm border border-slate-300 rounded-xl group hover:border-blue-500/30 transition-all">
+                                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-xs font-bold text-slate-600 hover:text-blue-400 transition-colors">
+                                                    <Globe className="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition-colors" /> {link.name}
                                                 </a>
                                                 {viewMode === 'admin' && (
-                                                    <button onClick={() => removePortfolioLink(link.id)} className="text-neutral-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                                                    <button onClick={() => removePortfolioLink(link.id)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1">
                                                         <X className="w-3 h-3" />
                                                     </button>
                                                 )}
                                             </div>
                                         ))
-                                    ) : ( <div className="text-xs text-neutral-500 italic py-2">No portfolio links added.</div> )}
+                                    ) : ( <div className="text-xs text-slate-500 italic py-2">No portfolio links added.</div> )}
                                 </div>
 
                                 {viewMode === 'admin' && (
-                                    <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+                                    <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Name</label>
-                                            <input className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-blue-500/50" placeholder="e.g. Behance" value={newPortfolioLink.name} onChange={(e) => setNewPortfolioLink({ ...newPortfolioLink, name: e.target.value })} />
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Name</label>
+                                            <input className="w-full bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 outline-none focus:border-blue-500/50" placeholder="e.g. Behance" value={newPortfolioLink.name} onChange={(e) => setNewPortfolioLink({ ...newPortfolioLink, name: e.target.value })} />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">URL</label>
-                                            <input className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-blue-500/50" placeholder="https://..." value={newPortfolioLink.url} onChange={(e) => setNewPortfolioLink({ ...newPortfolioLink, url: e.target.value })} />
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">URL</label>
+                                            <input className="w-full bg-white shadow-sm border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 outline-none focus:border-blue-500/50" placeholder="https://..." value={newPortfolioLink.url} onChange={(e) => setNewPortfolioLink({ ...newPortfolioLink, url: e.target.value })} />
                                         </div>
-                                        <button onClick={addPortfolioLink} className="w-full p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2">
+                                        <button onClick={addPortfolioLink} className="w-full p-2 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 hover:text-blue-600 transition-all flex items-center justify-center gap-2">
                                             <Plus className="w-4 h-4" /> Add Link
                                         </button>
                                     </div>
@@ -324,14 +324,14 @@ const PortfolioModule = ({
     return (
         <div className="animate-in fade-in duration-500 pb-20 h-full flex flex-col">
             {/* Top Navigation: Portfolio | Settings */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-white/5 pb-2 md:pb-6 mb-3 md:mb-8 gap-2 md:gap-4">
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-2 md:pb-6 mb-3 md:mb-8 gap-2 md:gap-4">
                  {/* Navigation Tabs - Clean, no title */}
-                 <div className="flex bg-neutral-900/50 p-1 rounded-lg border border-white/5 overflow-x-auto no-scrollbar w-full md:w-auto">
-                    <button onClick={() => setActiveView('portfolio')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'portfolio' ? 'bg-blue-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}>
+                 <div className="flex bg-white shadow-sm border border-slate-200/50 p-1 rounded-lg border border-slate-200 overflow-x-auto no-scrollbar w-full md:w-auto">
+                    <button onClick={() => setActiveView('portfolio')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'portfolio' ? 'bg-blue-600 text-slate-800 shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}>
                         <LayoutDashboard className="w-3 h-3" /> Portfolio
                     </button>
                     {viewMode === 'admin' && (
-                        <button onClick={() => setActiveView('settings')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'settings' ? 'bg-blue-600 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}>
+                        <button onClick={() => setActiveView('settings')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeView === 'settings' ? 'bg-blue-600 text-slate-800 shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}>
                             <Sliders className="w-3 h-3" /> Settings
                         </button>
                     )}

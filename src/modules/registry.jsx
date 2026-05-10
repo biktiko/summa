@@ -9,7 +9,7 @@ import TasksModule from './Tasks/TasksModule';
 import BlogModule from './Blog/BlogModule';
 
 
-const NetworkModule = () => <div className="p-8 text-neutral-500 font-mono uppercase">Network Module // Offline</div>;
+const NetworkModule = () => <div className="p-8 text-slate-500 font-mono uppercase">Network Module // Offline</div>;
 
 export const MODULES = [
     {

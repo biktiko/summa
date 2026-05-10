@@ -15,11 +15,11 @@ import {
 const StatCard = ({ title, amount, subtext, icon, color, isNegative, onClick, formatMoney }) => {
     const Icon = icon;
     return (
-        <div onClick={onClick} className={`bg-neutral-900/40 border border-white/5 p-6 rounded-2xl flex items-start justify-between relative overflow-hidden group cursor-pointer hover:border-white/10 transition-all`}>
+        <div onClick={onClick} className={`bg-white shadow-sm border border-slate-200/40 border border-slate-200 p-6 rounded-2xl flex items-start justify-between relative overflow-hidden group cursor-pointer hover:border-slate-300 transition-all`}>
             <div className={`absolute top-0 right-0 p-24 rounded-full blur-3xl opacity-10 transition-opacity group-hover:opacity-20`} style={{ backgroundColor: color }} />
             <div className="relative z-10">
-                <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-1">{title}</h3>
-                <div className="text-2xl font-black text-white mb-2">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">{title}</h3>
+                <div className="text-2xl font-black text-slate-800 mb-2">
                     {formatMoney ? formatMoney(amount) : `$${amount.toLocaleString()}`}
                 </div>
                 {subtext && (
@@ -28,7 +28,7 @@ const StatCard = ({ title, amount, subtext, icon, color, isNegative, onClick, fo
                     </div>
                 )}
             </div>
-            <div className={`p-3 rounded-xl bg-black/40 border border-white/10 ${isNegative ? 'text-red-500' : 'text-white'}`} style={{ color: color }}>
+            <div className={`p-3 rounded-xl bg-white shadow-sm border border-slate-300 ${isNegative ? 'text-red-500' : 'text-slate-800'}`} style={{ color: color }}>
                 <Icon className="w-6 h-6" />
             </div>
         </div>
@@ -49,7 +49,7 @@ const BudgetRow = ({ item, isExpense, onEdit, onDelete, currencySymbol = '$' }) 
     const yearly = daily * 365 * (activeMonths.length / 12);
 
     return (
-        <div className="grid grid-cols-12 gap-4 items-center p-3 bg-black/20 border border-white/5 rounded-xl hover:bg-white/5 transition-all group text-xs">
+        <div className="grid grid-cols-12 gap-4 items-center p-3 bg-white/20 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all group text-xs">
             <div className="col-span-3 flex items-center gap-3">
                 <div 
                     className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-lg"
@@ -59,24 +59,24 @@ const BudgetRow = ({ item, isExpense, onEdit, onDelete, currencySymbol = '$' }) 
                 </div>
                 <div>
                     <div className="font-bold whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</div>
-                    <div className="text-[9px] text-neutral-500">{activeMonths.length === 12 ? 'All Year' : `${activeMonths.length} Months`}</div>
+                    <div className="text-[9px] text-slate-500">{activeMonths.length === 12 ? 'All Year' : `${activeMonths.length} Months`}</div>
                 </div>
             </div>
-            <div className="col-span-2 text-neutral-400 flex flex-col leading-tight">
+            <div className="col-span-2 text-slate-500 flex flex-col leading-tight">
                 <span>{period === 30 ? 'Monthly' : period === 365 ? 'Yearly' : period === 7 ? 'Weekly' : `${period} Days`}</span>
-                {item.dayOfTransfer && <span className="text-[9px] text-neutral-600">Day {item.dayOfTransfer}</span>}
+                {item.dayOfTransfer && <span className="text-[9px] text-slate-400">Day {item.dayOfTransfer}</span>}
             </div>
-            <div className="col-span-2 font-mono text-white text-right">
+            <div className="col-span-2 font-mono text-slate-800 text-right">
                 {currencySymbol}{amount.toLocaleString()}
             </div>
-            <div className="col-span-4 grid grid-cols-3 gap-2 text-right font-mono text-neutral-500">
+            <div className="col-span-4 grid grid-cols-3 gap-2 text-right font-mono text-slate-500">
                 <div>{currencySymbol}{daily.toFixed(0)}</div>
                 <div className={isExpense ? 'text-red-400' : 'text-green-400'}>{currencySymbol}{monthly.toFixed(0)}</div>
                 <div>{yearly > 1000 ? (yearly/1000).toFixed(1) + 'k' : yearly.toFixed(0)}</div>
             </div>
             <div className="col-span-1 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => onEdit(item)} className="text-neutral-500 hover:text-white"><Edit3 className="w-3 h-3" /></button>
-                <button onClick={() => onDelete(item.id)} className="text-neutral-500 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                <button onClick={() => onEdit(item)} className="text-slate-500 hover:text-blue-600"><Edit3 className="w-3 h-3" /></button>
+                <button onClick={() => onDelete(item.id)} className="text-slate-500 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
             </div>
         </div>
     );
@@ -256,22 +256,22 @@ const FinanceModule = ({
     return (
         <div className="animate-in fade-in duration-500 pb-20 h-full flex flex-col">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-white/5 pb-2 md:pb-6 mb-4 md:mb-8 gap-4">
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-2 md:pb-6 mb-4 md:mb-8 gap-4">
                 <div>
                     <div className="flex items-center gap-4">
                         {/* No Title Here */}
                         
                         {/* Currency Selector */}
                         <div className="relative group">
-                            <button className="text-xl font-bold text-neutral-500 hover:text-white transition-colors flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg">
+                            <button className="text-xl font-bold text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg">
                                 {CURRENCIES[currentCurrencyCode].symbol} <span className="text-[10px] uppercase align-top">{currentCurrencyCode}</span>
                             </button>
-                            <div className="absolute top-full left-0 mt-2 bg-[#0A0A0A] border border-white/10 rounded-xl overflow-hidden hidden group-hover:block w-32 z-50 shadow-xl">
+                            <div className="absolute top-full left-0 mt-2 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl overflow-hidden hidden group-hover:block w-32 z-50 shadow-xl">
                                 {Object.entries(CURRENCIES).map(([code, info]) => (
                                     <button 
                                         key={code}
                                         onClick={() => setCurrency(code)}
-                                        className={`w-full text-left px-4 py-2 text-xs font-bold hover:bg-white/10 ${currentCurrencyCode === code ? 'text-green-500' : 'text-neutral-400'}`}
+                                        className={`w-full text-left px-4 py-2 text-xs font-bold hover:bg-slate-200 ${currentCurrencyCode === code ? 'text-green-500' : 'text-slate-500'}`}
                                     >
                                         {info.symbol} {code}
                                     </button>
@@ -282,25 +282,25 @@ const FinanceModule = ({
                     
                     {/* Month Selector */}
                     <div className="flex items-center gap-4 mt-2">
-                        <button onClick={() => adjustMonth(-1)} className="text-neutral-500 hover:text-white transition-colors"><ArrowDownRight className="w-4 h-4 rotate-45" /></button>
+                        <button onClick={() => adjustMonth(-1)} className="text-slate-500 hover:text-blue-600 transition-colors"><ArrowDownRight className="w-4 h-4 rotate-45" /></button>
                         <span className="text-sm font-mono font-bold text-green-500 uppercase tracking-widest min-w-[140px] text-center">
                             {getMonthLabel(selectedDate)}
                         </span>
-                        <button onClick={() => adjustMonth(1)} className="text-neutral-500 hover:text-white transition-colors"><ArrowUpRight className="w-4 h-4 rotate-45" /></button>
+                        <button onClick={() => adjustMonth(1)} className="text-slate-500 hover:text-blue-600 transition-colors"><ArrowUpRight className="w-4 h-4 rotate-45" /></button>
                     </div>
                 </div>
 
                 {/* Navigation Tabs - Match Task/Portfolio Style */}
-                 <div className="flex bg-neutral-900/50 p-1 rounded-lg border border-white/5 overflow-x-auto no-scrollbar w-full md:w-auto self-start md:self-end">
+                 <div className="flex bg-white shadow-sm border border-slate-200/50 p-1 rounded-lg border border-slate-200 overflow-x-auto no-scrollbar w-full md:w-auto self-start md:self-end">
                     {[
-                        { id: 'budget', label: 'Planning', color: 'bg-yellow-600 text-white shadow-lg' },
-                        { id: 'overview', label: 'Analytics', color: 'bg-green-600 text-white shadow-lg' },
-                        { id: 'history', label: 'History', color: 'bg-blue-600 text-white shadow-lg' }
+                        { id: 'budget', label: 'Planning', color: 'bg-amber-600 text-slate-800 shadow-lg' },
+                        { id: 'overview', label: 'Analytics', color: 'bg-green-600 text-slate-800 shadow-lg' },
+                        { id: 'history', label: 'History', color: 'bg-blue-600 text-slate-800 shadow-lg' }
                     ].map(t => (
                         <button
                             key={t.id}
                             onClick={() => setDashboardTab(t.id)}
-                            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${dashboardTab === t.id ? t.color : 'text-neutral-500 hover:text-white'}`}
+                            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${dashboardTab === t.id ? t.color : 'text-slate-500 hover:text-blue-600'}`}
                         >
                             {t.label}
                         </button>
@@ -325,9 +325,9 @@ const FinanceModule = ({
                         
                         {/* Source Toggle for Analytics */}
                         {dashboardTab === 'overview' && (
-                            <div className="flex bg-neutral-900 rounded-lg p-1 border border-white/5 mb-1 self-start md:self-auto w-full md:w-auto">
-                                <button onClick={() => setAnalyticsSource('actual')} className={`flex-1 md:flex-none px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'actual' ? 'bg-green-600 text-white' : 'text-neutral-500'}`}>Actuals</button>
-                                <button onClick={() => setAnalyticsSource('budget')} className={`flex-1 md:flex-none px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'budget' ? 'bg-yellow-600 text-white' : 'text-neutral-500'}`}>Budget Plan</button>
+                            <div className="flex bg-white shadow-sm border border-slate-200 rounded-lg p-1 border border-slate-200 mb-1 self-start md:self-auto w-full md:w-auto">
+                                <button onClick={() => setAnalyticsSource('actual')} className={`flex-1 md:flex-none px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'actual' ? 'bg-green-600 text-slate-800' : 'text-slate-500'}`}>Actuals</button>
+                                <button onClick={() => setAnalyticsSource('budget')} className={`flex-1 md:flex-none px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'budget' ? 'bg-amber-600 text-slate-800' : 'text-slate-500'}`}>Budget Plan</button>
                             </div>
                         )}
                     </div>
@@ -345,16 +345,16 @@ const FinanceModule = ({
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 {/* Income Section */}
                                 <div className="space-y-4">
-                                    <div className="flex justify-between items-center bg-green-900/10 p-4 rounded-xl border border-green-500/20">
+                                    <div className="flex justify-between items-center bg-green-50 p-4 rounded-xl border border-green-500/20">
                                         <h3 className="text-sm font-black text-green-500 uppercase tracking-widest">Recurring Income Sources</h3>
                                         <button 
                                             onClick={() => { setEditingCategoryData({ type: 'income', label: '', amount: '', period: 30, color: '#10b981' }); setIsEditingCategory(true); }}
-                                            className="p-2 bg-green-500/20 hover:bg-green-500 text-green-500 hover:text-white rounded-lg transition-all"
+                                            className="p-2 bg-green-500/20 hover:bg-green-500 text-green-500 hover:text-blue-600 rounded-lg transition-all"
                                         >
                                             <Plus className="w-4 h-4" />
                                         </button>
                                     </div>
-                                    <div className="hidden md:grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-neutral-600 px-3">
+                                    <div className="hidden md:grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-slate-400 px-3">
                                         <div className="col-span-3">Source</div>
                                         <div className="col-span-2">Period</div>
                                         <div className="col-span-2 text-right">Amount</div>
@@ -378,12 +378,12 @@ const FinanceModule = ({
                                         <h3 className="text-sm font-black text-red-500 uppercase tracking-widest">Recurring Expenses</h3>
                                         <button 
                                             onClick={() => { setEditingCategoryData({ type: 'expense', label: '', amount: '', period: 30, color: '#ef4444' }); setIsEditingCategory(true); }}
-                                            className="p-2 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white rounded-lg transition-all"
+                                            className="p-2 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-blue-600 rounded-lg transition-all"
                                         >
                                             <Plus className="w-4 h-4" />
                                         </button>
                                     </div>
-                                    <div className="hidden md:grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-neutral-600 px-3">
+                                    <div className="hidden md:grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-slate-400 px-3">
                                         <div className="col-span-3">Category</div>
                                         <div className="col-span-2">Period</div>
                                         <div className="col-span-2 text-right">Amount</div>
@@ -407,8 +407,8 @@ const FinanceModule = ({
                     {/* --- HISTORY VIEW --- */}
                     {dashboardTab === 'history' && (
                         <div className="space-y-4 animate-in slide-in-from-bottom-2 fade-in">
-                             <div className="flex justify-between items-center bg-neutral-900/40 p-4 rounded-xl border border-white/5">
-                                <h3 className="text-sm font-black text-white uppercase tracking-widest">Transactions • {getMonthLabel(selectedDate)}</h3>
+                             <div className="flex justify-between items-center bg-white shadow-sm border border-slate-200/40 p-4 rounded-xl border border-slate-200">
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Transactions • {getMonthLabel(selectedDate)}</h3>
                                 <button 
                                     onClick={() => setIsAddingTransaction(true)}
                                     className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2"
@@ -418,17 +418,17 @@ const FinanceModule = ({
                             </div>
                             <div className="space-y-2">
                                 {monthTransactions.length === 0 ? (
-                                    <div className="text-center py-20 text-neutral-500 italic border border-dashed border-white/10 rounded-xl">No transactions in {getMonthLabel(selectedDate)}</div>
+                                    <div className="text-center py-20 text-slate-500 italic border border-dashed border-slate-300 rounded-xl">No transactions in {getMonthLabel(selectedDate)}</div>
                                 ) : (
                                     monthTransactions.slice().sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(t => {
                                         const cat = categories.find(c => c.id === t.categoryId);
                                         return (
-                                            <div key={t.id} className="group relative flex justify-between items-center p-4 bg-black/20 border border-white/5 rounded-xl text-sm hover:bg-white/5 transition-all">
+                                            <div key={t.id} className="group relative flex justify-between items-center p-4 bg-white/20 border border-slate-200 rounded-xl text-sm hover:bg-slate-100 transition-all">
                                                 <div className="flex items-center gap-4">
                                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat?.color || '#555' }} />
                                                     <div>
-                                                        <div className="font-bold text-white">{t.description || 'Unknown'}</div>
-                                                        <div className="text-[10px] text-neutral-500 uppercase">{new Date(t.createdAt).toLocaleDateString()} • {cat?.label || 'Uncategorized'}</div>
+                                                        <div className="font-bold text-slate-800">{t.description || 'Unknown'}</div>
+                                                        <div className="text-[10px] text-slate-500 uppercase">{new Date(t.createdAt).toLocaleDateString()} • {cat?.label || 'Uncategorized'}</div>
                                                     </div>
                                                 </div>
                                                 <div className={`font-mono font-bold ${t.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
@@ -436,9 +436,9 @@ const FinanceModule = ({
                                                 </div>
                                                 
                                                 {/* Edit/Delete Overlay */}
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black p-1 rounded-lg border border-white/10 shadow-xl">
-                                                     <button onClick={() => { setNewTransaction({...t, date: t.createdAt.split('T')[0]}); setIsAddingTransaction(true); }} className="p-2 hover:bg-white/10 rounded text-neutral-400 hover:text-white"><Edit3 className="w-3 h-3" /></button>
-                                                     <button onClick={() => transactionsActions.delete(t.id)} className="p-2 hover:bg-white/10 rounded text-neutral-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white p-1 rounded-lg border border-slate-300 shadow-xl">
+                                                     <button onClick={() => { setNewTransaction({...t, date: t.createdAt.split('T')[0]}); setIsAddingTransaction(true); }} className="p-2 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600"><Edit3 className="w-3 h-3" /></button>
+                                                     <button onClick={() => transactionsActions.delete(t.id)} className="p-2 hover:bg-slate-200 rounded text-slate-500 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
                                                 </div>
                                             </div>
                                         );
@@ -482,8 +482,8 @@ const FinanceModule = ({
 
                              <div className="grid md:grid-cols-2 gap-6">
                                 {/* Pie Chart */}
-                                <div className="bg-neutral-900/40 p-6 rounded-2xl border border-white/5 h-[400px] min-h-[400px] flex flex-col">
-                                    <h3 className="text-xs font-bold text-white uppercase mb-4 tracking-widest flex items-center gap-2">
+                                <div className="bg-white shadow-sm border border-slate-200/40 p-6 rounded-2xl border border-slate-200 h-[400px] min-h-[400px] flex flex-col">
+                                    <h3 className="text-xs font-bold text-slate-800 uppercase mb-4 tracking-widest flex items-center gap-2">
                                         <PieChart className="w-4 h-4 text-purple-500"/> {analyticsSource === 'actual' ? 'Spending Breakdown (Actual)' : 'Budget Allocation (Planned)'}
                                     </h3>
                                     <div className="flex-1 w-full h-full min-h-0">
@@ -506,7 +506,7 @@ const FinanceModule = ({
                                             </RePieChart>
                                         </ResponsiveContainer>
                                     ) : (
-                                        <div className="h-full flex flex-col items-center justify-center text-neutral-600">
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
                                             <span className="text-xs">No data for this view in {getMonthLabel(selectedDate)}</span>
                                         </div>
                                     )}
@@ -514,13 +514,13 @@ const FinanceModule = ({
                                 </div>
 
                                 {/* Daily Spending Bar Chart */}
-                                <div className="bg-neutral-900/40 p-6 rounded-2xl border border-white/5 h-[400px] min-h-[400px] flex flex-col">
-                                    <h3 className="text-xs font-bold text-white uppercase mb-4 tracking-widest flex items-center gap-2">
+                                <div className="bg-white shadow-sm border border-slate-200/40 p-6 rounded-2xl border border-slate-200 h-[400px] min-h-[400px] flex flex-col">
+                                    <h3 className="text-xs font-bold text-slate-800 uppercase mb-4 tracking-widest flex items-center gap-2">
                                         <TrendingUp className="w-4 h-4 text-blue-500"/> {analyticsSource === 'actual' ? 'Daily Spending Flow' : 'Daily Projection (Not Available)'}
                                     </h3>
                                     <div className="flex-1 w-full h-full min-h-0">
                                     {analyticsSource === 'budget' ? (
-                                        <div className="h-full flex items-center justify-center text-neutral-500 text-xs">
+                                        <div className="h-full flex items-center justify-center text-slate-500 text-xs">
                                             Budget is averaged daily. Switch to 'Actuals' to see daily transactions.
                                         </div>
                                     ) : dailyActivity.length > 0 ? (
@@ -539,7 +539,7 @@ const FinanceModule = ({
                                             </BarChart>
                                         </ResponsiveContainer>
                                     ) : (
-                                        <div className="h-full flex flex-col items-center justify-center text-neutral-600">
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
                                             <span className="text-xs">No transactions found for {getMonthLabel(selectedDate)}</span>
                                         </div>
                                     )}
@@ -555,20 +555,20 @@ const FinanceModule = ({
 
             {/* Category/Budget Modal */}
             {isEditingCategory && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-                    <div className="w-full max-w-md bg-[#0A0A0A] border border-white/10 rounded-3xl p-6 shadow-2xl">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-md p-4 animate-in fade-in">
+                    <div className="w-full max-w-md bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-3xl p-6 shadow-2xl">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-black text-white uppercase">
+                            <h3 className="text-lg font-black text-slate-800 uppercase">
                                 {editingCategoryData?.id ? 'Edit Item' : 'New Budget Item'}
                             </h3>
-                            <button onClick={() => setIsEditingCategory(false)}><X className="w-5 h-5 text-neutral-500" /></button>
+                            <button onClick={() => setIsEditingCategory(false)}><X className="w-5 h-5 text-slate-500" /></button>
                         </div>
                         <form onSubmit={handleSaveCategory} className="space-y-4">
                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Name</label>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Name</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-black border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                                    className="w-full bg-white border border-slate-300 rounded-xl p-3 text-slate-800 focus:border-blue-500 outline-none"
                                     value={editingCategoryData.label}
                                     onChange={e => setEditingCategoryData({ ...editingCategoryData, label: e.target.value })}
                                     required autoFocus
@@ -576,27 +576,27 @@ const FinanceModule = ({
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Amount</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Amount</label>
                                     <input
                                         type="number"
-                                        className="w-full bg-black border border-white/10 rounded-xl p-3 text-white font-mono focus:border-blue-500 outline-none"
+                                        className="w-full bg-white border border-slate-300 rounded-xl p-3 text-slate-800 font-mono focus:border-blue-500 outline-none"
                                         value={editingCategoryData.amount}
                                         onChange={e => setEditingCategoryData({ ...editingCategoryData, amount: e.target.value })}
                                         required
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Period (Days)</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Period (Days)</label>
                                     <input
                                         type="number"
-                                        className="w-full bg-black border border-white/10 rounded-xl p-3 text-white font-mono focus:border-blue-500 outline-none"
+                                        className="w-full bg-white border border-slate-300 rounded-xl p-3 text-slate-800 font-mono focus:border-blue-500 outline-none"
                                         value={editingCategoryData.period}
                                         onChange={e => setEditingCategoryData({ ...editingCategoryData, period: e.target.value })}
                                         placeholder="30"
                                     />
                                 </div>
                                 <div className="space-y-1 col-span-2">
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Active Months</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Active Months</label>
                                     <div className="grid grid-cols-6 gap-2">
                                         {['J','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => (
                                              <button
@@ -610,10 +610,10 @@ const FinanceModule = ({
                                                          setEditingCategoryData({...editingCategoryData, activeMonths: [...months, i]});
                                                      }
                                                  }}
-                                                 className={`h-8 rounded text-xs font-bold transition-all border border-white/5 ${
+                                                 className={`h-8 rounded text-xs font-bold transition-all border border-slate-200 ${
                                                      (editingCategoryData.activeMonths || Array.from({length:12},(_,x)=>x)).includes(i)
                                                      ? 'bg-white text-black' 
-                                                     : 'bg-black text-neutral-500 hover:bg-white/10'
+                                                     : 'bg-white text-slate-500 hover:bg-slate-200'
                                                  }`}
                                              >{m}</button>
                                         ))}
@@ -622,21 +622,21 @@ const FinanceModule = ({
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Day of Transfer</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Day of Transfer</label>
                                     <input
                                         type="number"
                                         max="31" min="1"
-                                        className="w-full bg-black border border-white/10 rounded-xl p-3 text-white font-mono focus:border-blue-500 outline-none"
+                                        className="w-full bg-white border border-slate-300 rounded-xl p-3 text-slate-800 font-mono focus:border-blue-500 outline-none"
                                         value={editingCategoryData.dayOfTransfer || ''}
                                         onChange={e => setEditingCategoryData({ ...editingCategoryData, dayOfTransfer: e.target.value })}
                                         placeholder="e.g. 15"
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Color</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Color</label>
                                     <input
                                         type="color"
-                                        className="w-full h-[50px] bg-black border border-white/10 rounded-xl p-1 cursor-pointer"
+                                        className="w-full h-[50px] bg-white border border-slate-300 rounded-xl p-1 cursor-pointer"
                                         value={editingCategoryData.color}
                                         onChange={e => setEditingCategoryData({ ...editingCategoryData, color: e.target.value })}
                                     />
@@ -652,32 +652,32 @@ const FinanceModule = ({
              
             {/* Transaction Modal */}
             {isAddingTransaction && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-                     <div className="w-full max-w-md bg-[#0A0A0A] border border-white/10 rounded-3xl p-6 shadow-2xl">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-md p-4 animate-in fade-in">
+                     <div className="w-full max-w-md bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-3xl p-6 shadow-2xl">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-black text-white uppercase">Log Transaction</h3>
-                            <button onClick={() => setIsAddingTransaction(false)}><X className="w-5 h-5 text-neutral-500" /></button>
+                            <h3 className="text-lg font-black text-slate-800 uppercase">Log Transaction</h3>
+                            <button onClick={() => setIsAddingTransaction(false)}><X className="w-5 h-5 text-slate-500" /></button>
                         </div>
                         <form onSubmit={handleAddTransaction} className="space-y-4">
-                            <div className="flex bg-neutral-900 rounded-xl p-1 border border-white/5">
+                            <div className="flex bg-white shadow-sm border border-slate-200 rounded-xl p-1 border border-slate-200">
                                 <button
                                     type="button"
                                     onClick={() => setNewTransaction({ ...newTransaction, type: 'expense' })}
-                                    className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${newTransaction.type === 'expense' ? 'bg-red-500/20 text-red-500' : 'text-neutral-500'}`}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${newTransaction.type === 'expense' ? 'bg-red-500/20 text-red-500' : 'text-slate-500'}`}
                                 >Expense</button>
                                 <button
                                     type="button"
                                     onClick={() => setNewTransaction({ ...newTransaction, type: 'income' })}
-                                    className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${newTransaction.type === 'income' ? 'bg-green-500/20 text-green-500' : 'text-neutral-500'}`}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${newTransaction.type === 'income' ? 'bg-green-500/20 text-green-500' : 'text-slate-500'}`}
                                 >Income</button>
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Amount</label>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Amount</label>
                                 <input
                                     type="number"
                                     placeholder="0.00"
-                                    className="w-full bg-black border border-white/10 rounded-xl p-3 text-white text-lg font-mono focus:border-green-500 outline-none"
+                                    className="w-full bg-white border border-slate-300 rounded-xl p-3 text-slate-800 text-lg font-mono focus:border-green-500 outline-none"
                                     value={newTransaction.amount}
                                     onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
                                     autoFocus
@@ -685,11 +685,11 @@ const FinanceModule = ({
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Description</label>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Description</label>
                                 <input
                                     type="text"
                                     placeholder="e.g. Grocery"
-                                    className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm text-white focus:border-green-500 outline-none"
+                                    className="w-full bg-white border border-slate-300 rounded-xl p-3 text-sm text-slate-800 focus:border-green-500 outline-none"
                                     value={newTransaction.description}
                                     onChange={e => setNewTransaction({ ...newTransaction, description: e.target.value })}
                                 />
@@ -697,10 +697,10 @@ const FinanceModule = ({
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Category</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Category</label>
                                     <div className="flex gap-2">
                                         <select
-                                            className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-green-500"
+                                            className="w-full bg-white border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-green-500"
                                             value={newTransaction.categoryId}
                                             onChange={e => setNewTransaction({ ...newTransaction, categoryId: e.target.value })}
                                         >
@@ -713,17 +713,17 @@ const FinanceModule = ({
                                             type="button" 
                                             title="Create Category"
                                             onClick={() => { setIsAddingTransaction(false); setEditingCategoryData({ type: newTransaction.type, label: '', amount: '', period: 30, color: '#10b981' }); setIsEditingCategory(true); }}
-                                            className="p-3 bg-white/10 rounded-xl hover:bg-white/20 text-white"
+                                            className="p-3 bg-slate-100 border border-slate-200 rounded-xl hover:bg-white/20 text-slate-800"
                                         >
                                             <Plus className="w-5 h-5"/>
                                         </button>
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Date</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Date</label>
                                     <input
                                         type="date"
-                                        className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm text-white focus:border-green-500 outline-none"
+                                        className="w-full bg-white border border-slate-300 rounded-xl p-3 text-sm text-slate-800 focus:border-green-500 outline-none"
                                         value={newTransaction.date}
                                         onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
                                     />

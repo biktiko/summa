@@ -9,12 +9,12 @@
 /* Custom layer for base styles */
 @layer base {
   :root {
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   body {
     /* Ensures the background from tailwind.config.js is applied */
-    @apply bg-background text-neutral-100 antialiased overflow-x-hidden;
+    @apply bg-background text-slate-900 antialiased overflow-x-hidden;
     margin: 0;
     min-height: 100vh;
     font-feature-settings: "ss01", "ss02", "cv01";
@@ -27,7 +27,7 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-black;
+  @apply bg-slate-100;
 }
 
 ::-webkit-scrollbar-thumb {

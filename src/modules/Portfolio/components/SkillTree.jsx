@@ -51,7 +51,7 @@ const SkillCard = ({ skill, updateSkillLevel, updateSkillDetails, deleteSkill, v
     };
 
     return (
-        <div className={`p-5 bg-neutral-900/40 rounded-2xl border transition-all relative overflow-hidden ${isExpanded ? 'border-blue-500/40 bg-neutral-900/80' : 'border-white/5 hover:border-blue-500/20'} ${skill.isHidden ? 'opacity-60 border-red-900/30' : ''}`}>
+        <div className={`p-5 bg-white shadow-sm border border-slate-200/40 rounded-2xl border transition-all relative overflow-hidden ${isExpanded ? 'border-blue-500/40 bg-white shadow-sm border border-slate-200/80' : 'border-slate-200 hover:border-blue-500/20'} ${skill.isHidden ? 'opacity-60 border-red-900/30' : ''}`}>
             {/* Background Grid Effect */}
             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px] opacity-20 pointer-events-none" />
 
@@ -59,21 +59,21 @@ const SkillCard = ({ skill, updateSkillLevel, updateSkillDetails, deleteSkill, v
                 {/* Header */}
                 <div className="flex justify-between items-start mb-4 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
                     <div>
-                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-300 block">{skill.name}</span>
-                        <span className="text-[8px] font-bold uppercase text-neutral-600">{skill.category}</span>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 block">{skill.name}</span>
+                        <span className="text-[8px] font-bold uppercase text-slate-400">{skill.category}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         {viewMode === 'admin' && (
                             <>
-                                <button onClick={toggleVisibility} className={`p-1 rounded ${skill.isHidden ? 'text-red-500 bg-red-900/20' : 'text-neutral-600 hover:text-white'}`} title="Toggle Visibility">
+                                <button onClick={toggleVisibility} className={`p-1 rounded ${skill.isHidden ? 'text-red-500 bg-red-900/20' : 'text-slate-400 hover:text-blue-600'}`} title="Toggle Visibility">
                                     {skill.isHidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                                 </button>
-                                <button onClick={handleDeleteSkill} className="text-neutral-600 hover:text-red-500 transition-colors p-1">
+                                <button onClick={handleDeleteSkill} className="text-slate-400 hover:text-red-500 transition-colors p-1">
                                     <Trash2 className="w-3 h-3" />
                                 </button>
                             </>
                         )}
-                        <div className="text-neutral-500 hover:text-blue-500 transition-colors">
+                        <div className="text-slate-500 hover:text-blue-500 transition-colors">
                             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </div>
                     </div>
@@ -85,7 +85,7 @@ const SkillCard = ({ skill, updateSkillLevel, updateSkillDetails, deleteSkill, v
                         <span>Level Progress</span>
                         <span>{skill.level}%</span>
                     </div>
-                    <div className="h-1 bg-black rounded-full overflow-hidden border border-white/5">
+                    <div className="h-1 bg-white rounded-full overflow-hidden border border-slate-200">
                         <div
                             className="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all duration-500"
                             style={{ width: `${skill.level}%` }}
@@ -96,7 +96,7 @@ const SkillCard = ({ skill, updateSkillLevel, updateSkillDetails, deleteSkill, v
                 {/* Always Visible Content (Description & Links) */}
                 <div className="space-y-3">
                     {skill.description && (
-                        <p className="text-[10px] text-neutral-400 leading-relaxed border-l-2 border-white/10 pl-3">
+                        <p className="text-[10px] text-slate-500 leading-relaxed border-l-2 border-slate-300 pl-3">
                             {skill.description}
                         </p>
                     )}
@@ -109,7 +109,7 @@ const SkillCard = ({ skill, updateSkillLevel, updateSkillDetails, deleteSkill, v
                                         <ArrowUpRight className="w-3 h-3" /> {link.label}
                                     </a>
                                     {viewMode === 'admin' && (
-                                        <button onClick={(e) => handleRemoveLink(idx, e)} className="text-neutral-600 hover:text-red-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={(e) => handleRemoveLink(idx, e)} className="text-slate-400 hover:text-red-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <Trash2 className="w-2 h-2" />
                                         </button>
                                     )}
@@ -121,46 +121,46 @@ const SkillCard = ({ skill, updateSkillLevel, updateSkillDetails, deleteSkill, v
 
                 {/* Expanded Controls (Admin Only) */}
                 {isExpanded && viewMode === 'admin' && (
-                    <div className="mt-6 pt-4 border-t border-white/5 animate-in fade-in slide-in-from-top-2 space-y-4" onClick={(e) => e.stopPropagation()}>
+                    <div className="mt-6 pt-4 border-t border-slate-200 animate-in fade-in slide-in-from-top-2 space-y-4" onClick={(e) => e.stopPropagation()}>
                         {/* Level Controls */}
-                        <div className="flex items-center justify-between bg-black/40 p-2 rounded-lg border border-white/5">
-                            <span className="text-[9px] font-bold text-neutral-500 uppercase">Adjust Proficiency</span>
+                        <div className="flex items-center justify-between bg-white shadow-sm p-2 rounded-lg border border-slate-200">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase">Adjust Proficiency</span>
                             <div className="flex items-center gap-2">
-                                <button onClick={(e) => handleLevelChange(-5, e)} className="p-1 hover:bg-white/10 rounded text-neutral-400 hover:text-white"><Minus className="w-3 h-3" /></button>
-                                <button onClick={(e) => handleLevelChange(5, e)} className="p-1 hover:bg-white/10 rounded text-neutral-400 hover:text-white"><Plus className="w-3 h-3" /></button>
+                                <button onClick={(e) => handleLevelChange(-5, e)} className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600"><Minus className="w-3 h-3" /></button>
+                                <button onClick={(e) => handleLevelChange(5, e)} className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600"><Plus className="w-3 h-3" /></button>
                             </div>
                         </div>
 
                         {/* Description Edit */}
                         <div className="space-y-2">
                             <textarea
-                                className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-[10px] text-neutral-300 focus:border-blue-500/50 outline-none min-h-[60px]"
+                                className="w-full bg-white shadow-sm border border-slate-300 rounded-lg p-2 text-[10px] text-slate-600 focus:border-blue-500/50 outline-none min-h-[60px]"
                                 value={editDesc}
                                 onChange={(e) => setEditDesc(e.target.value)}
                                 placeholder="Update description..."
                             />
-                            <button onClick={handleSaveDetails} className="w-full py-1 bg-blue-600/20 hover:bg-blue-600 text-blue-500 hover:text-white text-[9px] font-bold uppercase rounded transition-colors flex items-center justify-center gap-1">
+                            <button onClick={handleSaveDetails} className="w-full py-1 bg-blue-600/20 hover:bg-blue-600 text-blue-500 hover:text-blue-600 text-[9px] font-bold uppercase rounded transition-colors flex items-center justify-center gap-1">
                                 <Save className="w-3 h-3" /> Save Changes
                             </button>
                         </div>
 
                         {/* Add Link */}
-                        <div className="space-y-2 pt-2 border-t border-white/5">
-                            <span className="text-[9px] font-bold text-neutral-500 uppercase block">Add Resource Link</span>
+                        <div className="space-y-2 pt-2 border-t border-slate-200">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase block">Add Resource Link</span>
                             <div className="flex gap-2">
                                 <input
-                                    className="flex-1 bg-black/40 border border-white/10 rounded p-1.5 text-[10px] text-white focus:border-blue-500/50 outline-none"
+                                    className="flex-1 bg-white shadow-sm border border-slate-300 rounded p-1.5 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none"
                                     placeholder="Label (e.g. GitHub)"
                                     value={newLink.label}
                                     onChange={(e) => setNewLink({ ...newLink, label: e.target.value })}
                                 />
                                 <input
-                                    className="flex-1 bg-black/40 border border-white/10 rounded p-1.5 text-[10px] text-white focus:border-blue-500/50 outline-none"
+                                    className="flex-1 bg-white shadow-sm border border-slate-300 rounded p-1.5 text-[10px] text-slate-800 focus:border-blue-500/50 outline-none"
                                     placeholder="URL"
                                     value={newLink.url}
                                     onChange={(e) => setNewLink({ ...newLink, url: e.target.value })}
                                 />
-                                <button onClick={handleAddLink} className="p-1.5 bg-blue-600/20 hover:bg-blue-600 text-blue-500 hover:text-white rounded transition-colors">
+                                <button onClick={handleAddLink} className="p-1.5 bg-blue-600/20 hover:bg-blue-600 text-blue-500 hover:text-blue-600 rounded transition-colors">
                                     <Plus className="w-3 h-3" />
                                 </button>
                             </div>
@@ -191,9 +191,9 @@ const SkillTree = ({ skills, updateSkillLevel, addNewSkill, updateSkillDetails, 
 
     return (
         <div className={`space-y-6`}>
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
                 <div className="flex items-center gap-3">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-neutral-300">⚡ Skill Matrix</h3>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-600">⚡ Skill Matrix</h3>
                     {viewMode === 'admin' && isSectionHidden && (
                         <span className="text-[9px] font-bold text-red-500 uppercase border border-red-900/50 px-2 py-0.5 rounded bg-red-900/20">Hidden Section</span>
                     )}
@@ -202,14 +202,14 @@ const SkillTree = ({ skills, updateSkillLevel, addNewSkill, updateSkillDetails, 
                     <div className="flex items-center gap-2">
                         <button
                             onClick={toggleSectionVisibility}
-                            className={`p-2 rounded-lg transition-all ${isSectionHidden ? 'text-red-500 bg-red-900/20 hover:bg-red-900/40' : 'text-neutral-600 hover:text-white'}`}
+                            className={`p-2 rounded-lg transition-all ${isSectionHidden ? 'text-red-500 bg-red-900/20 hover:bg-red-900/40' : 'text-slate-400 hover:text-blue-600'}`}
                             title={isSectionHidden ? "Show Section" : "Hide Section"}
                         >
                             {isSectionHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                         <button
                             onClick={() => setIsAdding(!isAdding)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 hover:text-white transition-all text-[10px] font-bold uppercase tracking-wider"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 text-blue-500 rounded-lg hover:bg-blue-600 hover:text-blue-600 transition-all text-[10px] font-bold uppercase tracking-wider"
                         >
                             <Plus className="w-3 h-3" /> Add Skill
                         </button>
@@ -218,10 +218,10 @@ const SkillTree = ({ skills, updateSkillLevel, addNewSkill, updateSkillDetails, 
             </div>
 
             {isAdding && (
-                <div className="p-4 bg-neutral-900/50 border border-blue-500/30 rounded-xl flex gap-3 animate-in fade-in slide-in-from-top-2">
+                <div className="p-4 bg-white shadow-sm border border-slate-200/50 border border-blue-500/30 rounded-xl flex gap-3 animate-in fade-in slide-in-from-top-2">
                     <input
                         placeholder="Skill Name"
-                        className="flex-1 bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-white focus:border-blue-500/50 outline-none"
+                        className="flex-1 bg-white shadow-sm border border-slate-300 rounded-lg p-2 text-sm text-slate-800 focus:border-blue-500/50 outline-none"
                         value={newSkillName}
                         onChange={(e) => setNewSkillName(e.target.value)}
                     />
@@ -229,7 +229,7 @@ const SkillTree = ({ skills, updateSkillLevel, addNewSkill, updateSkillDetails, 
                          <input
                             list="skill-categories"
                             placeholder="Category (Type or Select)"
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-white focus:border-blue-500/50 outline-none [&::-webkit-calendar-picker-indicator]:hidden"
+                            className="w-full bg-white shadow-sm border border-slate-300 rounded-lg p-2 text-sm text-slate-800 focus:border-blue-500/50 outline-none [&::-webkit-calendar-picker-indicator]:hidden"
                             value={newSkillCategory}
                             onChange={(e) => setNewSkillCategory(e.target.value)}
                         />

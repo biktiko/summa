@@ -202,7 +202,7 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
   // Loading State
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#020202] text-blue-500 flex flex-col items-center justify-center font-mono gap-4">
+      <div className="min-h-screen bg-slate-50 text-blue-500 flex flex-col items-center justify-center font-mono gap-4">
         <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
         <div className="text-xs font-black uppercase tracking-[0.2em]">Loading System...</div>
       </div>
@@ -228,12 +228,12 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
       : (authUser?.name || 'Guest User');
 
   return (
-    <div className="min-h-screen text-neutral-100 font-sans flex flex-col selection:bg-blue-500/30 relative transition-colors duration-500 pb-20 md:pb-0" style={{
+    <div className="min-h-screen text-slate-800 font-sans flex flex-col selection:bg-blue-500/30 relative transition-colors duration-500 pb-20 md:pb-0" style={{
       backgroundColor: backgroundColor,
       '--theme-color': themeColor
     }}>
       {/* --- HUD Header --- */}
-      <header className="p-2 md:px-6 md:py-4 border-b border-white/5 bg-black/40 backdrop-blur-xl relative top-0 z-50">
+      <header className="p-2 md:px-6 md:py-4 border-b border-slate-200 bg-white shadow-sm backdrop-blur-xl relative top-0 z-50">
         <div className="max-w-7xl mx-auto">
           
           {/* Mobile: Aesthetic Single Row */}
@@ -251,7 +251,7 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
             {/* Center: XP Bar with inline numbers */}
             {!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.xp !== false) && (
               <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                <div className="flex-1 relative h-2 bg-black rounded-full overflow-hidden">
+                <div className="flex-1 relative h-2 bg-white rounded-full overflow-hidden">
                   <div 
                     className="h-full transition-all duration-700" 
                     style={{ 
@@ -270,9 +270,9 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
             <div className="flex items-center gap-2 shrink-0">
               {/* Coins */}
               {((!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.coins !== false)) || (isGuest && userData?.gameplaySettings?.publicCoins)) && (
-                <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-lg border border-yellow-500/20">
-                  <Coins className="w-3 h-3 text-yellow-400" />
-                  <span className="font-bold text-[10px] text-yellow-400">{userData?.balance || 0}</span>
+                <div className="flex items-center gap-1 bg-amber-600/10 px-2 py-1 rounded-lg border border-slate-200">
+                  <Coins className="w-3 h-3 text-amber-600" />
+                  <span className="font-bold text-[10px] text-amber-600">{userData?.balance || 0}</span>
                 </div>
               )}
 
@@ -280,7 +280,7 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
               {!isGuest && (
                 <button
                   onClick={toggleSettings}
-                  className="p-1.5 rounded-lg transition-colors border border-white/5 text-neutral-400 bg-neutral-900/50 hover:bg-white/5"
+                  className="p-1.5 rounded-lg transition-colors border border-slate-200 text-slate-500 bg-white shadow-sm border border-slate-200/50 hover:bg-slate-100"
                 >
                   <Sliders className="w-3.5 h-3.5" />
                 </button>
@@ -295,7 +295,7 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
                {showDetailNav && (
                   <button
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="p-2 text-neutral-500 hover:text-white transition-colors"
+                  className="p-2 text-slate-500 hover:text-blue-600 transition-colors"
                   >
                   <Menu className="w-5 h-5" />
                   </button>
@@ -307,18 +307,18 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
                 {userData?.avatar ? (
                   <img src={userData.avatar} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <User className="w-5 h-5 text-white" />
+                  <User className="w-5 h-5 text-slate-800" />
                 )}
               </div>
               <div>
                 <h1 className="text-base font-black uppercase tracking-tighter leading-none flex items-center gap-2">
                   {displayName}
                 </h1>
-                <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest flex items-center gap-2 mt-0.5">
+                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-2 mt-0.5">
                   {!isGuest && (
                       <span style={{ color: themeColor }}>Architect LVL {level}</span>
                   )}
-                  <span className="w-1 h-1 bg-neutral-800 rounded-full"></span>
+                  <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
                   <span>{isGuest ? 'GUEST VIEW' : 'Online'}</span>
                   {!isGuest && (
                       <button
@@ -338,8 +338,8 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
                 {/* XP - Compact Bar */}
                 {((!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.xp !== false)) || (isGuest && userData?.gameplaySettings?.publicXP)) && (
                   <div className="flex items-center gap-3 w-48">
-                        <span className="text-[9px] font-bold uppercase text-neutral-500 w-12 text-right">XP {Math.floor(xpProgressInLevel)}/{xpRequiredForNextLevel}</span>
-                        <div className="flex-1 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                        <span className="text-[9px] font-bold uppercase text-slate-500 w-12 text-right">XP {Math.floor(xpProgressInLevel)}/{xpRequiredForNextLevel}</span>
+                        <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                             <div 
                                 className="h-full transition-all duration-700" 
                                 style={{ 
@@ -353,18 +353,18 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
 
                 {/* Balance */}
                 {((!isGuest && (!userData?.gameplaySettings || userData.gameplaySettings.coins !== false)) || (isGuest && userData?.gameplaySettings?.publicCoins)) && (
-                  <div className="flex items-center gap-2 text-yellow-500 font-bold bg-yellow-500/5 px-3 py-1 rounded-full border border-yellow-500/10">
+                  <div className="flex items-center gap-2 text-amber-600 font-bold bg-amber-600/5 px-3 py-1 rounded-full border border-amber-600/10">
                     <Coins className="w-3.5 h-3.5" />
                     <span className="text-xs">{userData?.balance || 0}</span>
                   </div>
                 )}
                 
                 {/* Settings & Logout */}
-                <div className="flex items-center gap-1 border-l border-white/10 pl-4 ml-2">
+                <div className="flex items-center gap-1 border-l border-slate-300 pl-4 ml-2">
                     {!isGuest && (
                         <button
                             onClick={toggleSettings}
-                            className={`p-2 rounded-lg transition-colors ${activeTabId === 'settings' ? 'text-white bg-white/10' : 'text-neutral-500 hover:text-white hover:bg-white/5'}`}
+                            className={`p-2 rounded-lg transition-colors ${activeTabId === 'settings' ? 'text-slate-800 bg-slate-100 border border-slate-200' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'}`}
                             title="System Settings"
                         >
                             <Sliders className="w-4 h-4" />
@@ -372,11 +372,11 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
                     )}
                     
                     {logout ? (
-                        <button onClick={logout} className="p-2 rounded-lg text-neutral-500 hover:text-red-500 hover:bg-red-500/10 transition-colors" title="Logout">
+                        <button onClick={logout} className="p-2 rounded-lg text-slate-500 hover:text-red-500 hover:bg-red-500/10 transition-colors" title="Logout">
                             <LogOut className="w-4 h-4" />
                         </button>
                     ) : (
-                        <Link to="/" className="ml-2 flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all">
+                        <Link to="/" className="ml-2 flex items-center gap-2 bg-slate-100 border border-slate-200 hover:bg-white/20 text-slate-800 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all">
                             <span>Create</span>
                             <ArrowRight className="w-3 h-3" />
                         </Link>
@@ -387,16 +387,16 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
         </div>
       </header>
 
-      <div className="w-full max-w-[1800px] mx-auto flex flex-col md:flex-row flex-1 border-x border-white/5 relative">
+      <div className="w-full max-w-[1800px] mx-auto flex flex-col md:flex-row flex-1 border-x border-slate-200 relative">
 
         {/* --- Sidebar Navigation (Desktop) --- */}
         {(showDetailNav) && (
-            <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} hidden md:flex transition-all duration-300 p-4 space-y-2 border-r border-white/5 flex-col gap-2 md:gap-0`}>
+            <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} hidden md:flex transition-all duration-300 p-4 space-y-2 border-r border-slate-200 flex-col gap-2 md:gap-0`}>
             {visibleModules.map(module => (
                 <button
                 key={module.id}
                 onClick={() => handleModuleChange(module.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 md:shrink ${activeTabId === module.id ? 'text-white shadow-lg' : 'text-neutral-500 hover:bg-white/5'} ${!isSidebarOpen && 'justify-center px-2'} `}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 md:shrink ${activeTabId === module.id ? 'text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'} ${!isSidebarOpen && 'justify-center px-2'} `}
                 style={activeTabId === module.id ? { backgroundColor: themeColor } : {}}
                 title={!isSidebarOpen ? module.label : ''}
                 >
@@ -407,10 +407,10 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
             
             {/* Settings in Sidebar (Admin Only) */}
             {!isGuest && (
-                <div className="pt-4 mt-auto border-t border-white/5">
+                <div className="pt-4 mt-auto border-t border-slate-200">
                     <button
                     onClick={() => setActiveTabId('settings')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 md:shrink ${activeTabId === 'settings' ? 'text-white shadow-lg' : 'text-neutral-500 hover:bg-white/5'} ${!isSidebarOpen && 'justify-center px-2'}`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 md:shrink ${activeTabId === 'settings' ? 'text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'} ${!isSidebarOpen && 'justify-center px-2'}`}
                     style={activeTabId === 'settings' ? { backgroundColor: themeColor } : {}}
                     title={!isSidebarOpen ? 'Settings' : ''}
                     >
@@ -438,7 +438,7 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
                     setMissionTab={setActiveTaskTab}
                 />
             ) : (
-                <div className="flex items-center justify-center h-full text-neutral-500 text-xs font-mono uppercase">
+                <div className="flex items-center justify-center h-full text-slate-500 text-xs font-mono uppercase">
                     Initializing Interface... (or Module Not Found)
                 </div>
             )}
@@ -450,12 +450,12 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
         <>
              {/* Extended Mobile Menu */}
             {activeMobileMenu && visibleModules.length > 5 && (
-                 <div className="md:hidden fixed bottom-20 right-2 w-48 bg-[#0A0A0A] border border-white/10 rounded-xl shadow-2xl p-1 z-50 animate-in slide-in-from-bottom-5 space-y-1">
+                 <div className="md:hidden fixed bottom-20 right-2 w-48 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl shadow-2xl p-1 z-50 animate-in slide-in-from-bottom-5 space-y-1">
                     {visibleModules.slice(4).map(module => (
                         <button
                             key={module.id}
                             onClick={() => { handleModuleChange(module.id); setActiveMobileMenu(false); }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${activeTabId === module.id ? 'bg-white/10 text-white' : 'text-neutral-500 hover:text-white'}`}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${activeTabId === module.id ? 'bg-slate-100 border border-slate-200 text-slate-800' : 'text-slate-500 hover:text-blue-600'}`}
                             style={activeTabId === module.id ? { color: themeColor } : {}}
                         >
                              <module.icon className="w-4 h-4" />
@@ -466,14 +466,14 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
             )}
 
             <nav 
-                className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0A0A0A]/90 backdrop-blur-xl border-t border-white/5 z-50 grid p-2 pb-6 gap-1"
+                className="md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-xl border border-slate-200/90 backdrop-blur-xl border-t border-slate-200 z-50 grid p-2 pb-6 gap-1"
                 style={{ gridTemplateColumns: `repeat(${Math.min(visibleModules.length > 5 ? 5 : visibleModules.length, 5)}, 1fr)` }}
             >
                 {visibleModules.slice(0, visibleModules.length > 5 ? 4 : 5).map(module => (
                 <button
                     key={module.id}
                     onClick={() => { handleModuleChange(module.id); setActiveMobileMenu(false); }}
-                    className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${activeTabId === module.id ? 'text-white' : 'text-neutral-500'}`}
+                    className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${activeTabId === module.id ? 'text-slate-800' : 'text-slate-500'}`}
                     style={activeTabId === module.id ? { color: themeColor } : {}}
                 >
                     <module.icon className={`w-5 h-5 mb-1 ${activeTabId === module.id && 'scale-110 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]'}`} />
@@ -484,7 +484,7 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
                  {visibleModules.length > 5 && (
                      <button
                         onClick={() => setActiveMobileMenu(!activeMobileMenu)}
-                        className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${activeMobileMenu ? 'text-white bg-white/5' : 'text-neutral-500'}`}
+                        className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${activeMobileMenu ? 'text-slate-800 bg-slate-50' : 'text-slate-500'}`}
                     >
                         <div className="w-5 h-5 mb-1 flex items-center justify-center">
                             <Menu className="w-5 h-5" />
@@ -497,7 +497,7 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
       )}
 
       {/* --- Footer --- */}
-      <footer className="hidden md:block p-4 border-t border-white/5 text-center bg-black/80">
+      <footer className="hidden md:block p-4 border-t border-slate-200 text-center bg-white/80">
         <div className="text-[8px] text-neutral-800 font-black uppercase tracking-[0.8em]">
            SUMMA OS // PORTFOLIO_MODE: {isGuest ? 'GUEST' : 'ADMIN'}
         </div>
@@ -515,7 +515,7 @@ const AuthenticatedRoute = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#020202] text-blue-500 flex flex-col items-center justify-center font-mono gap-4">
+            <div className="min-h-screen bg-slate-50 text-blue-500 flex flex-col items-center justify-center font-mono gap-4">
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
             <div className="text-xs font-black uppercase tracking-[0.2em]">Initializing Security...</div>
             </div>
@@ -528,16 +528,16 @@ const AuthenticatedRoute = () => {
 
     if (!isVerified) {
         return (
-        <div className="min-h-screen bg-[#020202] text-neutral-200 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden font-sans">
+        <div className="min-h-screen bg-slate-50 text-slate-700 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden font-sans">
                 {/* Background Effects */}
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
                 
-                <div className="w-16 h-16 bg-yellow-600/20 rounded-2xl flex items-center justify-center mb-6 border border-yellow-500/20 z-10 animate-pulse">
-                <UserCheck className="w-8 h-8 text-yellow-500" />
+                <div className="w-16 h-16 bg-amber-600/20 rounded-2xl flex items-center justify-center mb-6 border border-slate-200 z-10 animate-pulse">
+                <UserCheck className="w-8 h-8 text-amber-600" />
                 </div>
                 
                 <h2 className="text-2xl font-black uppercase tracking-tighter mb-2 z-10">Verification Required</h2>
-                <p className="text-neutral-500 text-xs font-bold uppercase tracking-widest max-w-sm mb-8 z-10 leading-relaxed">
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest max-w-sm mb-8 z-10 leading-relaxed">
                 A security protocol link has been sent to your email channel.<br/>
                 Please verify your identity to access the system.
                 </p>
@@ -551,11 +551,11 @@ const AuthenticatedRoute = () => {
                 </button>
                 <button 
                     onClick={logout}
-                    className="w-full bg-neutral-900/80 border border-white/10 hover:bg-white/5 text-neutral-400 font-bold uppercase tracking-widest py-3.5 rounded-xl transition-all backdrop-blur-sm"
+                    className="w-full bg-white shadow-sm border border-slate-200/80 border border-slate-300 hover:bg-slate-100 text-slate-500 font-bold uppercase tracking-widest py-3.5 rounded-xl transition-all backdrop-blur-sm"
                 >
                     Return to Login
                 </button>
-                <div className="mt-4 text-[10px] text-neutral-600 uppercase font-bold tracking-widest">
+                <div className="mt-4 text-[10px] text-slate-400 uppercase font-bold tracking-widest">
                     Done verifying? <span className="text-blue-500 cursor-pointer hover:underline" onClick={() => window.location.reload()}>Reload Page</span>
                 </div>
                 </div>
@@ -601,7 +601,7 @@ const PublicProfileRoute = () => {
 
     if (lookupLoading) {
         return (
-            <div className="min-h-screen bg-[#020202] text-neutral-500 flex items-center justify-center">
+            <div className="min-h-screen bg-slate-50 text-slate-500 flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-neutral-500 border-t-transparent rounded-full animate-spin" />
             </div>
         );
@@ -609,9 +609,9 @@ const PublicProfileRoute = () => {
 
     if (error || !targetUserId) {
         return (
-            <div className="min-h-screen bg-[#020202] text-white flex flex-col items-center justify-center p-8 text-center">
+            <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col items-center justify-center p-8 text-center">
                 <h1 className="text-4xl font-black uppercase tracking-tighter mb-4 text-neutral-800">404 Error</h1>
-                <p className="text-neutral-500 font-bold uppercase tracking-widest mb-8">User Profile Not Found</p>
+                <p className="text-slate-500 font-bold uppercase tracking-widest mb-8">User Profile Not Found</p>
                 <Link to="/" className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-blue-500 transition-all">
                     Create Your Own Profile
                 </Link>

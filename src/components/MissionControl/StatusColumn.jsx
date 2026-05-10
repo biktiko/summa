@@ -35,14 +35,14 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, edit
 
     return (
         <>
-            <div className="flex-1 min-w-[300px] bg-neutral-900/20 rounded-2xl p-2 md:p-4 border border-white/5 flex flex-col min-h-[500px]">
+            <div className="flex-1 min-w-[300px] bg-slate-100 rounded-2xl p-2 md:p-4 border border-slate-200 flex flex-col min-h-[500px]">
                 <div className={`hidden md:flex items-center justify-between mb-4 pb-2 border-b border-${color}-500/20`}>
                     <h3 className={`text-xs font-black uppercase tracking-widest text-${color}-500`}>{title}</h3>
                     <div className="flex items-center gap-3">
-                         <span className="text-[10px] font-mono text-neutral-500">{filteredTasks.length}</span>
+                         <span className="text-[10px] font-mono text-slate-500">{filteredTasks.length}</span>
                          <button 
                             onClick={() => setIsExpanded(true)}
-                            className="hidden md:block text-neutral-500 hover:text-white transition-colors"
+                            className="hidden md:block text-slate-500 hover:text-blue-600 transition-colors"
                             title="Open Grid View"
                          >
                              <Maximize2 className="w-3 h-3" />
@@ -74,19 +74,19 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, edit
 
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between pt-4 mt-2 border-t border-white/5">
+                    <div className="flex items-center justify-between pt-4 mt-2 border-t border-slate-200">
                         <button
                             onClick={() => setPage(Math.max(0, page - 1))}
                             disabled={page === 0}
-                            className="p-1 rounded bg-neutral-900 text-neutral-500 disabled:opacity-30 hover:text-white"
+                            className="p-1 rounded bg-white shadow-sm border border-slate-200 text-slate-500 disabled:opacity-30 hover:text-blue-600"
                         >
                             &lt;
                         </button>
-                        <span className="text-[10px] text-neutral-500">Page {page + 1} of {totalPages}</span>
+                        <span className="text-[10px] text-slate-500">Page {page + 1} of {totalPages}</span>
                         <button
                             onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                             disabled={page === totalPages - 1}
-                            className="p-1 rounded bg-neutral-900 text-neutral-500 disabled:opacity-30 hover:text-white"
+                            className="p-1 rounded bg-white shadow-sm border border-slate-200 text-slate-500 disabled:opacity-30 hover:text-blue-600"
                         >
                             &gt;
                         </button>
@@ -96,20 +96,20 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, edit
 
             {/* Windowed / Grid Mode Overlay */}
             {isExpanded && (
-                <div className="fixed inset-0 z-[100] bg-black/20 backdrop-blur-3xl p-6 md:p-12 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if(e.target === e.currentTarget) setIsExpanded(false); }}>
+                <div className="fixed inset-0 z-[100] bg-white/20 backdrop-blur-3xl p-6 md:p-12 overflow-y-auto animate-in fade-in duration-200" onClick={(e) => { if(e.target === e.currentTarget) setIsExpanded(false); }}>
                     <div className="max-w-7xl mx-auto">
-                        <div className="flex items-center justify-between mb-8 bg-transparent z-20 py-4 border-b border-white/10">
+                        <div className="flex items-center justify-between mb-8 bg-transparent z-20 py-4 border-b border-slate-300">
                             <div className="flex items-center gap-4">
                                 <h2 className={`text-2xl font-black uppercase tracking-tighter text-${color}-500`}>{title}</h2>
-                                <span className="bg-white/10 px-2 py-0.5 rounded text-xs font-mono text-white">{filteredTasks.length} Tasks</span>
+                                <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs font-mono text-slate-800">{filteredTasks.length} Tasks</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-neutral-500 hover:text-white transition-all">
+                                <button className="p-1.5 bg-slate-50 hover:bg-slate-200 rounded-lg text-slate-500 hover:text-blue-600 transition-all">
                                     <MoreVertical className="w-4 h-4" />
                                 </button>
                                 <button 
                                     onClick={() => setIsExpanded(false)}
-                                    className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all shadow-lg"
+                                    className="p-2 rounded-full bg-slate-100 border border-slate-200 hover:bg-white/20 text-slate-800 transition-all shadow-lg"
                                 >
                                     <X className="w-6 h-6" />
                                 </button>

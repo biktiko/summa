@@ -103,8 +103,8 @@ const HealthMetrics = ({ userData, updateUser, viewMode, isSectionHidden, toggle
     // Enhanced Graph Visualization
     const renderGraph = () => {
         if (weightHistory.length < 2 && targetWeight === 0) return (
-            <div className="w-full h-64 flex items-center justify-center border border-dashed border-white/5 rounded-xl bg-black/20">
-                <p className="text-neutral-500 text-xs font-mono uppercase tracking-widest">Not enough data for graph</p>
+            <div className="w-full h-64 flex items-center justify-center border border-dashed border-slate-200 rounded-xl bg-white/20">
+                <p className="text-slate-500 text-xs font-mono uppercase tracking-widest">Not enough data for graph</p>
             </div>
         );
 
@@ -135,7 +135,7 @@ const HealthMetrics = ({ userData, updateUser, viewMode, isSectionHidden, toggle
         return (
             <div className="w-full h-96 mt-8 relative group/graph">
                 {/* Y-Axis Labels (Left) */}
-                <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between text-[9px] text-neutral-600 font-mono py-2 pointer-events-none">
+                <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between text-[9px] text-slate-400 font-mono py-2 pointer-events-none">
                     <span>{Math.round(maxWeight)}kg</span>
                     <span>{Math.round(minWeight + range / 2)}kg</span>
                     <span>{Math.round(minWeight)}kg</span>
@@ -214,9 +214,9 @@ const HealthMetrics = ({ userData, updateUser, viewMode, isSectionHidden, toggle
                                     {/* Tooltip */}
                                     <foreignObject x={`${x}%`} y={`${y}%`} width="100" height="50" className="overflow-visible opacity-0 group-hover/point:opacity-100 transition-opacity pointer-events-none">
                                         <div className="transform -translate-x-1/2 -translate-y-full pb-2">
-                                            <div className="bg-neutral-900 border border-white/10 rounded px-2 py-1 text-[10px] whitespace-nowrap text-white shadow-xl">
+                                            <div className="bg-white shadow-sm border border-slate-200 border border-slate-300 rounded px-2 py-1 text-[10px] whitespace-nowrap text-slate-800 shadow-xl">
                                                 <span className="font-bold">{entry.weight}kg</span>
-                                                <span className="text-neutral-500 ml-1">{entry.date}</span>
+                                                <span className="text-slate-500 ml-1">{entry.date}</span>
                                             </div>
                                         </div>
                                     </foreignObject>
@@ -227,7 +227,7 @@ const HealthMetrics = ({ userData, updateUser, viewMode, isSectionHidden, toggle
                 </div>
 
                 {/* X-Axis Labels */}
-                <div className="flex justify-between text-[9px] text-neutral-600 mt-4 font-mono uppercase ml-8">
+                <div className="flex justify-between text-[9px] text-slate-400 mt-4 font-mono uppercase ml-8">
                     <span>{weightHistory[0]?.date}</span>
                     <span>{weightHistory[weightHistory.length - 1]?.date}</span>
                 </div>
@@ -242,27 +242,27 @@ const HealthMetrics = ({ userData, updateUser, viewMode, isSectionHidden, toggle
     return (
         <div className={`w-full space-y-6 ${isSectionHidden ? 'opacity-50 grayscale' : ''}`}>
             {/* Main Stats Card */}
-            <div className="bg-neutral-900/30 border border-white/5 rounded-3xl p-8 relative overflow-hidden group">
+            <div className="bg-white shadow-sm border border-slate-200/30 border border-slate-200 rounded-3xl p-8 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-6 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                     {viewMode === 'admin' && (
                         <>
                             <button
                                 onClick={toggleSectionVisibility}
-                                className={`p-2 rounded-xl transition-colors backdrop-blur-sm ${isSectionHidden ? 'bg-red-500/20 text-red-500' : 'bg-white/5 text-neutral-400 hover:text-white'}`}
+                                className={`p-2 rounded-xl transition-colors backdrop-blur-sm ${isSectionHidden ? 'bg-red-500/20 text-red-500' : 'bg-slate-50 text-slate-500 hover:text-blue-600'}`}
                                 title={isSectionHidden ? "Show to Guests" : "Hide from Guests"}
                             >
                                 {isSectionHidden ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                             </button>
                             <button
                                 onClick={openSettings}
-                                className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-neutral-400 hover:text-white transition-colors backdrop-blur-sm"
+                                className="p-2 bg-slate-50 hover:bg-slate-200 rounded-xl text-slate-500 hover:text-blue-600 transition-colors backdrop-blur-sm"
                                 title="Body Settings"
                             >
                                 <Settings className="w-5 h-5" />
                             </button>
                             <button
                                 onClick={openAddModal}
-                                className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-neutral-400 hover:text-white transition-colors backdrop-blur-sm"
+                                className="p-2 bg-slate-50 hover:bg-slate-200 rounded-xl text-slate-500 hover:text-blue-600 transition-colors backdrop-blur-sm"
                                 title="Log Weight"
                             >
                                 <Plus className="w-5 h-5" />
@@ -276,49 +276,49 @@ const HealthMetrics = ({ userData, updateUser, viewMode, isSectionHidden, toggle
                         <Activity className="w-8 h-8 text-red-500" />
                     </div>
                     <div>
-                        <h2 className="text-3xl font-black uppercase tracking-tighter text-white">Body Metrics {isSectionHidden && <span className="text-xs text-red-500 ml-2">(HIDDEN)</span>}</h2>
-                        <p className="text-xs text-neutral-500 font-mono uppercase tracking-widest">Physical Status & Trajectory</p>
+                        <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">Body Metrics {isSectionHidden && <span className="text-xs text-red-500 ml-2">(HIDDEN)</span>}</h2>
+                        <p className="text-xs text-slate-500 font-mono uppercase tracking-widest">Physical Status & Trajectory</p>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     {/* Weight */}
-                    <div className="bg-black/40 rounded-2xl p-6 border border-white/5 hover:border-red-500/30 transition-colors group/stat">
-                        <div className="flex items-center gap-2 text-xs font-bold text-neutral-500 uppercase mb-2 group-hover/stat:text-red-500 transition-colors">
+                    <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-200 hover:border-red-500/30 transition-colors group/stat">
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase mb-2 group-hover/stat:text-red-500 transition-colors">
                             <Scale className="w-4 h-4" /> Current Weight
                         </div>
-                        <div className="text-5xl font-black text-white tracking-tighter">
-                            {currentWeight} <span className="text-lg text-neutral-500 font-bold">kg</span>
+                        <div className="text-5xl font-black text-slate-800 tracking-tighter">
+                            {currentWeight} <span className="text-lg text-slate-500 font-bold">kg</span>
                         </div>
                     </div>
 
                     {/* Target Weight */}
-                    <div className="bg-black/40 rounded-2xl p-6 border border-white/5 hover:border-yellow-500/30 transition-colors group/stat">
-                        <div className="flex items-center gap-2 text-xs font-bold text-neutral-500 uppercase mb-2 group-hover/stat:text-yellow-500 transition-colors">
+                    <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-200 hover:border-amber-600/30 transition-colors group/stat">
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase mb-2 group-hover/stat:text-amber-600 transition-colors">
                             <Target className="w-4 h-4" /> Target Goal
                         </div>
-                        <div className="text-5xl font-black text-yellow-500 tracking-tighter">
-                            {targetWeight || '--'} <span className="text-lg text-yellow-500/50 font-bold">kg</span>
+                        <div className="text-5xl font-black text-amber-600 tracking-tighter">
+                            {targetWeight || '--'} <span className="text-lg text-amber-600/50 font-bold">kg</span>
                         </div>
                     </div>
 
                     {/* Height */}
-                    <div className="bg-black/40 rounded-2xl p-6 border border-white/5 hover:border-blue-500/30 transition-colors group/stat">
-                        <div className="flex items-center gap-2 text-xs font-bold text-neutral-500 uppercase mb-2 group-hover/stat:text-blue-500 transition-colors">
+                    <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-200 hover:border-blue-500/30 transition-colors group/stat">
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase mb-2 group-hover/stat:text-blue-500 transition-colors">
                             <Ruler className="w-4 h-4" /> Height
                         </div>
-                        <div className="text-5xl font-black text-white tracking-tighter">
-                            {height || '--'} <span className="text-lg text-neutral-500 font-bold">cm</span>
+                        <div className="text-5xl font-black text-slate-800 tracking-tighter">
+                            {height || '--'} <span className="text-lg text-slate-500 font-bold">cm</span>
                         </div>
                     </div>
 
                     {/* Body Fat */}
-                    <div className="bg-black/40 rounded-2xl p-6 border border-white/5 hover:border-purple-500/30 transition-colors group/stat">
-                        <div className="flex items-center gap-2 text-xs font-bold text-neutral-500 uppercase mb-2 group-hover/stat:text-purple-500 transition-colors">
+                    <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-200 hover:border-purple-500/30 transition-colors group/stat">
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase mb-2 group-hover/stat:text-purple-500 transition-colors">
                             <Activity className="w-4 h-4" /> Body Fat
                         </div>
-                        <div className="text-5xl font-black text-white tracking-tighter">
-                            {userData.bodyFat || '--'} <span className="text-lg text-neutral-500 font-bold">%</span>
+                        <div className="text-5xl font-black text-slate-800 tracking-tighter">
+                            {userData.bodyFat || '--'} <span className="text-lg text-slate-500 font-bold">%</span>
                         </div>
                     </div>
                 </div>
@@ -328,19 +328,19 @@ const HealthMetrics = ({ userData, updateUser, viewMode, isSectionHidden, toggle
 
             {/* History Table */}
             {weightHistory.length > 0 && (
-                <div className="bg-neutral-900/30 border border-white/5 rounded-3xl p-8">
+                <div className="bg-white shadow-sm border border-slate-200/30 border border-slate-200 rounded-3xl p-8">
                     <div className="flex items-center gap-3 mb-6">
-                        <Calendar className="w-5 h-5 text-neutral-500" />
-                        <h3 className="text-lg font-black text-white uppercase tracking-wider">History Log</h3>
+                        <Calendar className="w-5 h-5 text-slate-500" />
+                        <h3 className="text-lg font-black text-slate-800 uppercase tracking-wider">History Log</h3>
                     </div>
 
-                    <div className="overflow-hidden rounded-xl border border-white/5">
+                    <div className="overflow-hidden rounded-xl border border-slate-200">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-white/5 text-[10px] font-bold uppercase tracking-widest text-neutral-500">
-                                    <th className="p-4 border-b border-white/5">Date</th>
-                                    <th className="p-4 border-b border-white/5">Weight</th>
-                                    <th className="p-4 border-b border-white/5 text-right">Actions</th>
+                                <tr className="bg-slate-50 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                    <th className="p-4 border-b border-slate-200">Date</th>
+                                    <th className="p-4 border-b border-slate-200">Weight</th>
+                                    <th className="p-4 border-b border-slate-200 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
@@ -348,22 +348,22 @@ const HealthMetrics = ({ userData, updateUser, viewMode, isSectionHidden, toggle
                                     // We reversed the array for display (newest first), so we need to calculate the original index
                                     const originalIndex = weightHistory.length - 1 - index;
                                     return (
-                                        <tr key={index} className="group hover:bg-white/5 transition-colors">
-                                            <td className="p-4 text-sm font-mono text-neutral-300">{entry.date}</td>
-                                            <td className="p-4 text-sm font-bold text-white">{entry.weight} kg</td>
+                                        <tr key={index} className="group hover:bg-slate-100 transition-colors">
+                                            <td className="p-4 text-sm font-mono text-slate-600">{entry.date}</td>
+                                            <td className="p-4 text-sm font-bold text-slate-800">{entry.weight} kg</td>
                                             <td className="p-4 text-right">
                                                 {viewMode === 'admin' && (
                                                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <button
                                                             onClick={() => openEditModal(originalIndex)}
-                                                            className="p-2 hover:bg-white/10 rounded-lg text-neutral-500 hover:text-white transition-colors"
+                                                            className="p-2 hover:bg-slate-200 rounded-lg text-slate-500 hover:text-blue-600 transition-colors"
                                                             title="Edit"
                                                         >
                                                             <Edit2 className="w-4 h-4" />
                                                         </button>
                                                         <button
                                                             onClick={() => handleDeleteEntry(originalIndex)}
-                                                            className="p-2 hover:bg-red-500/10 rounded-lg text-neutral-500 hover:text-red-500 transition-colors"
+                                                            className="p-2 hover:bg-red-500/10 rounded-lg text-slate-500 hover:text-red-500 transition-colors"
                                                             title="Delete"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
@@ -382,21 +382,21 @@ const HealthMetrics = ({ userData, updateUser, viewMode, isSectionHidden, toggle
 
             {/* Add/Edit Weight Modal */}
             {isEditingWeight && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-sm bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-2xl p-8">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-sm bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-3xl shadow-2xl p-8">
                         <div className="flex justify-between items-center mb-8">
-                            <h3 className="text-lg font-black text-white uppercase tracking-wider">
+                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-wider">
                                 {editingIndex !== null ? 'Edit Entry' : 'Log Weight'}
                             </h3>
-                            <button onClick={() => setIsEditingWeight(false)} className="text-neutral-500 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
+                            <button onClick={() => setIsEditingWeight(false)} className="text-slate-500 hover:text-blue-600 transition-colors"><X className="w-6 h-6" /></button>
                         </div>
 
                         <div className="space-y-6">
                             <div>
-                                <label className="text-xs font-bold text-neutral-500 uppercase mb-2 block">Weight (kg)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Weight (kg)</label>
                                 <input
                                     type="number"
-                                    className="w-full bg-neutral-900 border border-white/10 rounded-xl p-4 text-white text-lg outline-none focus:border-red-500 transition-colors font-mono"
+                                    className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-4 text-slate-800 text-lg outline-none focus:border-red-500 transition-colors font-mono"
                                     value={newWeight}
                                     onChange={e => setNewWeight(e.target.value)}
                                     autoFocus
@@ -404,10 +404,10 @@ const HealthMetrics = ({ userData, updateUser, viewMode, isSectionHidden, toggle
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-neutral-500 uppercase mb-2 block">Date</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Date</label>
                                 <input
                                     type="date"
-                                    className="w-full bg-neutral-900 border border-white/10 rounded-xl p-4 text-white text-lg outline-none focus:border-red-500 transition-colors font-mono"
+                                    className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-4 text-slate-800 text-lg outline-none focus:border-red-500 transition-colors font-mono"
                                     value={weightDate}
                                     onChange={e => setWeightDate(e.target.value)}
                                 />
@@ -426,39 +426,39 @@ const HealthMetrics = ({ userData, updateUser, viewMode, isSectionHidden, toggle
 
             {/* Settings Modal */}
             {isEditingSettings && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-sm bg-[#0A0A0A] border border-white/10 rounded-3xl shadow-2xl p-8">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-sm bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-3xl shadow-2xl p-8">
                         <div className="flex justify-between items-center mb-8">
-                            <h3 className="text-lg font-black text-white uppercase tracking-wider">Body Settings</h3>
-                            <button onClick={() => setIsEditingSettings(false)} className="text-neutral-500 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
+                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-wider">Body Settings</h3>
+                            <button onClick={() => setIsEditingSettings(false)} className="text-slate-500 hover:text-blue-600 transition-colors"><X className="w-6 h-6" /></button>
                         </div>
 
                         <div className="space-y-6">
                             <div>
-                                <label className="text-xs font-bold text-neutral-500 uppercase mb-2 block">Height (cm)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Height (cm)</label>
                                 <input
                                     type="number"
-                                    className="w-full bg-neutral-900 border border-white/10 rounded-xl p-4 text-white text-lg outline-none focus:border-blue-500 transition-colors font-mono"
+                                    className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-4 text-slate-800 text-lg outline-none focus:border-blue-500 transition-colors font-mono"
                                     value={settingsHeight}
                                     onChange={e => setSettingsHeight(e.target.value)}
                                     placeholder="180"
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-neutral-500 uppercase mb-2 block">Target Weight (kg)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Target Weight (kg)</label>
                                 <input
                                     type="number"
-                                    className="w-full bg-neutral-900 border border-white/10 rounded-xl p-4 text-white text-lg outline-none focus:border-yellow-500 transition-colors font-mono"
+                                    className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-4 text-slate-800 text-lg outline-none focus:border-amber-600 transition-colors font-mono"
                                     value={settingsTargetWeight}
                                     onChange={e => setSettingsTargetWeight(e.target.value)}
                                     placeholder="75"
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-neutral-500 uppercase mb-2 block">Body Fat (%)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Body Fat (%)</label>
                                 <input
                                     type="number"
-                                    className="w-full bg-neutral-900 border border-white/10 rounded-xl p-4 text-white text-lg outline-none focus:border-purple-500 transition-colors font-mono"
+                                    className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-4 text-slate-800 text-lg outline-none focus:border-purple-500 transition-colors font-mono"
                                     value={settingsBodyFat}
                                     onChange={e => setSettingsBodyFat(e.target.value)}
                                     placeholder="15"

@@ -41,21 +41,21 @@ const HealthModule = ({
     return (
         <div className="animate-in fade-in duration-500 pb-20 h-full flex flex-col">
             {/* Module Top Navigation (Tab Switcher only) */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-white/5 pb-6 mb-8 gap-4">
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-6 mb-8 gap-4">
                  {/* No Title */}
                  
                  {/* Internal Navigation */}
                  <div className="flex items-center gap-6 pb-1 overflow-x-auto">
                         <button
                             onClick={() => setStatusTab('metrics')}
-                            className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${statusTab === 'metrics' ? 'text-emerald-500' : 'text-neutral-500 hover:text-white'}`}
+                            className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${statusTab === 'metrics' ? 'text-emerald-500' : 'text-slate-500 hover:text-blue-600'}`}
                         >
                             Body Metrics
                             {statusTab === 'metrics' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-500 rounded-t-full" />}
                         </button>
                         <button
                             onClick={() => setStatusTab('telemetry')}
-                            className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${statusTab === 'telemetry' ? 'text-blue-500' : 'text-neutral-500 hover:text-white'}`}
+                            className={`pb-3 text-xs font-black uppercase tracking-widest transition-all relative ${statusTab === 'telemetry' ? 'text-blue-500' : 'text-slate-500 hover:text-blue-600'}`}
                         >
                             Bio-Telemetry
                             {statusTab === 'telemetry' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 rounded-t-full" />}
