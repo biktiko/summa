@@ -501,7 +501,7 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
       {/* --- Footer --- */}
       <footer className="hidden md:block p-4 border-t border-slate-200 text-center bg-white/80">
         <div className="text-[8px] text-neutral-800 font-black uppercase tracking-[0.8em]">
-           SUMMA OS // PORTFOLIO_MODE: {isGuest ? 'GUEST' : 'ADMIN'}
+           SUMMA | PORTFOLIO MODE: {isGuest ? 'GUEST' : 'ADMIN'}
         </div>
       </footer>
     </div>

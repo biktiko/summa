@@ -179,7 +179,7 @@ const SettingsModule = ({ userData, updateUser }) => {
         }
 
         // Define Headers
-        const headers = ['ID', 'Title', 'Status', 'Priority', 'Difficulty', 'XP Reward', 'Coin Reward', 'Module', 'Created At', 'Completed At', 'Tags'];
+        const headers = ['ID', 'Title', 'Status', 'Priority', 'Difficulty', 'XP Reward', 'Coin Reward', 'Created At', 'Completed At', 'Tags'];
         
         // Convert to CSV (Using semicolon delimiter for Excel compatibility in some regions)
         const csvRows = [
@@ -194,7 +194,6 @@ const SettingsModule = ({ userData, updateUser }) => {
                     task.difficulty,
                     task.xpReward,
                     task.coinReward,
-                    task.moduleId,
                     task.createdAt || '',
                     task.completedAt || '',
                     `"${tags}"`

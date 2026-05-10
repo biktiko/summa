@@ -15,7 +15,7 @@ const TAG_COLORS = [
     { name: 'Gray', value: 'bg-neutral-500 text-white' },
 ];
 
-const TaskBoard = ({ tasks, actions, moduleId, projectId, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings, updateUser, userXP }) => {
+const TaskBoard = ({ tasks, actions, projectId, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings, updateUser, userXP }) => {
     const titleInputRef = useRef(null);
     const [isAdding, setIsAdding] = useState(false);
 
@@ -91,9 +91,6 @@ const TaskBoard = ({ tasks, actions, moduleId, projectId, viewMode, processTask,
     // 1. Filter tasks by Module and Project (Context)
     const contextTasks = useMemo(() => {
         return tasks.filter(t => {
-            // If moduleId is provided, filter by it. If not (global view), show all.
-            if (moduleId && t.moduleId !== moduleId) return false;
-            
             // Project ID Filtering
             if (projectId !== undefined) {
                 if (projectId === null && t.projectId) return false; // Hide project tasks from global view
@@ -101,7 +98,7 @@ const TaskBoard = ({ tasks, actions, moduleId, projectId, viewMode, processTask,
             }
             return true;
         });
-    }, [tasks, moduleId, projectId]);
+    }, [tasks, projectId]);
 
     // 2. Calculate unique tags from contextTasks (including color) - Case Insensitive
     const uniqueTagsMap = useMemo(() => {
@@ -185,6 +182,9 @@ const TaskBoard = ({ tasks, actions, moduleId, projectId, viewMode, processTask,
                  // Sort by total calculated value (XP + Coins*Ratio)
                  va = (a.xpReward || 0) + (a.coinReward || 0) * 10;
                  vb = (b.xpReward || 0) + (b.coinReward || 0) * 10;
+            } else if (key === 'createdAt') {
+                 va = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                 vb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
             }
 
             if (va < vb) return direction === 'asc' ? -1 : 1;
@@ -287,7 +287,6 @@ const TaskBoard = ({ tasks, actions, moduleId, projectId, viewMode, processTask,
             ...newTask, 
             xpReward: xp, // Auto-calculated
             coinReward: coins, // Auto-calculated
-            moduleId, 
             projectId,
             sequenceNumber: nextSeq,
             isSyncedToCalendar: false,

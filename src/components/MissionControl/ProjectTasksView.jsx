@@ -114,7 +114,6 @@ const ProjectTasksView = ({ projects, tasks, projectsActions, tasksActions, view
                             <TaskBoard
                                 tasks={tasks}
                                 actions={tasksActions}
-                                moduleId={null}
                                 projectId={activeProject.id}
                                 viewMode={viewMode}
                                 processTask={processTask}

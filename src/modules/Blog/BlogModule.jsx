@@ -13,7 +13,6 @@ const BlogModule = ({
                 notes={userData.notes}
                 actions={notesActions}
                 viewMode={viewMode}
-                moduleId={null} // Global
                 isSectionHidden={false}
                 toggleSectionVisibility={() => {}}
             />

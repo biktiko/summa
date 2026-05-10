@@ -60,7 +60,6 @@ const TasksModule = ({
                     <DailyProtocol
                         protocols={userData.protocols}
                         actions={protocolsActions}
-                        moduleId={null}
                         viewMode={viewMode}
                         processTask={processTask}
                         isSectionHidden={false}
@@ -71,7 +70,6 @@ const TasksModule = ({
                     <TaskBoard
                         tasks={userData.tasks}
                         actions={tasksActions}
-                        moduleId={null}
                         projectId={null} // Hide project tasks from general TaskBoard
                         viewMode={viewMode}
                         processTask={processTask}
@@ -100,7 +98,6 @@ const TasksModule = ({
                         actions={goalsActions}
                         viewMode={viewMode}
                         processTask={processTask}
-                        moduleId={null}
                         isSectionHidden={false}
                         toggleSectionVisibility={() => {}}
                     />

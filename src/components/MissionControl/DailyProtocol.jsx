@@ -3,27 +3,29 @@ import { CheckCircle2, Circle, Clock, Calendar, Repeat, Plus, Trash2, Edit2, X, 
 import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, getUserProfile, updateEvent, deleteEvent } from '../../core/services/googleCalendar';
 import ConfirmationModal from '../Common/ConfirmationModal';
 
-const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings }) => {
+const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHidden, toggleSectionVisibility, settings }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [isCalendarConnected, setIsCalendarConnected] = useState(false);
     const [userEmail, setUserEmail] = useState('');
     const [itemToDelete, setItemToDelete] = useState(null);
 
-    // Filter protocols for this specific module
-    const moduleProtocols = React.useMemo(() => 
-        protocols ? protocols.filter(p => {
-            if (moduleId && p.moduleId !== moduleId) return false;
-            return true;
-        }) : [], 
-        [protocols, moduleId]
-    );
+    // Filter and sort protocols for this specific module
+    const moduleProtocols = React.useMemo(() => {
+        const list = protocols ? [...protocols] : [];
+        list.sort((a, b) => {
+            if (a.isCompleted === b.isCompleted) return 0;
+            return a.isCompleted ? 1 : -1;
+        });
+        return list;
+    }, [protocols]);
 
     const [formData, setFormData] = useState({
         title: '',
         frequency: 'daily',
         specificDays: [], 
         time: '',
+        specificTimes: {},
         xpReward: 10,
         coinReward: 5,
         description: '',
@@ -76,28 +78,43 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
         }
     };
 
-    // Reset logic check
     useEffect(() => {
         const checkResets = async () => {
-            const today = new Date().toISOString().split('T')[0];
+            const now = new Date();
+            const today = now.toISOString().split('T')[0];
 
-            for (const p of moduleProtocols) {
-                if (p.isCompleted && p.lastCompletedDate !== today) {
+            for (const p of protocols || []) {
+                if (p.isCompleted && p.lastCompletedDate) {
                     let shouldReset = false;
-                    if (p.frequency === 'daily') shouldReset = true;
-                    else if (p.frequency === 'weekly') {
-                        const lastDate = new Date(p.lastCompletedDate);
-                        const diffTime = Math.abs(new Date() - lastDate);
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const lastDate = p.lastCompletedDate.split('T')[0];
+
+                    if (p.frequency === 'daily' || p.frequency === 'specific_days') {
+                        // Reset if last completed was on a previous day
+                        if (lastDate !== today) {
+                            shouldReset = true;
+                        }
+                    } else if (p.frequency === 'weekly') {
+                        const diffTime = Math.abs(now - new Date(p.lastCompletedDate));
+                        const diffDays = diffTime / (1000 * 60 * 60 * 24);
                         if (diffDays >= 7) shouldReset = true;
+                    } else if (p.frequency === 'monthly') {
+                        const diffTime = Math.abs(now - new Date(p.lastCompletedDate));
+                        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+                        if (diffDays >= 30) shouldReset = true;
                     }
+
                     if (shouldReset) await actions.update(p.id, { isCompleted: false });
                 }
             }
         };
 
-        if (viewMode === 'admin') checkResets();
-    }, [moduleProtocols, viewMode, actions]);
+        if (viewMode === 'admin') {
+            checkResets();
+            // Still check periodically in case the user leaves the tab open overnight
+            const interval = setInterval(checkResets, 60000); 
+            return () => clearInterval(interval);
+        }
+    }, [protocols, viewMode, actions]);
 
 
     const handleSave = async (e) => {
@@ -106,7 +123,6 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
         const data = {
             ...formData,
-            moduleId,
             isCompleted: false,
             lastCompletedDate: null,
             streak: 0
@@ -194,6 +210,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
             frequency: 'daily',
             specificDays: [],
             time: '',
+            specificTimes: {},
             xpReward: 10,
             coinReward: 5,
             description: '',
@@ -209,9 +226,11 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
             frequency: item.frequency || 'daily',
             specificDays: item.specificDays || [],
             time: item.time || '',
+            specificTimes: item.specificTimes || {},
             xpReward: item.xpReward || 10,
             coinReward: item.coinReward || 5,
-            description: item.description || ''
+            description: item.description || '',
+            addToCalendar: item.addToCalendar ?? true
         });
         setEditingId(item.id);
         setIsAdding(true);
@@ -227,32 +246,48 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
     };
 
     const handleComplete = async (protocol) => {
-        if (protocol.isCompleted) return;
+        const isUndo = protocol.isCompleted;
+        if (viewMode === 'guest') return;
 
-        const today = new Date().toISOString().split('T')[0];
-        const newStreak = (protocol.streak || 0) + 1;
+        const now = new Date().toISOString();
+        
+        // Calculate Streak change
+        let newStreak = (protocol.streak || 0);
+        if (isUndo) {
+            newStreak = Math.max(0, newStreak - 1);
+        } else {
+            newStreak = newStreak + 1;
+        }
 
         // --- Improved Reward Logic ---
-        // Formula: 5 + (Streak - 1). Hard Cap Base at 30.
-        let xp = 5 + Math.max(0, newStreak - 1);
+        // We calculate based on the streak that was used when completing/undoing
+        const streakForCalculation = isUndo ? protocol.streak : newStreak;
+        
+        let xp = 5 + Math.max(0, streakForCalculation - 1);
         if (xp > 30) xp = 30;
 
         // Language Bonus (+5)
         const primaryLanguage = settings?.primaryLanguage || 'none';
         if (primaryLanguage !== 'none') {
             const isMatch = checkLanguageMatch(protocol.title, primaryLanguage);
-            if (isMatch) xp += 5; // Max becomes 35
+            if (isMatch) xp += 5;
         }
 
         // Coins Formula: Every 7th day -> Coins = Streak / 7 (Max 4)
         let coins = 0;
-        if (newStreak > 0 && newStreak % 7 === 0) {
-            coins = Math.min(4, Math.floor(newStreak / 7));
+        if (streakForCalculation > 0 && streakForCalculation % 7 === 0) {
+            coins = Math.min(4, Math.floor(streakForCalculation / 7));
+        }
+
+        // If it's an undo, make them negative to subtract
+        if (isUndo) {
+            xp = -xp;
+            coins = -coins;
         }
 
         await actions.update(protocol.id, {
-            isCompleted: true,
-            lastCompletedDate: today,
+            isCompleted: !isUndo,
+            lastCompletedDate: isUndo ? null : now, // Reset date on undo
             streak: newStreak
         });
 
@@ -271,7 +306,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                 {/* Header Section */}
                 <div className="hidden md:block">
-                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-wider">🔄 Routines</h3>
+                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-wider">Routines</h3>
                     <p className="text-xs text-slate-500 font-mono">Daily Operations & Habits</p>
                 </div>
                  {viewMode === 'admin' && (
@@ -309,7 +344,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                              {/* Check Button */}
                              <button
                                 onClick={() => handleComplete(protocol)}
-                                disabled={protocol.isCompleted || viewMode === 'guest'}
+                                disabled={viewMode === 'guest'}
                                 className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shrink-0 ${protocol.isCompleted
                                     ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
                                     : 'bg-white shadow-sm border border-neutral-700 hover:border-blue-500 text-slate-500 hover:text-blue-500'
@@ -320,17 +355,21 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
 
                             {/* Content */}
                             <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                <h4 className={`font-bold text-base truncate ${protocol.isCompleted ? 'text-emerald-500' : 'text-slate-700'}`}>
+                                <h4 className={`font-bold text-base truncate transition-all ${protocol.isCompleted ? 'text-emerald-500 line-through opacity-70' : 'text-slate-700'}`}>
                                     {protocol.title}
                                 </h4>
                                 <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
                                     <Repeat className="w-3 h-3" />
                                     <span>
                                         {protocol.frequency === 'specific_days'
-                                            ? protocol.specificDays.map(d => daysOfWeek[d].short).join(',')
+                                            ? protocol.specificDays.map(d => {
+                                                const dayLabel = daysOfWeek[d].short;
+                                                const timeStr = protocol.specificTimes?.[d];
+                                                return timeStr ? `${dayLabel}@${timeStr}` : dayLabel;
+                                              }).join(', ')
                                             : protocol.frequency}
                                     </span>
-                                    {protocol.time && <span className="text-blue-500 ml-1">@ {protocol.time}</span>}
+                                    {protocol.frequency !== 'specific_days' && protocol.time && <span className="text-blue-500 ml-1">@ {protocol.time}</span>}
                                 </div>
                             </div>
 
@@ -339,7 +378,7 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                 
                                 {/* Streak */}
                                 <div className="flex items-center gap-1.5 px-2">
-                                    <span className="text-2xl drop-shadow-md">🔥</span>
+                                    {protocol.streak >= 8 && <span className="text-2xl drop-shadow-md">🔥</span>}
                                     <div className="flex flex-col items-start leading-none">
                                         <span className="text-sm font-black text-amber-600">{protocol.streak || 0}</span>
                                         <span className="text-[7px] font-bold text-yellow-600 uppercase tracking-tighter">Day Streak</span>
@@ -412,15 +451,17 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                                         <option value="specific_days">Specific Days</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Time (Optional)</label>
-                                    <input
-                                        type="time"
-                                        className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500 transition-colors"
-                                        value={formData.time}
-                                        onChange={e => setFormData({ ...formData, time: e.target.value })}
-                                    />
-                                </div>
+                                {formData.frequency !== 'specific_days' && (
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Time (Optional)</label>
+                                        <input
+                                            type="time"
+                                            className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500 transition-colors"
+                                            value={formData.time}
+                                            onChange={e => setFormData({ ...formData, time: e.target.value })}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             {isCalendarConnected && (
@@ -444,23 +485,47 @@ const DailyProtocol = ({ protocols, actions, moduleId, viewMode, processTask, is
                             )}
 
                             {formData.frequency === 'specific_days' && (
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Active Days</label>
-                                    <div className="flex justify-between gap-1">
-                                        {daysOfWeek.map(day => (
-                                            <button
-                                                key={day.id}
-                                                type="button"
-                                                onClick={() => toggleDay(day.id)}
-                                                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${formData.specificDays.includes(day.id)
-                                                    ? 'bg-blue-600 text-slate-800'
-                                                    : 'bg-white shadow-sm border border-slate-200 text-slate-500 hover:bg-slate-200'
-                                                    }`}
-                                            >
-                                                {day.short}
-                                            </button>
-                                        ))}
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Active Days</label>
+                                        <div className="flex justify-between gap-1">
+                                            {daysOfWeek.map(day => (
+                                                <button
+                                                    key={day.id}
+                                                    type="button"
+                                                    onClick={() => toggleDay(day.id)}
+                                                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${formData.specificDays.includes(day.id)
+                                                        ? 'bg-blue-600 text-slate-800'
+                                                        : 'bg-white shadow-sm border border-slate-200 text-slate-500 hover:bg-slate-200'
+                                                        }`}
+                                                >
+                                                    {day.short}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
+
+                                    {formData.specificDays.length > 0 && (
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Time per Day</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {formData.specificDays.sort().map(dayId => (
+                                                    <div key={dayId} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                                                        <span className="text-xs font-bold w-8 text-slate-600">{daysOfWeek[dayId].short}</span>
+                                                        <input
+                                                            type="time"
+                                                            className="flex-1 bg-white border border-slate-300 rounded p-1 text-xs outline-none text-slate-800"
+                                                            value={formData.specificTimes?.[dayId] || ''}
+                                                            onChange={e => setFormData({
+                                                                ...formData,
+                                                                specificTimes: { ...(formData.specificTimes || {}), [dayId]: e.target.value }
+                                                            })}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

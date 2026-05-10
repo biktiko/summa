@@ -80,9 +80,9 @@ export const SEED_DATA = {
         }
     ],
     goals: [
-        { id: 'g1', userId: 'u1', moduleId: 'career', title: '1 Million Dram Monthly Profit', type: 'numeric', target: 1000000, current: 350000, unit: 'AMD', deadline: '2026-12-31', status: 'active', linkedTaskIds: [], link: '#', linkName: 'Financial Plan', isHidden: false },
-        { id: 'g2', userId: 'u1', moduleId: 'career', title: 'Reach Level 50 Architect', type: 'numeric', target: 50, current: 12, unit: 'LVL', deadline: '2026-06-01', status: 'active', linkedTaskIds: [], link: '', linkName: '', isHidden: false },
-        { id: 'g3', userId: 'u1', moduleId: 'career', title: 'Launch MVP', type: 'boolean', target: 1, current: 0, unit: '', deadline: '2026-03-01', status: 'active', linkedTaskIds: ['1', '3'], link: '', linkName: '', isHidden: false }
+        { id: 'g1', userId: 'u1', title: '1 Million Dram Monthly Profit', type: 'numeric', target: 1000000, current: 350000, unit: 'AMD', deadline: '2026-12-31', status: 'active', linkedTaskIds: [], link: '#', linkName: 'Financial Plan', isHidden: false },
+        { id: 'g2', userId: 'u1', title: 'Reach Level 50 Architect', type: 'numeric', target: 50, current: 12, unit: 'LVL', deadline: '2026-06-01', status: 'active', linkedTaskIds: [], link: '', linkName: '', isHidden: false },
+        { id: 'g3', userId: 'u1', title: 'Launch MVP', type: 'boolean', target: 1, current: 0, unit: '', deadline: '2026-03-01', status: 'active', linkedTaskIds: ['1', '3'], link: '', linkName: '', isHidden: false }
     ],
     skills: [
         { id: 's1', userId: 'u1', name: 'Python for Gamedev', level: 45, category: 'Technical', description: 'Core language for backend systems.', links: [], isHidden: false },
@@ -117,14 +117,14 @@ export const SEED_DATA = {
         { id: 'a3', userId: 'u1', title: 'Hackathon Winner', date: '2022', type: 'Award', description: 'Best Gameplay Mechanics award at Global Game Jam 2022.', link: '#', linkName: 'Devpost', isHidden: false }
     ],
     tasks: [
-        { id: '1', userId: 'u1', moduleId: 'career', title: 'Refactor Auth System', status: 'done', priority: 'high', description: 'Move to JWT based auth.', xpReward: 50, coinReward: 100, link: '#', linkName: 'PR Link', isHidden: false },
-        { id: '2', userId: 'u1', moduleId: 'career', title: 'Design Task Board', status: 'in_progress', priority: 'medium', description: 'Kanban style board for tasks.', xpReward: 30, coinReward: 50, link: '#', linkName: 'Figma', isHidden: false },
-        { id: '3', userId: 'u1', moduleId: 'career', title: 'Mobile Optimization', status: 'todo', priority: 'high', description: 'Fix layout on iPhone SE.', xpReward: 40, coinReward: 80, link: '#', linkName: 'Ticket', isHidden: false, targetValue: 100, currentValue: 20, unit: '%' },
-        { id: '4', userId: 'u1', moduleId: 'finance', title: 'Setup Stripe', status: 'todo', priority: 'high', description: 'Integration for payments.' }
+        { id: '1', userId: 'u1', title: 'Refactor Auth System', status: 'done', priority: 'high', description: 'Move to JWT based auth.', xpReward: 50, coinReward: 100, link: '#', linkName: 'PR Link', isHidden: false },
+        { id: '2', userId: 'u1', title: 'Design Task Board', status: 'in_progress', priority: 'medium', description: 'Kanban style board for tasks.', xpReward: 30, coinReward: 50, link: '#', linkName: 'Figma', isHidden: false },
+        { id: '3', userId: 'u1', title: 'Mobile Optimization', status: 'todo', priority: 'high', description: 'Fix layout on iPhone SE.', xpReward: 40, coinReward: 80, link: '#', linkName: 'Ticket', isHidden: false, targetValue: 100, currentValue: 20, unit: '%' },
+        { id: '4', userId: 'u1', title: 'Setup Stripe', status: 'todo', priority: 'high', description: 'Integration for payments.' }
     ],
     backlog: [],
     notes: [
-        { id: 'n1', userId: 'u1', moduleId: 'career', title: 'Game Idea: Space Trader', content: 'Core loop: Buy low, sell high. Factions: Pirates, Federation, Aliens.', tags: [{ text: 'Idea', color: 'bg-purple-500 text-white' }], isPinned: true, isPublic: false, createdAt: '2026-01-15T10:00:00Z' }
+        { id: 'n1', userId: 'u1', title: 'Game Idea: Space Trader', content: 'Core loop: Buy low, sell high. Factions: Pirates, Federation, Aliens.', tags: [{ text: 'Idea', color: 'bg-purple-500 text-white' }], isPinned: true, isPublic: false, createdAt: '2026-01-15T10:00:00Z' }
     ],
     protocols: [
         { id: 'pr1', userId: 'u1', title: 'Morning Stretch', isCompleted: false, lastCompletedDate: '' },

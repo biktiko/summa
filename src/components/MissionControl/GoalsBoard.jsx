@@ -13,13 +13,13 @@ const TAG_COLORS = [
     { name: 'Gray', value: 'bg-neutral-500 text-white' },
 ];
 
-const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSectionVisibility, processTask, moduleId }) => {
+const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSectionVisibility, processTask }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [newGoal, setNewGoal] = useState({
         title: '', description: '', type: 'numeric', target: 100, current: 0, unit: '%',
         deadline: '', status: 'active', isHidden: false,
         linkedTaskIds: [], linkedTaskIdsString: '', link: '', linkName: '',
-        xpReward: 50, coinReward: 20, tags: [], moduleId: moduleId || 'architect'
+        xpReward: 50, coinReward: 20, tags: []
     });
     const [editingId, setEditingId] = useState(null);
     const [editData, setEditData] = useState({});
@@ -48,7 +48,6 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
     // Filter and Sort Goals
     const filteredGoals = useMemo(() => {
         let result = goals.filter(g => {
-            if (moduleId && g.moduleId !== moduleId) return false;
             if (viewMode === 'guest' && g.isHidden) return false;
             if (filters.status && g.status !== filters.status) return false;
             if (filters.tags.length > 0) {
@@ -64,7 +63,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
             if (a.status === b.status) return 0;
             return a.status === 'completed' ? 1 : -1;
         });
-    }, [goals, filters, viewMode, moduleId]);
+    }, [goals, filters, viewMode]);
 
     if (viewMode === 'guest' && isSectionHidden) return null;
 
@@ -105,7 +104,7 @@ const GoalsBoard = ({ goals, tasks, actions, viewMode, isSectionHidden, toggleSe
             title: '', description: '', type: 'numeric', target: 100, current: 0, unit: '%',
             deadline: '', status: 'active', isHidden: false,
             linkedTaskIds: [], linkedTaskIdsString: '', link: '', linkName: '',
-            xpReward: 50, coinReward: 20, tags: [], moduleId: moduleId || 'architect'
+            xpReward: 50, coinReward: 20, tags: []
         });
     };
 

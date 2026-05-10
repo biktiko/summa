@@ -80,7 +80,7 @@ const NoteCard = ({ note, viewMode, startEdit, deleteNote, togglePin, togglePubl
     );
 };
 
-const NotesBoard = ({ notes, actions, viewMode, moduleId }) => {
+const NotesBoard = ({ notes, actions, viewMode }) => {
     const [search, setSearch] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -93,11 +93,6 @@ const NotesBoard = ({ notes, actions, viewMode, moduleId }) => {
 
     const filteredNotes = useMemo(() => {
         let result = notes || [];
-
-        // Filter by moduleId
-        if (moduleId) {
-            result = result.filter(n => n.moduleId === moduleId);
-        }
 
         // Filter by search
         if (search) {
@@ -114,7 +109,7 @@ const NotesBoard = ({ notes, actions, viewMode, moduleId }) => {
             if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
             return new Date(b.createdAt) - new Date(a.createdAt);
         });
-    }, [notes, search, moduleId]);
+    }, [notes, search]);
 
     const handleAdd = async () => {
         if (!formData.title && !formData.content) return;
@@ -126,8 +121,7 @@ const NotesBoard = ({ notes, actions, viewMode, moduleId }) => {
             isPinned: formData.isPinned,
             isPublic: formData.isPublic,
 
-            createdAt: new Date().toISOString(),
-            moduleId: moduleId || 'architect'
+            createdAt: new Date().toISOString()
         };
 
         if (editingId) {
