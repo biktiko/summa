@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Circle, Clock, Calendar, Repeat, Plus, Trash2, Edit2, X, AlertCircle, Eye, EyeOff, Zap, Coins, Calendar as CalendarIcon } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Calendar, Repeat, Plus, Trash2, Edit2, X, AlertCircle, Eye, EyeOff, Zap, Coins, Flag, Calendar as CalendarIcon } from 'lucide-react';
 import { addEventToCalendar, createEventObject, isSignedIn, signInToGoogle, initGoogleCalendar, getUserProfile, updateEvent, deleteEvent } from '../../core/services/googleCalendar';
 import ConfirmationModal from '../Common/ConfirmationModal';
 
@@ -14,8 +14,10 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
     const moduleProtocols = React.useMemo(() => {
         const list = protocols ? [...protocols] : [];
         list.sort((a, b) => {
-            if (a.isCompleted === b.isCompleted) return 0;
-            return a.isCompleted ? 1 : -1;
+            const aDone = a.lastCompletedDate === a.targetDate;
+            const bDone = b.lastCompletedDate === b.targetDate;
+            if (aDone === bDone) return 0;
+            return aDone ? 1 : -1;
         });
         return list;
     }, [protocols]);
@@ -24,8 +26,12 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
         title: '',
         frequency: 'daily',
         specificDays: [], 
+        monthlyDay: 1,
         time: '',
+        useDifferentTimes: false,
         specificTimes: {},
+        importance: 'low',
+        complexity: 'low',
         xpReward: 10,
         coinReward: 5,
         description: '',
@@ -41,14 +47,66 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
     };
 
     const daysOfWeek = [
-        { id: 0, label: 'Sun', short: 'S' },
-        { id: 1, label: 'Mon', short: 'M' },
-        { id: 2, label: 'Tue', short: 'T' },
-        { id: 3, label: 'Wed', short: 'W' },
-        { id: 4, label: 'Thu', short: 'T' },
-        { id: 5, label: 'Fri', short: 'F' },
-        { id: 6, label: 'Sat', short: 'S' }
+        { id: 0, label: 'Sun', short: 'Sun' },
+        { id: 1, label: 'Mon', short: 'Mon' },
+        { id: 2, label: 'Tue', short: 'Tue' },
+        { id: 3, label: 'Wed', short: 'Wed' },
+        { id: 4, label: 'Thu', short: 'Thu' },
+        { id: 5, label: 'Fri', short: 'Fri' },
+        { id: 6, label: 'Sat', short: 'Sat' }
     ];
+
+    const getNextOccurrence = (baseDateStr, frequency, specificDays, monthlyDay) => {
+        const baseDate = new Date(baseDateStr);
+        let nextDate = new Date(baseDate);
+
+        if (frequency === 'daily') {
+            nextDate.setDate(baseDate.getDate() + 1);
+        } else if (frequency === 'monthly') {
+            nextDate.setMonth(baseDate.getMonth() + 1);
+            nextDate.setDate(monthlyDay || 1);
+        } else if (frequency === 'specific_days' && specificDays?.length > 0) {
+            let found = false;
+            for (let i = 1; i <= 7; i++) {
+                let checkDate = new Date(baseDate);
+                checkDate.setDate(baseDate.getDate() + i);
+                if (specificDays.includes(checkDate.getDay())) {
+                    nextDate = checkDate;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) nextDate.setDate(baseDate.getDate() + 1);
+        }
+        return nextDate.toISOString().split('T')[0];
+    };
+
+    const getInitialTarget = (frequency, specificDays, monthlyDay) => {
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        
+        if (frequency === 'daily') return todayStr;
+        if (frequency === 'monthly') {
+            const targetThisMonth = new Date(today);
+            targetThisMonth.setDate(monthlyDay || 1);
+            if (targetThisMonth.toISOString().split('T')[0] >= todayStr) return targetThisMonth.toISOString().split('T')[0];
+            const targetNextMonth = new Date(today);
+            targetNextMonth.setMonth(today.getMonth() + 1);
+            targetNextMonth.setDate(monthlyDay || 1);
+            return targetNextMonth.toISOString().split('T')[0];
+        }
+        if (frequency === 'specific_days') {
+            if (specificDays.includes(today.getDay())) return todayStr;
+            return getNextOccurrence(todayStr, 'specific_days', specificDays);
+        }
+        return todayStr;
+    };
+
+    const formatDateNice = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    };
 
     useEffect(() => {
         const init = async () => {
@@ -84,54 +142,81 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
             const today = now.toISOString().split('T')[0];
 
             for (const p of protocols || []) {
-                if (p.isCompleted && p.lastCompletedDate) {
-                    let shouldReset = false;
-                    const lastDate = p.lastCompletedDate.split('T')[0];
+                const targetDate = p.targetDate || today;
+                const lastDate = p.lastCompletedDate ? p.lastCompletedDate.split('T')[0] : null;
 
-                    if (p.frequency === 'daily' || p.frequency === 'specific_days') {
-                        // Reset if last completed was on a previous day
-                        if (lastDate !== today) {
-                            shouldReset = true;
-                        }
-                    } else if (p.frequency === 'weekly') {
-                        const diffTime = Math.abs(now - new Date(p.lastCompletedDate));
-                        const diffDays = diffTime / (1000 * 60 * 60 * 24);
-                        if (diffDays >= 7) shouldReset = true;
-                    } else if (p.frequency === 'monthly') {
-                        const diffTime = Math.abs(now - new Date(p.lastCompletedDate));
-                        const diffDays = diffTime / (1000 * 60 * 60 * 24);
-                        if (diffDays >= 30) shouldReset = true;
+                let shouldAdvance = false;
+                
+                // Initialize if missing
+                if (!p.targetDate) {
+                    shouldAdvance = true;
+                }
+                
+                // Advance if target date has passed
+                else if (today > targetDate) {
+                    // Missed task penalty?
+                    if (lastDate !== targetDate && p.streak > 0) {
+                        if (processTask) await processTask({ xpReward: -5 });
+                        await actions.update(p.id, { streak: 0 });
                     }
+                    shouldAdvance = true;
+                }
+                
+                // OR if it was completed and it's now at least the day after completion
+                if (lastDate && today > lastDate && lastDate === targetDate) {
+                    shouldAdvance = true;
+                }
 
-                    if (shouldReset) await actions.update(p.id, { isCompleted: false });
+                if (shouldAdvance) {
+                    const nextDate = !p.targetDate 
+                        ? getInitialTarget(p.frequency, p.specificDays, p.monthlyDay)
+                        : getNextOccurrence(targetDate, p.frequency, p.specificDays, p.monthlyDay);
+                    
+                    await actions.update(p.id, { 
+                        targetDate: nextDate,
+                        isCompleted: lastDate === nextDate
+                    });
                 }
             }
         };
 
         if (viewMode === 'admin') {
             checkResets();
-            // Still check periodically in case the user leaves the tab open overnight
             const interval = setInterval(checkResets, 60000); 
             return () => clearInterval(interval);
         }
-    }, [protocols, viewMode, actions]);
+    }, [protocols, viewMode, actions, processTask]);
 
 
     const handleSave = async (e) => {
         e.preventDefault();
         if (!formData.title) return;
 
+        const initialTarget = getInitialTarget(formData.frequency, formData.specificDays, formData.monthlyDay);
+
         const data = {
             ...formData,
             isCompleted: false,
             lastCompletedDate: null,
+            targetDate: initialTarget,
             streak: 0
         };
 
         if (editingId) {
             // Edit Mode
             const existingProtocol = moduleProtocols.find(p => p.id === editingId);
-            if (existingProtocol && existingProtocol.googleEventId && isCalendarConnected) {
+            
+            // Preserve tracking fields
+            const updateData = {
+                ...formData,
+                isCompleted: existingProtocol.isCompleted,
+                lastCompletedDate: existingProtocol.lastCompletedDate,
+                targetDate: existingProtocol.targetDate || initialTarget,
+                streak: existingProtocol.streak || 0,
+                googleEventId: existingProtocol.googleEventId
+            };
+
+            if (existingProtocol.googleEventId && isCalendarConnected) {
                  try {
                     const today = new Date();
                     let updateTime = today;
@@ -150,9 +235,17 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
                      console.error("Failed to update routine calendar event", e);
                  }
             }
-            await actions.update(editingId, data);
+            await actions.update(editingId, updateData);
         } else {
-            // Add Mode - Fix Double Creation
+            // Add Mode
+            const data = {
+                ...formData,
+                isCompleted: false,
+                lastCompletedDate: null,
+                targetDate: initialTarget,
+                streak: 0
+            };
+
             let googleEventId = null;
             if (isCalendarConnected && formData.time && formData.addToCalendar) {
                  try {
@@ -162,7 +255,6 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
 
                     let recurrence = [];
                     if (formData.frequency === 'daily') recurrence.push('RRULE:FREQ=DAILY');
-                    else if (formData.frequency === 'weekly') recurrence.push('RRULE:FREQ=WEEKLY');
                     else if (formData.frequency === 'monthly') recurrence.push('RRULE:FREQ=MONTHLY');
                     else if (formData.frequency === 'specific_days' && formData.specificDays.length > 0) {
                         const daysMap = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -209,8 +301,12 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
             title: '',
             frequency: 'daily',
             specificDays: [],
+            monthlyDay: 1,
             time: '',
+            useDifferentTimes: false,
             specificTimes: {},
+            importance: 'low',
+            complexity: 'low',
             xpReward: 10,
             coinReward: 5,
             description: '',
@@ -225,8 +321,12 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
             title: item.title,
             frequency: item.frequency || 'daily',
             specificDays: item.specificDays || [],
+            monthlyDay: item.monthlyDay || 1,
             time: item.time || '',
+            useDifferentTimes: item.useDifferentTimes || false,
             specificTimes: item.specificTimes || {},
+            importance: item.importance || 'low',
+            complexity: item.complexity || 'low',
             xpReward: item.xpReward || 10,
             coinReward: item.coinReward || 5,
             description: item.description || '',
@@ -246,48 +346,62 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
     };
 
     const handleComplete = async (protocol) => {
-        const isUndo = protocol.isCompleted;
+        const isDone = protocol.lastCompletedDate === protocol.targetDate;
         if (viewMode === 'guest') return;
 
-        const now = new Date().toISOString();
+        const targetDate = protocol.targetDate || new Date().toISOString().split('T')[0];
         
         // Calculate Streak change
         let newStreak = (protocol.streak || 0);
-        if (isUndo) {
+        if (isDone) {
             newStreak = Math.max(0, newStreak - 1);
         } else {
             newStreak = newStreak + 1;
         }
 
-        // --- Improved Reward Logic ---
-        // We calculate based on the streak that was used when completing/undoing
-        const streakForCalculation = isUndo ? protocol.streak : newStreak;
+        const streakForCalculation = isDone ? protocol.streak : newStreak;
         
+        // Base XP
         let xp = 5 + Math.max(0, streakForCalculation - 1);
         if (xp > 30) xp = 30;
 
-        // Language Bonus (+5)
+        // Importance Modifier
+        if (protocol.importance === 'medium') xp += 1;
+        else if (protocol.importance === 'high') xp += 2;
+
+        // Complexity Modifier
+        if (protocol.complexity === 'medium') xp += 1;
+        else if (protocol.complexity === 'high') xp += 2;
+
+        // Monthly Bonus
+        if (protocol.frequency === 'monthly') {
+            xp *= 4;
+        }
+
         const primaryLanguage = settings?.primaryLanguage || 'none';
         if (primaryLanguage !== 'none') {
             const isMatch = checkLanguageMatch(protocol.title, primaryLanguage);
             if (isMatch) xp += 5;
         }
 
-        // Coins Formula: Every 7th day -> Coins = Streak / 7 (Max 4)
         let coins = 0;
         if (streakForCalculation > 0 && streakForCalculation % 7 === 0) {
             coins = Math.min(4, Math.floor(streakForCalculation / 7));
         }
 
-        // If it's an undo, make them negative to subtract
-        if (isUndo) {
+        // Monthly Coin Bonus
+        if (protocol.frequency === 'monthly') {
+            coins += 1;
+        }
+
+        if (isDone) {
             xp = -xp;
             coins = -coins;
         }
 
         await actions.update(protocol.id, {
-            isCompleted: !isUndo,
-            lastCompletedDate: isUndo ? null : now, // Reset date on undo
+            isCompleted: !isDone,
+            lastCompletedDate: isDone ? null : targetDate,
             streak: newStreak
         });
 
@@ -332,46 +446,71 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
                     </div>
                 )}
 
-                {moduleProtocols.map(protocol => (
-                    <div
-                        key={protocol.id}
-                        className={`group relative p-3 rounded-2xl border transition-all ${protocol.isCompleted
-                            ? 'bg-emerald-900/10 border-emerald-500/20'
-                            : 'bg-white shadow-sm border border-slate-200/40 border-slate-200 hover:border-blue-500/30'
-                            }`}
-                    >
-                         <div className="flex items-center gap-4">
-                             {/* Check Button */}
-                             <button
-                                onClick={() => handleComplete(protocol)}
-                                disabled={viewMode === 'guest'}
-                                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shrink-0 ${protocol.isCompleted
-                                    ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                                    : 'bg-white shadow-sm border border-neutral-700 hover:border-blue-500 text-slate-500 hover:text-blue-500'
-                                    }`}
-                            >
-                                <CheckCircle2 className="w-6 h-6" />
-                            </button>
+                {moduleProtocols.map(protocol => {
+                    const isDone = protocol.lastCompletedDate === protocol.targetDate;
+                    const displayTargetDate = protocol.targetDate || new Date().toISOString().split('T')[0];
+                    const protocolDay = new Date(displayTargetDate).getDay();
+                    const displayTime = (protocol.frequency === 'specific_days' && protocol.useDifferentTimes && protocol.specificTimes?.[protocolDay]) 
+                        ? protocol.specificTimes[protocolDay] 
+                        : protocol.time;
 
-                            {/* Content */}
-                            <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                <h4 className={`font-bold text-base truncate transition-all ${protocol.isCompleted ? 'text-emerald-500 line-through opacity-70' : 'text-slate-700'}`}>
-                                    {protocol.title}
-                                </h4>
-                                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
-                                    <Repeat className="w-3 h-3" />
-                                    <span>
-                                        {protocol.frequency === 'specific_days'
-                                            ? protocol.specificDays.map(d => {
-                                                const dayLabel = daysOfWeek[d].short;
-                                                const timeStr = protocol.specificTimes?.[d];
-                                                return timeStr ? `${dayLabel}@${timeStr}` : dayLabel;
-                                              }).join(', ')
-                                            : protocol.frequency}
-                                    </span>
-                                    {protocol.frequency !== 'specific_days' && protocol.time && <span className="text-blue-500 ml-1">@ {protocol.time}</span>}
+                    return (
+                        <div
+                            key={protocol.id}
+                            className={`group relative p-3 rounded-2xl border transition-all ${isDone
+                                ? 'bg-emerald-900/10 border-emerald-500/20'
+                                : 'bg-white shadow-sm border border-slate-200/40 border-slate-200 hover:border-blue-500/30'
+                                }`}
+                        >
+                             <div className="flex items-center gap-4">
+                                 {/* Check Button */}
+                                 <button
+                                    onClick={() => handleComplete(protocol)}
+                                    disabled={viewMode === 'guest'}
+                                    className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shrink-0 ${isDone
+                                        ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                                        : 'bg-white shadow-sm border border-neutral-700 hover:border-blue-500 text-slate-500 hover:text-blue-500'
+                                        }`}
+                                >
+                                    <CheckCircle2 className="w-6 h-6" />
+                                </button>
+
+                                {/* Content */}
+                                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                    <h4 className={`font-bold text-base truncate transition-all ${isDone ? 'text-emerald-500 line-through opacity-70' : 'text-slate-700'}`}>
+                                        {protocol.title}
+                                    </h4>
+                                    <div className="flex flex-col gap-0.5 mt-1">
+                                        <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                            <Calendar className="w-3 h-3" />
+                                            <span className={isDone ? 'text-emerald-500/70' : 'text-slate-600'}>
+                                                {formatDateNice(displayTargetDate)}
+                                            </span>
+                                            <Repeat className="w-3 h-3 ml-1" />
+                                            <span>{protocol.frequency === 'specific_days' ? 'Custom' : protocol.frequency}</span>
+                                            
+                                            {/* Importance & Complexity Icons */}
+                                            {protocol.importance !== 'low' && (
+                                                <div className={`flex items-center gap-0.5 ml-1 ${protocol.importance === 'high' ? 'text-red-500' : 'text-amber-500'}`}>
+                                                    <Flag className="w-3 h-3 fill-current" />
+                                                    <span className="text-[8px]">{protocol.importance}</span>
+                                                </div>
+                                            )}
+                                            {protocol.complexity !== 'low' && (
+                                                <div className={`flex items-center gap-0.5 ml-1 ${protocol.complexity === 'high' ? 'text-purple-500' : 'text-blue-500'}`}>
+                                                    <Zap className="w-3 h-3 fill-current" />
+                                                    <span className="text-[8px]">{protocol.complexity}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {displayTime && (
+                                            <div className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-tighter">
+                                                <Clock className="w-2.5 h-2.5" />
+                                                <span>{displayTime}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
 
                             {/* Stats & Actions */}
                             <div className="flex items-center gap-3 shrink-0">
@@ -411,13 +550,13 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
                             </div>
                         </div>
                     </div>
-                ))}
+                );})}
             </div>
 
             {/* Add/Edit Modal */}
             {isAdding && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-md bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-3xl shadow-2xl p-8">
+                    <div className="w-full max-w-md bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-3xl shadow-2xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-lg font-black text-slate-800 uppercase tracking-wider">
                                 {editingId ? 'Edit Routine' : 'New Routine'}
@@ -446,12 +585,11 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
                                         onChange={e => setFormData({ ...formData, frequency: e.target.value })}
                                     >
                                         <option value="daily">Daily</option>
-                                        <option value="weekly">Weekly</option>
                                         <option value="monthly">Monthly</option>
                                         <option value="specific_days">Specific Days</option>
                                     </select>
                                 </div>
-                                {formData.frequency !== 'specific_days' && (
+                                {(formData.frequency !== 'specific_days' || !formData.useDifferentTimes) && (
                                     <div>
                                         <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Time (Optional)</label>
                                         <input
@@ -463,6 +601,47 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
                                     </div>
                                 )}
                             </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Importance</label>
+                                    <select
+                                        className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500 transition-colors"
+                                        value={formData.importance}
+                                        onChange={e => setFormData({ ...formData, importance: e.target.value })}
+                                    >
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Complexity</label>
+                                    <select
+                                        className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500 transition-colors"
+                                        value={formData.complexity}
+                                        onChange={e => setFormData({ ...formData, complexity: e.target.value })}
+                                    >
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {formData.frequency === 'monthly' && (
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Day of Month</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="31"
+                                        className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500 transition-colors"
+                                        value={formData.monthlyDay}
+                                        onChange={e => setFormData({ ...formData, monthlyDay: parseInt(e.target.value) || 1 })}
+                                    />
+                                </div>
+                            )}
 
                             {isCalendarConnected && (
                                 <label className="flex items-center gap-3 cursor-pointer group p-3 bg-white shadow-sm border border-slate-200/50 rounded-xl border border-slate-200 hover:border-slate-300 transition-all">
@@ -488,13 +667,13 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
                                 <div className="space-y-4">
                                     <div>
                                         <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Active Days</label>
-                                        <div className="flex justify-between gap-1">
+                                        <div className="flex flex-wrap justify-between gap-1">
                                             {daysOfWeek.map(day => (
                                                 <button
                                                     key={day.id}
                                                     type="button"
                                                     onClick={() => toggleDay(day.id)}
-                                                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${formData.specificDays.includes(day.id)
+                                                    className={`w-10 h-10 rounded-lg text-xs font-bold transition-all ${formData.specificDays.includes(day.id)
                                                         ? 'bg-blue-600 text-slate-800'
                                                         : 'bg-white shadow-sm border border-slate-200 text-slate-500 hover:bg-slate-200'
                                                         }`}
@@ -506,24 +685,36 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
                                     </div>
 
                                     {formData.specificDays.length > 0 && (
-                                        <div>
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Time per Day</label>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {formData.specificDays.sort().map(dayId => (
-                                                    <div key={dayId} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                                                        <span className="text-xs font-bold w-8 text-slate-600">{daysOfWeek[dayId].short}</span>
-                                                        <input
-                                                            type="time"
-                                                            className="flex-1 bg-white border border-slate-300 rounded p-1 text-xs outline-none text-slate-800"
-                                                            value={formData.specificTimes?.[dayId] || ''}
-                                                            onChange={e => setFormData({
-                                                                ...formData,
-                                                                specificTimes: { ...(formData.specificTimes || {}), [dayId]: e.target.value }
-                                                            })}
-                                                        />
-                                                    </div>
-                                                ))}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase">Schedule</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, useDifferentTimes: !formData.useDifferentTimes })}
+                                                    className="text-[9px] font-black uppercase tracking-widest text-blue-600 hover:underline"
+                                                >
+                                                    {formData.useDifferentTimes ? 'Set Same Time' : 'Set Different Times'}
+                                                </button>
                                             </div>
+
+                                            {formData.useDifferentTimes && (
+                                                <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 max-h-40 overflow-y-auto">
+                                                    {formData.specificDays.sort((a,b) => a-b).map(dayId => (
+                                                        <div key={dayId} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
+                                                            <span className="text-xs font-black w-6 text-slate-600">{daysOfWeek[dayId].short}</span>
+                                                            <input
+                                                                type="time"
+                                                                className="flex-1 bg-transparent text-xs outline-none text-slate-800"
+                                                                value={formData.specificTimes?.[dayId] || ''}
+                                                                onChange={e => setFormData({
+                                                                    ...formData,
+                                                                    specificTimes: { ...(formData.specificTimes || {}), [dayId]: e.target.value }
+                                                                })}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
