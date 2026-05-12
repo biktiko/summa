@@ -24,6 +24,38 @@ const loadGisScript = () => {
     });
 };
 
+const TOKEN_KEY = 'google_calendar_token';
+
+const saveToken = (tokenResponse) => {
+    if (tokenResponse && tokenResponse.access_token) {
+        const expirationTime = Date.now() + (tokenResponse.expires_in * 1000);
+        const tokenData = {
+            ...tokenResponse,
+            expires_at: expirationTime
+        };
+        localStorage.setItem(TOKEN_KEY, JSON.stringify(tokenData));
+        localStorage.setItem('google_calendar_authorized', 'true');
+    }
+};
+
+const getPersistedToken = () => {
+    const tokenStr = localStorage.getItem(TOKEN_KEY);
+    if (!tokenStr) return null;
+    
+    try {
+        const tokenData = JSON.parse(tokenStr);
+        // Check if token is still valid (with 5 min buffer)
+        if (tokenData.expires_at > Date.now() + 300000) {
+            return tokenData;
+        } else {
+            localStorage.removeItem(TOKEN_KEY);
+        }
+    } catch (e) {
+        localStorage.removeItem(TOKEN_KEY);
+    }
+    return null;
+};
+
 // Keep track of initialization state
 let isInitialized = false;
 let initPromise = null;
@@ -70,9 +102,24 @@ export const initGoogleCalendar = async () => {
                 callback: (tokenResponse) => {
                     if (tokenResponse && tokenResponse.access_token) {
                         gapi.client.setToken(tokenResponse);
+                        saveToken(tokenResponse);
                     }
                 },
             });
+
+            // 6. Restore token or refresh silently
+            const savedToken = getPersistedToken();
+            if (savedToken) {
+                gapi.client.setToken(savedToken);
+                console.log("Restored Google Calendar token from storage");
+            } else if (localStorage.getItem('google_calendar_authorized') === 'true') {
+                console.log("Attempting silent token refresh...");
+                try {
+                    tokenClient.requestAccessToken({ prompt: '' });
+                } catch (refreshError) {
+                    console.warn("Silent refresh failed", refreshError);
+                }
+            }
 
             console.log("Google Calendar API Initialized Successfully");
             isInitialized = true;
@@ -102,9 +149,11 @@ export const signInToGoogle = async () => {
         tokenClient.callback = (resp) => {
             if (resp.error !== undefined) {
                 reject(resp);
+                return;
             }
-            // Manually set the token for gapi
+            // Manually set the token for gapi and save it
             gapi.client.setToken(resp);
+            saveToken(resp);
             resolve(resp);
         };
 
@@ -130,7 +179,12 @@ export const signOutFromGoogle = () => {
     if (token !== null) {
         window.google.accounts.oauth2.revoke(token.access_token, () => {
             gapi.client.setToken('');
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem('google_calendar_authorized');
         });
+    } else {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem('google_calendar_authorized');
     }
 };
 

@@ -82,6 +82,7 @@ export const AuthProvider = ({ children }) => {
     const googleLogin = async () => {
         try {
             const provider = new GoogleAuthProvider();
+            provider.addScope('https://www.googleapis.com/auth/calendar.events');
             await signInWithPopup(auth, provider);
             return true;
         } catch (e) {

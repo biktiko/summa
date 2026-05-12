@@ -78,22 +78,22 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
             }
             if (!found) nextDate.setDate(baseDate.getDate() + 1);
         }
-        return nextDate.toISOString().split('T')[0];
+        return nextDate.toLocaleDateString('en-CA');
     };
 
     const getInitialTarget = (frequency, specificDays, monthlyDay) => {
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const today = new Date(todayStr);
         
         if (frequency === 'daily') return todayStr;
         if (frequency === 'monthly') {
             const targetThisMonth = new Date(today);
             targetThisMonth.setDate(monthlyDay || 1);
-            if (targetThisMonth.toISOString().split('T')[0] >= todayStr) return targetThisMonth.toISOString().split('T')[0];
+            if (targetThisMonth.toLocaleDateString('en-CA') >= todayStr) return targetThisMonth.toLocaleDateString('en-CA');
             const targetNextMonth = new Date(today);
             targetNextMonth.setMonth(today.getMonth() + 1);
             targetNextMonth.setDate(monthlyDay || 1);
-            return targetNextMonth.toISOString().split('T')[0];
+            return targetNextMonth.toLocaleDateString('en-CA');
         }
         if (frequency === 'specific_days') {
             if (specificDays.includes(today.getDay())) return todayStr;
@@ -138,8 +138,7 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
 
     useEffect(() => {
         const checkResets = async () => {
-            const now = new Date();
-            const today = now.toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA');
 
             for (const p of protocols || []) {
                 const targetDate = p.targetDate || today;
@@ -156,6 +155,7 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
                 else if (today > targetDate) {
                     // Missed task penalty?
                     if (lastDate !== targetDate && p.streak > 0) {
+                        console.log(`[Protocol] Penalty for ${p.title}: Today(${today}) > Target(${targetDate})`);
                         if (processTask) await processTask({ xpReward: -5 });
                         await actions.update(p.id, { streak: 0 });
                     }
@@ -172,6 +172,7 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
                         ? getInitialTarget(p.frequency, p.specificDays, p.monthlyDay)
                         : getNextOccurrence(targetDate, p.frequency, p.specificDays, p.monthlyDay);
                     
+                    console.log(`[Protocol] Advancing ${p.title}: ${targetDate} -> ${nextDate}`);
                     await actions.update(p.id, { 
                         targetDate: nextDate,
                         isCompleted: lastDate === nextDate
@@ -448,7 +449,8 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
 
                 {moduleProtocols.map(protocol => {
                     const isDone = protocol.lastCompletedDate === protocol.targetDate;
-                    const displayTargetDate = protocol.targetDate || new Date().toISOString().split('T')[0];
+                    const todayStr = new Date().toLocaleDateString('en-CA');
+                    const displayTargetDate = protocol.targetDate || todayStr;
                     const protocolDay = new Date(displayTargetDate).getDay();
                     const displayTime = (protocol.frequency === 'specific_days' && protocol.useDifferentTimes && protocol.specificTimes?.[protocolDay]) 
                         ? protocol.specificTimes[protocolDay] 
