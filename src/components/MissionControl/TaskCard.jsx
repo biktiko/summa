@@ -14,7 +14,7 @@ const TAG_COLORS = [
     { name: 'Gray', value: 'bg-neutral-500 text-white' },
 ];
 
-export const TaskCard = ({ task, viewMode, displayMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings, suggestedTags, index }) => {
+export const TaskCard = ({ task, viewMode, displayMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings, suggestedTags, index, isCalendarConnected }) => {
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
     // Skip hidden tasks for guests
@@ -75,6 +75,7 @@ export const TaskCard = ({ task, viewMode, displayMode, editingId, editData, set
                     saveEdit={saveEdit}
                     setEditingId={setEditingId}
                     suggestedTags={suggestedTags}
+                    isCalendarConnected={isCalendarConnected}
                 />
             ) : displayMode === 'list' ? (
                 <div className="flex items-center justify-between w-full h-8 md:h-10 px-1 md:px-2">

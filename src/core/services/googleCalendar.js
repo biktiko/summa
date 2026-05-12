@@ -145,21 +145,23 @@ export const signInToGoogle = async () => {
     }
 
     return new Promise((resolve, reject) => {
-        // Override the callback to handle the promise
         tokenClient.callback = (resp) => {
             if (resp.error !== undefined) {
+                console.error("GIS Sign-in Error:", resp);
                 reject(resp);
                 return;
             }
-            // Manually set the token for gapi and save it
             gapi.client.setToken(resp);
             saveToken(resp);
             resolve(resp);
         };
-
-        // Request access token (triggers popup)
         tokenClient.requestAccessToken({ prompt: 'consent' });
     });
+};
+
+export const initAndSignIn = async () => {
+    await initGoogleCalendar();
+    return await signInToGoogle();
 };
 
 export const getUserProfile = async () => {

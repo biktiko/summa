@@ -12,7 +12,7 @@ const TAG_COLORS = [
     { name: 'Gray', value: 'bg-neutral-500 text-white' },
 ];
 
-export const TaskEditModal = ({ task, editData, setEditData, saveEdit, setEditingId, suggestedTags }) => {
+export const TaskEditModal = ({ task, editData, setEditData, saveEdit, setEditingId, suggestedTags, isCalendarConnected }) => {
     const addTag = () => {
         if (editData.newTagText) {
             const newTag = {
@@ -110,7 +110,62 @@ export const TaskEditModal = ({ task, editData, setEditData, saveEdit, setEditin
                                 onChange={e => setEditData({ ...editData, deadline: e.target.value })}
                             />
                         </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Time</label>
+                            <input
+                                type="time"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
+                                value={editData.startTime || ''}
+                                onChange={e => setEditData({ ...editData, startTime: e.target.value })}
+                            />
+                        </div>
                     </div>
+
+                    {/* Google Calendar Sync Options (If Connected) */}
+                    {isCalendarConnected && (
+                        <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className="bg-blue-500/10 p-1.5 rounded-lg">
+                                        <Save className="w-4 h-4 text-blue-500" /> {/* Reusing Save icon as a placeholder for calendar if lucide-react Calendar not imported, but it is in TaskBoard. Wait, check imports in TaskEditModal */}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-wider">Google Calendar</span>
+                                        <span className="text-[9px] text-blue-400 font-bold">Sync this mission to your calendar</span>
+                                    </div>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        className="sr-only peer"
+                                        checked={editData.addToCalendar}
+                                        onChange={e => setEditData({ ...editData, addToCalendar: e.target.checked })}
+                                    />
+                                    <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+
+                            {editData.addToCalendar && (
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-3 border-t border-blue-100/50">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase">Notification:</span>
+                                    </div>
+                                    <select
+                                        className="flex-1 bg-white border border-blue-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
+                                        value={editData.reminderBefore}
+                                        onChange={e => setEditData({ ...editData, reminderBefore: parseInt(e.target.value) })}
+                                    >
+                                        <option value="5">5 minutes before</option>
+                                        <option value="10">10 minutes before</option>
+                                        <option value="15">15 minutes before</option>
+                                        <option value="30">30 minutes before</option>
+                                        <option value="60">1 hour before</option>
+                                        <option value="1440">1 day before</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Progress Tracking */}
                     <div className="space-y-2">

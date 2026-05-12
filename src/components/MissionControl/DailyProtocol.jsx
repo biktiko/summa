@@ -10,17 +10,31 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
     const [userEmail, setUserEmail] = useState('');
     const [itemToDelete, setItemToDelete] = useState(null);
 
-    // Filter and sort protocols for this specific module
-    const moduleProtocols = React.useMemo(() => {
+    // Group and sort protocols by category
+    const groupedProtocols = React.useMemo(() => {
+        const groups = {};
         const list = protocols ? [...protocols] : [];
-        list.sort((a, b) => {
-            const aDone = a.lastCompletedDate === a.targetDate;
-            const bDone = b.lastCompletedDate === b.targetDate;
-            if (aDone === bDone) return 0;
-            return aDone ? 1 : -1;
+        
+        list.forEach(p => {
+            const cat = p.category || 'General';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(p);
         });
-        return list;
+
+        // Sort each group (done at bottom)
+        Object.keys(groups).forEach(cat => {
+            groups[cat].sort((a, b) => {
+                const aDone = a.lastCompletedDate === a.targetDate;
+                const bDone = b.lastCompletedDate === b.targetDate;
+                if (aDone === bDone) return 0;
+                return aDone ? 1 : -1;
+            });
+        });
+
+        return groups;
     }, [protocols]);
+
+    const moduleProtocols = React.useMemo(() => protocols ? [...protocols] : [], [protocols]);
 
     const [formData, setFormData] = useState({
         title: '',
@@ -35,6 +49,7 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
         xpReward: 10,
         coinReward: 5,
         description: '',
+        category: '', // New field
         addToCalendar: true
     });
 
@@ -219,16 +234,18 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
 
             if (existingProtocol.googleEventId && isCalendarConnected) {
                  try {
-                    const today = new Date();
-                    let updateTime = today;
-                    if (formData.time) {
-                        const [hours, minutes] = formData.time.split(':');
-                        updateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-                    }
+                    const targetDate = existingProtocol.targetDate || new Date().toISOString().split('T')[0];
+                    const [y, m, d] = targetDate.split('-').map(Number);
+                    const startDate = new Date(y, m - 1, d);
+                    
+                    const timeStr = formData.time || '09:00';
+                    const [hours, minutes] = timeStr.split(':');
+                    startDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
                      const eventUpdate = createEventObject(
                         `${formData.title} [Routine]`,
-                        `Routine: ${formData.description || ''}\nFrequency: ${formData.frequency}`,
-                        updateTime,
+                        `Routine: ${formData.description || ''}\nFrequency: ${formData.frequency}\nCategory: ${formData.category || 'General'}`,
+                        startDate,
                         30
                     );
                     await updateEvent(existingProtocol.googleEventId, eventUpdate);
@@ -248,25 +265,30 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
             };
 
             let googleEventId = null;
-            if (isCalendarConnected && formData.time && formData.addToCalendar) {
+            if (isCalendarConnected && formData.addToCalendar) {
                  try {
-                    const today = new Date();
-                    const [hours, minutes] = formData.time.split(':');
-                    today.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                    const [y, m, d] = initialTarget.split('-').map(Number);
+                    const startDate = new Date(y, m - 1, d);
+                    
+                    const timeStr = formData.time || '09:00';
+                    const [hours, minutes] = timeStr.split(':');
+                    startDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
                     let recurrence = [];
-                    if (formData.frequency === 'daily') recurrence.push('RRULE:FREQ=DAILY');
-                    else if (formData.frequency === 'monthly') recurrence.push('RRULE:FREQ=MONTHLY');
-                    else if (formData.frequency === 'specific_days' && formData.specificDays.length > 0) {
+                    if (formData.frequency === 'daily') {
+                        recurrence.push('RRULE:FREQ=DAILY');
+                    } else if (formData.frequency === 'monthly') {
+                        recurrence.push('RRULE:FREQ=MONTHLY');
+                    } else if (formData.frequency === 'specific_days' && formData.specificDays.length > 0) {
                         const daysMap = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-                        const byDay = formData.specificDays.map(d => daysMap[d]).join(',');
+                        const byDay = formData.specificDays.map(dayIdx => daysMap[dayIdx]).join(',');
                         recurrence.push(`RRULE:FREQ=WEEKLY;BYDAY=${byDay}`);
                     }
 
                     const event = createEventObject(
                         `${formData.title} [Routine]`,
-                        `Routine: ${formData.description || ''}\nFrequency: ${formData.frequency}`,
-                        today,
+                        `Routine: ${formData.description || ''}\nFrequency: ${formData.frequency}\nCategory: ${formData.category || 'General'}`,
+                        startDate,
                         30, 
                         [],
                         { recurrence }
@@ -311,6 +333,7 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
             xpReward: 10,
             coinReward: 5,
             description: '',
+            category: '',
             addToCalendar: true
         });
         setIsAdding(false);
@@ -331,6 +354,7 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
             xpReward: item.xpReward || 10,
             coinReward: item.coinReward || 5,
             description: item.description || '',
+            category: item.category || '',
             addToCalendar: item.addToCalendar ?? true
         });
         setEditingId(item.id);
@@ -414,6 +438,22 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
         }
     };
 
+    const getStreakStyle = (streak) => {
+        const s = streak || 0;
+        // Saturation goes from 40% to 100%, Lightness goes from 70% to 40% (darker/intense)
+        const intensity = Math.min(1, s / 20); // Max at 20 days
+        const saturation = 40 + (intensity * 60);
+        const lightness = 65 - (intensity * 25);
+        const color = `hsl(35, ${saturation}%, ${lightness}%)`;
+        
+        return {
+            color: color,
+            backgroundColor: `hsla(35, ${saturation}%, ${lightness}%, 0.1)`,
+            borderColor: `hsla(35, ${saturation}%, ${lightness}%, 0.2)`,
+            boxShadow: s >= 7 ? `0 0 ${Math.min(15, s)}px hsla(35, ${saturation}%, ${lightness}%, 0.3)` : 'none'
+        };
+    };
+
     if (isSectionHidden && viewMode !== 'admin') return null;
 
     return (
@@ -441,118 +481,133 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
             </div>
 
             <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
-                {moduleProtocols.length === 0 && !isAdding && (
+                {Object.keys(groupedProtocols).length === 0 && !isAdding && (
                     <div className="text-center py-12 border border-dashed border-slate-300 rounded-xl">
                         <p className="text-slate-500 text-sm">No active protocols initialized.</p>
                     </div>
                 )}
 
-                {moduleProtocols.map(protocol => {
-                    const isDone = protocol.lastCompletedDate === protocol.targetDate;
-                    const todayStr = new Date().toLocaleDateString('en-CA');
-                    const displayTargetDate = protocol.targetDate || todayStr;
-                    const protocolDay = new Date(displayTargetDate).getDay();
-                    const displayTime = (protocol.frequency === 'specific_days' && protocol.useDifferentTimes && protocol.specificTimes?.[protocolDay]) 
-                        ? protocol.specificTimes[protocolDay] 
-                        : protocol.time;
+                {Object.entries(groupedProtocols).map(([category, items]) => (
+                    <div key={category} className="space-y-3">
+                        <div className="flex items-center gap-3 pt-4 pb-1">
+                            <div className="h-px flex-1 bg-slate-200" />
+                            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{category}</h5>
+                            <div className="h-px flex-1 bg-slate-200" />
+                        </div>
+                        
+                        {items.map(protocol => {
+                            const isDone = protocol.lastCompletedDate === protocol.targetDate;
+                            const todayStr = new Date().toLocaleDateString('en-CA');
+                            const displayTargetDate = protocol.targetDate || todayStr;
+                            const protocolDay = new Date(displayTargetDate).getDay();
+                            const displayTime = (protocol.frequency === 'specific_days' && protocol.useDifferentTimes && protocol.specificTimes?.[protocolDay]) 
+                                ? protocol.specificTimes[protocolDay] 
+                                : protocol.time;
+                            
+                            const streakStyle = getStreakStyle(protocol.streak);
 
-                    return (
-                        <div
-                            key={protocol.id}
-                            className={`group relative p-3 rounded-2xl border transition-all ${isDone
-                                ? 'bg-emerald-900/10 border-emerald-500/20'
-                                : 'bg-white shadow-sm border border-slate-200/40 border-slate-200 hover:border-blue-500/30'
-                                }`}
-                        >
-                             <div className="flex items-center gap-4">
-                                 {/* Check Button */}
-                                 <button
-                                    onClick={() => handleComplete(protocol)}
-                                    disabled={viewMode === 'guest'}
-                                    className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shrink-0 ${isDone
-                                        ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                                        : 'bg-white shadow-sm border border-neutral-700 hover:border-blue-500 text-slate-500 hover:text-blue-500'
+                            return (
+                                <div
+                                    key={protocol.id}
+                                    className={`group relative p-3 rounded-2xl border transition-all ${isDone
+                                        ? 'bg-emerald-900/10 border-emerald-500/20'
+                                        : 'bg-white shadow-sm border border-slate-200/40 border-slate-200 hover:border-blue-500/30'
                                         }`}
                                 >
-                                    <CheckCircle2 className="w-6 h-6" />
-                                </button>
-
-                                {/* Content */}
-                                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                    <h4 className={`font-bold text-base truncate transition-all ${isDone ? 'text-emerald-500 line-through opacity-70' : 'text-slate-700'}`}>
-                                        {protocol.title}
-                                    </h4>
-                                    <div className="flex flex-col gap-0.5 mt-1">
-                                        <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                                            <Calendar className="w-3 h-3" />
-                                            <span className={isDone ? 'text-emerald-500/70' : 'text-slate-600'}>
-                                                {formatDateNice(displayTargetDate)}
-                                            </span>
-                                            <Repeat className="w-3 h-3 ml-1" />
-                                            <span>{protocol.frequency === 'specific_days' ? 'Custom' : protocol.frequency}</span>
-                                            
-                                            {/* Importance & Complexity Icons */}
-                                            {protocol.importance !== 'low' && (
-                                                <div className={`flex items-center gap-0.5 ml-1 ${protocol.importance === 'high' ? 'text-red-500' : 'text-amber-500'}`}>
-                                                    <Flag className="w-3 h-3 fill-current" />
-                                                    <span className="text-[8px]">{protocol.importance}</span>
-                                                </div>
-                                            )}
-                                            {protocol.complexity !== 'low' && (
-                                                <div className={`flex items-center gap-0.5 ml-1 ${protocol.complexity === 'high' ? 'text-purple-500' : 'text-blue-500'}`}>
-                                                    <Zap className="w-3 h-3 fill-current" />
-                                                    <span className="text-[8px]">{protocol.complexity}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                        {displayTime && (
-                                            <div className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-tighter">
-                                                <Clock className="w-2.5 h-2.5" />
-                                                <span>{displayTime}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                            {/* Stats & Actions */}
-                            <div className="flex items-center gap-3 shrink-0">
-                                
-                                {/* Streak */}
-                                <div className="flex items-center gap-1.5 px-2">
-                                    {protocol.streak >= 8 && <span className="text-2xl drop-shadow-md">🔥</span>}
-                                    <div className="flex flex-col items-start leading-none">
-                                        <span className="text-sm font-black text-amber-600">{protocol.streak || 0}</span>
-                                        <span className="text-[7px] font-bold text-yellow-600 uppercase tracking-tighter">Day Streak</span>
-                                    </div>
-                                </div>
-                                
-                                {/* Divider */}
-                                <div className="w-px h-8 bg-slate-50 mx-1 hidden sm:block" />
-
-                                {/* XP Reward */}
-                                <div className="text-xs font-black text-blue-500 tabular-nums bg-blue-500/10 px-2 py-1 rounded hidden sm:block">
-                                    +{5 + Math.max(0, (protocol.streak || 0))} XP
-                                </div>
-                                {/* Mobile XP (Compact) */}
-                                <div className="text-[10px] font-bold text-blue-500 sm:hidden">
-                                     +{5 + Math.max(0, (protocol.streak || 0))} XP
-                                </div>
-
-
-                                {viewMode === 'admin' && (
-                                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity ml-2 absolute top-2 right-2 md:static">
-                                        <button onClick={() => startEdit(protocol)} className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600">
-                                            <Edit2 className="w-3 h-3" />
+                                     <div className="flex items-center gap-4">
+                                         {/* Check Button ... */}
+                                         <button
+                                            onClick={() => handleComplete(protocol)}
+                                            disabled={viewMode === 'guest'}
+                                            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shrink-0 ${isDone
+                                                ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                                                : 'bg-white shadow-sm border border-neutral-700 hover:border-blue-500 text-slate-500 hover:text-blue-500'
+                                                }`}
+                                        >
+                                            <CheckCircle2 className="w-6 h-6" />
                                         </button>
-                                        <button onClick={() => setItemToDelete(protocol.id)} className="p-1 hover:bg-red-500/10 rounded text-slate-500 hover:text-red-500">
-                                             <Trash2 className="w-3 h-3" />
-                                         </button>
-                                     </div>
-                                 )}
+
+                                        {/* Content */}
+                                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                            <h4 className={`font-bold text-base truncate transition-all ${isDone ? 'text-emerald-500 line-through opacity-70' : 'text-slate-700'}`}>
+                                                {protocol.title}
+                                            </h4>
+                                            <div className="flex flex-col gap-0.5 mt-1">
+                                                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                                    <Calendar className="w-3 h-3" />
+                                                    <span className={isDone ? 'text-emerald-500/70' : 'text-slate-600'}>
+                                                        {formatDateNice(displayTargetDate)}
+                                                    </span>
+                                                    <Repeat className="w-3 h-3 ml-1" />
+                                                    <span>{protocol.frequency === 'specific_days' ? 'Custom' : protocol.frequency}</span>
+                                                    
+                                                    {protocol.importance !== 'low' && (
+                                                        <div className={`flex items-center gap-0.5 ml-1 ${protocol.importance === 'high' ? 'text-red-500' : 'text-amber-500'}`}>
+                                                            <Flag className="w-3 h-3 fill-current" />
+                                                            <span className="text-[8px]">{protocol.importance}</span>
+                                                        </div>
+                                                    )}
+                                                    {protocol.complexity !== 'low' && (
+                                                        <div className={`flex items-center gap-0.5 ml-1 ${protocol.complexity === 'high' ? 'text-purple-500' : 'text-blue-500'}`}>
+                                                            <Zap className="w-3 h-3 fill-current" />
+                                                            <span className="text-[8px]">{protocol.complexity}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {displayTime && (
+                                                    <div className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-tighter">
+                                                        <Clock className="w-2.5 h-2.5" />
+                                                        <span>{displayTime}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                    {/* Stats & Actions */}
+                                    <div className="flex items-center gap-3 shrink-0">
+                                        
+                                        {/* Streak with Dynamic Style */}
+                                        <div 
+                                            className="flex items-center gap-1.5 px-3 py-1 rounded-xl border transition-all duration-500"
+                                            style={{ 
+                                                color: streakStyle.color,
+                                                backgroundColor: streakStyle.backgroundColor,
+                                                borderColor: streakStyle.borderColor,
+                                                boxShadow: streakStyle.boxShadow
+                                            }}
+                                        >
+                                            {protocol.streak >= 7 && <span className="text-lg animate-pulse" style={{ filter: `saturate(${Math.min(200, 100 + (protocol.streak || 0) * 5)}%)` }}>🔥</span>}
+                                            <div className="flex flex-col items-start leading-none">
+                                                <span className="text-sm font-black" style={{ color: streakStyle.color }}>{protocol.streak || 0}</span>
+                                                <span className="text-[7px] font-black uppercase tracking-tighter opacity-70">Streak</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="w-px h-8 bg-slate-50 mx-1 hidden sm:block" />
+
+                                        <div className="text-xs font-black text-blue-500 tabular-nums bg-blue-500/10 px-2 py-1 rounded hidden sm:block">
+                                            +{5 + Math.max(0, (protocol.streak || 0))} XP
+                                        </div>
+                                        <div className="text-[10px] font-bold text-blue-500 sm:hidden">
+                                             +{5 + Math.max(0, (protocol.streak || 0))} XP
+                                        </div>
+
+                                        {viewMode === 'admin' && (
+                                            <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity ml-2 absolute top-2 right-2 md:static">
+                                                <button onClick={() => startEdit(protocol)} className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600">
+                                                    <Edit2 className="w-3 h-3" />
+                                                </button>
+                                                <button onClick={() => setItemToDelete(protocol.id)} className="p-1 hover:bg-red-500/10 rounded text-slate-500 hover:text-red-500">
+                                                     <Trash2 className="w-3 h-3" />
+                                                 </button>
+                                             </div>
+                                         )}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        );})}
                     </div>
-                );})}
+                ))}
             </div>
 
             {/* Add/Edit Modal */}
@@ -567,15 +622,26 @@ const DailyProtocol = ({ protocols, actions, viewMode, processTask, isSectionHid
                         </div>
 
                         <form onSubmit={handleSave} className="space-y-6">
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Routine Name</label>
-                                <input
-                                    className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500 transition-colors"
-                                    value={formData.title}
-                                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                    placeholder="e.g. Morning Stretch"
-                                    autoFocus
-                                />
+                             <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Category</label>
+                                    <input
+                                        className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500 transition-colors"
+                                        value={formData.category}
+                                        onChange={e => setFormData({ ...formData, category: e.target.value })}
+                                        placeholder="e.g. Work, Health..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Routine Name</label>
+                                    <input
+                                        className="w-full bg-white shadow-sm border border-slate-200 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500 transition-colors"
+                                        value={formData.title}
+                                        onChange={e => setFormData({ ...formData, title: e.target.value })}
+                                        placeholder="e.g. Morning Stretch"
+                                        autoFocus
+                                    />
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

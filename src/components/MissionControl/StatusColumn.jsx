@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Maximize2, X, MoreVertical } from 'lucide-react';
 import { TaskCard } from './TaskCard';
 
-export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, displayMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings, suggestedTags }) => {
+export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, displayMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings, suggestedTags, isCalendarConnected }) => {
     const [page, setPage] = useState(0);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [isExpanded, setIsExpanded] = useState(false); // Windowed Mode State
@@ -79,6 +79,7 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, disp
                             toggleSubtask={toggleSubtask}
                             settings={settings}
                             suggestedTags={suggestedTags}
+                            isCalendarConnected={isCalendarConnected}
                             index={page * TASKS_PER_PAGE + index}
                         />
                     ))}
@@ -145,6 +146,7 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, disp
                                     toggleSubtask={toggleSubtask}
                                     settings={settings}
                                     suggestedTags={suggestedTags}
+                                    isCalendarConnected={isCalendarConnected}
                                     index={index}
                                 />
                             ))}
