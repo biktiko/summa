@@ -65,7 +65,7 @@ export const TaskCard = ({ task, viewMode, displayMode, editingId, editData, set
         <>
         <div 
             onClick={() => { if (editingId !== task.id) setIsDetailsOpen(true); }}
-            className={`group bg-white shadow-sm border border-slate-200 rounded-xl hover:border-blue-500/30 transition-all relative cursor-pointer ${task.isHidden ? 'opacity-60 border-red-900/30' : ''} ${displayMode === 'list' && editingId !== task.id ? 'p-1.5 md:p-2' : 'p-2 md:p-4'}`}
+            className={`group bg-white shadow-sm border border-slate-200 rounded-xl hover:border-blue-500/30 transition-all relative cursor-pointer break-inside-avoid ${task.isHidden ? 'opacity-60 border-red-900/30' : ''} ${displayMode === 'list' && editingId !== task.id ? 'p-1.5 md:p-2' : 'p-2 md:p-4'}`}
         >
             {editingId === task.id ? (
                 <TaskEditModal 

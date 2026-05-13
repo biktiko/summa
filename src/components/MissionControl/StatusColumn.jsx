@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Maximize2, X, MoreVertical } from 'lucide-react';
 import { TaskCard } from './TaskCard';
 
-export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, displayMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings, suggestedTags, isCalendarConnected }) => {
+export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, displayMode, editingId, editData, setEditData, startEdit, saveEdit, setEditingId, updateStatus, deleteTaskId, toggleSubtask, settings, suggestedTags, isCalendarConnected, span = 1 }) => {
     const [page, setPage] = useState(0);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [isExpanded, setIsExpanded] = useState(false); // Windowed Mode State
@@ -22,7 +22,7 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, disp
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isExpanded]);
 
-    const TASKS_PER_PAGE = isMobile ? 4 : (displayMode === 'list' ? (settings?.appearance?.listTasksPerPage || 20) : (settings?.appearance?.tasksPerPage || 6));
+    const TASKS_PER_PAGE = isMobile ? 4 : (displayMode === 'list' ? (settings?.appearance?.listTasksPerPage || 20) : (span > 1 ? (span === 3 ? 15 : 10) : (settings?.appearance?.tasksPerPage || 6)));
     const paginationEnabled = displayMode === 'list' ? (settings?.appearance?.listPaginationEnabled === true) : (settings?.appearance?.paginationEnabled !== false);
 
     let filteredTasks = moduleTasks.filter(t => t.status === status);
@@ -61,7 +61,8 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, disp
                     </div>
                 </div>
 
-                <div className={`space-y-2 md:space-y-3 overflow-y-auto flex-1 pr-1 md:pr-2 custom-scrollbar ${displayMode === 'list' ? 'space-y-1' : ''}`}>
+                {/* Apply CSS columns (Masonry) if spanning multiple columns */}
+                <div className={`overflow-y-auto flex-1 pr-1 md:pr-2 custom-scrollbar ${span > 1 ? `columns-1 ${span === 3 ? 'md:columns-3' : 'md:columns-2'} gap-3 [&>div]:mb-3` : `space-y-2 md:space-y-3 ${displayMode === 'list' ? 'space-y-1' : ''}`}`}>
                     {visibleTasks.map((task, index) => (
                         <TaskCard
                             key={task.id}

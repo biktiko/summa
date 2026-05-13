@@ -237,6 +237,14 @@ const TaskBoard = ({ tasks, actions, projectId, viewMode, processTask, isSection
     const [isCalendarConnected, setIsCalendarConnected] = useState(false);
     const [mobileColumnView, setMobileColumnView] = useState('todo'); // 'todo', 'in_progress', 'done', 'backlog'
     const [taskToDelete, setTaskToDelete] = useState(null);
+    const [showDone, setShowDone] = useState(() => {
+        const saved = localStorage.getItem('summa_task_show_done');
+        return saved ? JSON.parse(saved) : false;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('summa_task_show_done', JSON.stringify(showDone));
+    }, [showDone]);
 
     const handleConnectCalendar = async () => {
         try {
@@ -1189,78 +1197,106 @@ Link: ${taskToAdd.link || 'None'}
                     })}
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-6">
-                    {/* To Do Column */}
-                    <div className={`${mobileColumnView === 'todo' ? 'block' : 'hidden'} md:block flex-1`}>
-                        <StatusColumn
-                            title="To Do"
-                            status="todo"
-                            color="blue"
-                            moduleTasks={moduleTasks}
-                            viewMode={viewMode}
-                            displayMode={displayMode}
-                            editingId={editingId}
-                            editData={editData}
-                            setEditData={setEditData}
-                            startEdit={startEdit}
-                            saveEdit={saveEdit}
-                            setEditingId={setEditingId}
-                            updateStatus={updateStatus}
-                            deleteTaskId={deleteTaskId}
-                            toggleSubtask={toggleSubtask}
-                            settings={settings}
-                            suggestedTags={suggestedTags}
-                            isCalendarConnected={isCalendarConnected}
-                        />
-                    </div>
+                <div className="hidden md:flex justify-end mb-3">
+                    <button 
+                        onClick={() => setShowDone(!showDone)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${showDone ? 'bg-green-50 text-green-600 border border-green-200/50 hover:bg-green-100' : 'bg-white shadow-sm border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        {showDone ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        {showDone ? 'Hide Done' : 'Show Done'}
+                    </button>
+                </div>
 
-                    {/* In Progress Column */}
-                    <div className={`${mobileColumnView === 'in_progress' ? 'block' : 'hidden'} md:block flex-1`}>
-                         <StatusColumn
-                            title="In Progress"
-                            status="in_progress"
-                            color="yellow"
-                            moduleTasks={moduleTasks}
-                            viewMode={viewMode}
-                            displayMode={displayMode}
-                            editingId={editingId}
-                            editData={editData}
-                            setEditData={setEditData}
-                            startEdit={startEdit}
-                            saveEdit={saveEdit}
-                            setEditingId={setEditingId}
-                            updateStatus={updateStatus}
-                            deleteTaskId={deleteTaskId}
-                            toggleSubtask={toggleSubtask}
-                            settings={settings}
-                            suggestedTags={suggestedTags}
-                            isCalendarConnected={isCalendarConnected}
-                        />
-                    </div>
+                <div className="flex flex-col md:flex-row gap-6 items-start">
+                    {(() => {
+                        const hasInProgress = moduleTasks.some(t => t.status === 'in_progress');
+                        let todoSpan = 1;
+                        if (!showDone && !hasInProgress) todoSpan = 3;
+                        else if (!showDone && hasInProgress) todoSpan = 2;
+                        else if (showDone && !hasInProgress) todoSpan = 2;
+                        else todoSpan = 1;
 
-                    {/* Done Column */}
-                    <div className={`${mobileColumnView === 'done' ? 'block' : 'hidden'} md:block flex-1`}>
-                        <StatusColumn
-                            title="Done"
-                            status="done"
-                            color="green"
-                            moduleTasks={moduleTasks}
-                            viewMode={viewMode}
-                            displayMode={displayMode}
-                            editingId={editingId}
-                            editData={editData}
-                            setEditData={setEditData}
-                            startEdit={startEdit}
-                            saveEdit={saveEdit}
-                            setEditingId={setEditingId}
-                            updateStatus={updateStatus}
-                            deleteTaskId={deleteTaskId}
-                            toggleSubtask={toggleSubtask}
-                            settings={settings}
-                            suggestedTags={suggestedTags}
-                            isCalendarConnected={isCalendarConnected}
-                        />
-                    </div>
+                        return (
+                            <>
+                                {/* To Do Column */}
+                                <div className={`${mobileColumnView === 'todo' ? 'block' : 'hidden'} md:block ${todoSpan === 3 ? 'flex-[3]' : todoSpan === 2 ? 'flex-[2]' : 'flex-1'} transition-all`}>
+                                    <StatusColumn
+                                        title="To Do"
+                                        status="todo"
+                                        color="blue"
+                                        moduleTasks={moduleTasks}
+                                        viewMode={viewMode}
+                                        displayMode={displayMode}
+                                        editingId={editingId}
+                                        editData={editData}
+                                        setEditData={setEditData}
+                                        startEdit={startEdit}
+                                        saveEdit={saveEdit}
+                                        setEditingId={setEditingId}
+                                        updateStatus={updateStatus}
+                                        deleteTaskId={deleteTaskId}
+                                        toggleSubtask={toggleSubtask}
+                                        settings={settings}
+                                        suggestedTags={suggestedTags}
+                                        isCalendarConnected={isCalendarConnected}
+                                        span={todoSpan}
+                                    />
+                                </div>
+
+                                {/* In Progress Column */}
+                                {hasInProgress && (
+                                    <div className={`${mobileColumnView === 'in_progress' ? 'block' : 'hidden'} md:block flex-1 transition-all`}>
+                                         <StatusColumn
+                                            title="In Progress"
+                                            status="in_progress"
+                                            color="yellow"
+                                            moduleTasks={moduleTasks}
+                                            viewMode={viewMode}
+                                            displayMode={displayMode}
+                                            editingId={editingId}
+                                            editData={editData}
+                                            setEditData={setEditData}
+                                            startEdit={startEdit}
+                                            saveEdit={saveEdit}
+                                            setEditingId={setEditingId}
+                                            updateStatus={updateStatus}
+                                            deleteTaskId={deleteTaskId}
+                                            toggleSubtask={toggleSubtask}
+                                            settings={settings}
+                                            suggestedTags={suggestedTags}
+                                            isCalendarConnected={isCalendarConnected}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Done Column */}
+                                {showDone && (
+                                    <div className={`${mobileColumnView === 'done' ? 'block' : 'hidden'} md:block flex-1 transition-all`}>
+                                        <StatusColumn
+                                            title="Done"
+                                            status="done"
+                                            color="green"
+                                            moduleTasks={moduleTasks}
+                                            viewMode={viewMode}
+                                            displayMode={displayMode}
+                                            editingId={editingId}
+                                            editData={editData}
+                                            setEditData={setEditData}
+                                            startEdit={startEdit}
+                                            saveEdit={saveEdit}
+                                            setEditingId={setEditingId}
+                                            updateStatus={updateStatus}
+                                            deleteTaskId={deleteTaskId}
+                                            toggleSubtask={toggleSubtask}
+                                            settings={settings}
+                                            suggestedTags={suggestedTags}
+                                            isCalendarConnected={isCalendarConnected}
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        );
+                    })()}
                 </div>
             </div>
 
