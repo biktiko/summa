@@ -29,25 +29,25 @@ const TasksModule = ({
                <div className="flex bg-white shadow-sm border border-slate-200/50 p-1 rounded-lg border border-slate-200 overflow-x-auto no-scrollbar w-full md:w-auto">
                     <button
                         onClick={() => setTab('protocol')}
-                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${currentTab === 'protocol' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}
+                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${currentTab === 'protocol' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}
                     >
                         Routine
                     </button>
                     <button
                         onClick={() => setTab('missions')}
-                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${currentTab === 'missions' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}
+                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${currentTab === 'missions' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}
                     >
                          Tasks
                     </button>
                     <button
                         onClick={() => setTab('projects')}
-                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${currentTab === 'projects' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}
+                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${currentTab === 'projects' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}
                     >
                          Projects
                     </button>
                     <button
                         onClick={() => setTab('goals')}
-                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${currentTab === 'goals' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}
+                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${currentTab === 'goals' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}
                     >
                          Strategic
                     </button>

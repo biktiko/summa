@@ -62,7 +62,7 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, disp
                 </div>
 
                 {/* Apply CSS columns (Masonry) if spanning multiple columns */}
-                <div className={`overflow-y-auto flex-1 pr-1 md:pr-2 custom-scrollbar ${span > 1 ? `columns-1 ${span === 3 ? 'md:columns-3' : 'md:columns-2'} gap-3 [&>div]:mb-3` : `space-y-2 md:space-y-3 ${displayMode === 'list' ? 'space-y-1' : ''}`}`}>
+                <div className={`overflow-y-auto flex-1 pr-1 md:pr-2 pb-24 md:pb-4 custom-scrollbar ${span > 1 ? `columns-1 ${span === 3 ? 'md:columns-3' : 'md:columns-2'} gap-3 [&>div]:mb-3` : `space-y-2 md:space-y-3 ${displayMode === 'list' ? 'space-y-1' : ''}`}`}>
                     {visibleTasks.map((task, index) => (
                         <TaskCard
                             key={task.id}

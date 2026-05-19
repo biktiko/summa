@@ -1207,7 +1207,7 @@ Link: ${taskToAdd.link || 'None'}
                     </button>
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-6 items-start">
+                <div className="flex flex-col md:flex-row gap-6 w-full md:items-start">
                     {(() => {
                         const hasInProgress = moduleTasks.some(t => t.status === 'in_progress');
                         let todoSpan = 1;

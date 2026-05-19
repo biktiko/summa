@@ -17,10 +17,25 @@ const CustomTooltip = ({ active, payload, label, selectedDate, getMonthLabel, fo
         const filteredPayload = payload.filter(p => Number(p.value) > 0);
         if (filteredPayload.length === 0) return null;
         
+        const fullDateVal = payload[0]?.payload?.fullDate;
+        let headerLabel = label;
+        if (fullDateVal) {
+            const dateObj = new Date(fullDateVal);
+            if (!isNaN(dateObj.getTime())) {
+                if (fullDateVal.length === 7) {
+                    headerLabel = dateObj.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+                } else {
+                    headerLabel = dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                }
+            }
+        } else {
+            headerLabel = (getMonthLabel && selectedDate) ? `${getMonthLabel(selectedDate)} ${label}` : label;
+        }
+        
         return (
             <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl shadow-xl text-xs text-white max-w-[280px]">
                 <p className="font-bold mb-2 uppercase tracking-wider text-[10px] text-slate-400">
-                    {getMonthLabel ? getMonthLabel(selectedDate) : ''} {label}
+                    {headerLabel}
                 </p>
                 <div className="space-y-1.5 max-h-[250px] overflow-y-auto pr-1 no-scrollbar">
                     {filteredPayload.map((p, idx) => (
@@ -77,6 +92,7 @@ const BudgetRow = ({ item, isExpense, actualAmount = 0, onEdit, onDelete, curren
     let statusText = '';
     let statusColor = '';
     let progressColor = item.color || (isExpense ? '#ef4444' : '#10b981');
+    const space = currencySymbol === '֏' ? '\u00a0' : '';
     
     if (plannedMonthly === 0) {
         statusText = 'Unplanned';
@@ -85,7 +101,7 @@ const BudgetRow = ({ item, isExpense, actualAmount = 0, onEdit, onDelete, curren
         progressColor = item.color || '#94a3b8';
     } else if (isExpense) {
         if (percent > 100) {
-            statusText = `Overbudget by ${currencySymbol}${(actualAmount - plannedMonthly).toLocaleString(undefined, {maximumFractionDigits:0})}`;
+            statusText = `Overbudget by ${currencySymbol}${space}${(actualAmount - plannedMonthly).toLocaleString(undefined, {maximumFractionDigits:0})}`;
             statusColor = 'text-red-500';
             progressColor = '#ef4444'; // Red alert
         } else {
@@ -121,7 +137,7 @@ const BudgetRow = ({ item, isExpense, actualAmount = 0, onEdit, onDelete, curren
             <div className="md:col-span-3 text-slate-800 font-bold hidden md:block pl-4 border-l border-slate-200/60">
                 <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Budget Limit</div>
                 {plannedMonthly > 0 ? (
-                    <div className="text-sm">{currencySymbol}{plannedMonthly.toLocaleString(undefined, {maximumFractionDigits:0})} <span className="text-[10px] text-slate-400 font-normal">/ mo</span></div>
+                    <div className="text-sm">{currencySymbol}{space}{plannedMonthly.toLocaleString(undefined, {maximumFractionDigits:0})} <span className="text-[10px] text-slate-400 font-normal">/ mo</span></div>
                 ) : (
                     <div className="text-sm italic text-slate-400">Not set</div>
                 )}
@@ -130,7 +146,7 @@ const BudgetRow = ({ item, isExpense, actualAmount = 0, onEdit, onDelete, curren
             <div className="md:col-span-6 flex flex-col justify-center pr-8 md:pr-12">
                 <div className="flex justify-between items-end mb-1.5 text-[10px] uppercase font-bold tracking-wider">
                     <div className="text-slate-500">
-                        Actual: <span className="text-slate-800 text-xs">{currencySymbol}{actualAmount.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
+                        Actual: <span className="text-slate-800 text-xs">{currencySymbol}{space}{actualAmount.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
                     </div>
                     <div className={statusColor}>
                         {statusText}
@@ -174,15 +190,50 @@ const FinanceModule = ({
     const [isAddingTransaction, setIsAddingTransaction] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [analyticsSource, setAnalyticsSource] = useState('actual'); // 'actual' | 'budget'
+    const [dateFilterType, setDateFilterType] = useState('month'); // 'month' | 'all' | 'custom'
+    const [customStartDate, setCustomStartDate] = useState('');
+    const [customEndDate, setCustomEndDate] = useState('');
 
     // Currency Persistence
     const currentCurrencyCode = userData.gameplaySettings?.currency || 'AMD';
     const setCurrency = (code) => updateUser({ gameplaySettings: { ...userData.gameplaySettings, currency: code } });
     const currencySymbol = CURRENCIES[currentCurrencyCode]?.symbol || '֏';
-    const formatMoney = (amount) => `${currencySymbol}${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    
+    const getLocalYYYYMMDD = (dateOrStr) => {
+        const d = dateOrStr ? new Date(dateOrStr) : new Date();
+        if (isNaN(d.getTime())) return '';
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    };
 
-    // --- Helpers ---
+    const formatMoney = (amount) => {
+        const val = Number(amount);
+        const absVal = Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        const space = currencySymbol === '֏' ? '\u00a0' : '';
+        if (val < 0) {
+            return `-${currencySymbol}${space}${absVal}`;
+        }
+        return `${currencySymbol}${space}${absVal}`;
+    };
+
     const getMonthLabel = (date) => date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    const getDateRangeLabel = () => {
+        if (dateFilterType === 'month') {
+            return getMonthLabel(selectedDate);
+        }
+        if (dateFilterType === 'all') {
+            return 'All Time';
+        }
+        if (dateFilterType === 'custom') {
+            const formatD = (dStr) => {
+                if (!dStr) return '?';
+                const d = new Date(dStr);
+                return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+            };
+            return `${formatD(customStartDate)} - ${formatD(customEndDate)}`;
+        }
+        return '';
+    };
     const adjustMonth = (delta) => {
         const newDate = new Date(selectedDate);
         newDate.setMonth(newDate.getMonth() + delta);
@@ -219,7 +270,7 @@ const FinanceModule = ({
         accountId: '',
         toAccountId: '',
         description: '',
-        date: new Date().toISOString().split('T')[0]
+        date: getLocalYYYYMMDD()
     });
 
     // --- Data Processing (Month-Aware) ---
@@ -243,13 +294,42 @@ const FinanceModule = ({
         return selectedAnalyticAccounts;
     }, [filterAccountsList, selectedAnalyticAccounts]);
     
-    const currentMonthKey = selectedDate.toISOString().slice(0, 7); // "YYYY-MM"
+    const resolvedDateRange = useMemo(() => {
+        let start = new Date();
+        let end = new Date();
+        
+        if (dateFilterType === 'month') {
+            start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+            end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        } else if (dateFilterType === 'all') {
+            const dates = transactions.map(t => new Date(t.createdAt)).filter(d => !isNaN(d.getTime()));
+            if (dates.length > 0) {
+                start = new Date(Math.min(...dates));
+                end = new Date(Math.max(...dates));
+            } else {
+                start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+                end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+            }
+        } else if (dateFilterType === 'custom') {
+            if (customStartDate) start = new Date(customStartDate);
+            else start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+            
+            if (customEndDate) end = new Date(customEndDate);
+            else end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        }
+        
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        return { start, end };
+    }, [dateFilterType, selectedDate, customStartDate, customEndDate, transactions]);
 
-    // 1. Month Actuals
-    const monthTransactions = useMemo(() => 
-        transactions.filter(t => t.createdAt.startsWith(currentMonthKey)),
-        [transactions, currentMonthKey]
-    );
+    // 1. Month Actuals (Range-aware)
+    const monthTransactions = useMemo(() => {
+        return transactions.filter(t => {
+            const tDate = new Date(t.createdAt);
+            return tDate >= resolvedDateRange.start && tDate <= resolvedDateRange.end;
+        });
+    }, [transactions, resolvedDateRange]);
 
     const filteredMonthTransactions = useMemo(() => {
         const list = [];
@@ -274,6 +354,35 @@ const FinanceModule = ({
 
     const monthActualIncome = filteredMonthTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
     const monthActualExpense = filteredMonthTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
+    
+    const activeDaysInMonth = useMemo(() => {
+        const totalDays = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
+        
+        if (filteredMonthTransactions.length === 0) return totalDays;
+        
+        const dates = filteredMonthTransactions
+            .map(t => new Date(t.createdAt))
+            .filter(d => !isNaN(d.getTime()));
+            
+        if (dates.length === 0) return totalDays;
+        
+        const earliestDate = new Date(Math.min(...dates));
+        
+        if (earliestDate.getFullYear() === selectedDate.getFullYear() && earliestDate.getMonth() === selectedDate.getMonth()) {
+            const startDay = earliestDate.getDate();
+            
+            const today = new Date();
+            let endDay = totalDays;
+            if (today.getFullYear() === selectedDate.getFullYear() && today.getMonth() === selectedDate.getMonth()) {
+                endDay = today.getDate();
+            }
+            
+            const activeDays = endDay - startDay + 1;
+            return activeDays > 0 ? activeDays : 1;
+        }
+        
+        return totalDays;
+    }, [filteredMonthTransactions, selectedDate]);
     // monthNetBalance removed (unused)
 
     // 2. Global Budget (Projected/Baseline)
@@ -353,40 +462,80 @@ const FinanceModule = ({
         }
     }, [analyticsSource, monthTransactions, categories, expenseCategories]);
 
-    // 5. Daily Bar Chart (Month View)
+    // 5. Daily Bar Chart (Range View)
     const dailyActivity = useMemo(() => {
         if (analyticsSource === 'budget') return []; // Budget has no daily distribution
         
-        const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
+        const diffTime = Math.abs(resolvedDateRange.end - resolvedDateRange.start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
         const days = [];
-        for(let i=1; i<=daysInMonth; i++) {
-            const dayStr = `${currentMonthKey}-${String(i).padStart(2, '0')}`;
-            const dayData = { day: String(i), income: 0, expense: 0, fullDate: dayStr };
-            
-            // Filter transactions for this day
-            const dayTransactions = filteredMonthTransactions.filter(t => 
-                t.createdAt.startsWith(dayStr) && 
-                (dailyChartCategoryFilter === 'all' || t.categoryId === dailyChartCategoryFilter)
-            );
-            
-            dayTransactions.forEach(t => {
-                const amount = Number(t.amount) || 0;
-                const cat = categories.find(c => c.id === t.categoryId);
-                const categoryLabel = cat ? cat.label : 'Other';
+        
+        // If range is within 62 days, show daily bars
+        if (diffDays <= 62) {
+            let current = new Date(resolvedDateRange.start);
+            while (current <= resolvedDateRange.end) {
+                const dayStr = current.toISOString().slice(0, 10); // "YYYY-MM-DD"
+                const dayLabel = current.getDate().toString();
+                const dayData = { day: dayLabel, income: 0, expense: 0, fullDate: dayStr };
                 
-                if (t.type === 'income') {
-                    dayData.income += amount;
-                    dayData[`IN_${categoryLabel}`] = (dayData[`IN_${categoryLabel}`] || 0) + amount;
-                } else if (t.type === 'expense') {
-                    dayData.expense += amount;
-                    dayData[`OUT_${categoryLabel}`] = (dayData[`OUT_${categoryLabel}`] || 0) + amount;
-                }
-            });
-            
-            days.push(dayData);
+                // Filter transactions for this day
+                const dayTransactions = filteredMonthTransactions.filter(t => 
+                    t.createdAt.startsWith(dayStr) && 
+                    (dailyChartCategoryFilter === 'all' || t.categoryId === dailyChartCategoryFilter)
+                );
+                
+                dayTransactions.forEach(t => {
+                    const amount = Number(t.amount) || 0;
+                    const cat = categories.find(c => c.id === t.categoryId);
+                    const categoryLabel = cat ? cat.label : 'Other';
+                    
+                    if (t.type === 'income') {
+                        dayData.income += amount;
+                        dayData[`IN_${categoryLabel}`] = (dayData[`IN_${categoryLabel}`] || 0) + amount;
+                    } else if (t.type === 'expense') {
+                        dayData.expense += amount;
+                        dayData[`OUT_${categoryLabel}`] = (dayData[`OUT_${categoryLabel}`] || 0) + amount;
+                    }
+                });
+                
+                days.push(dayData);
+                current.setDate(current.getDate() + 1);
+            }
+        } else {
+            // Group by Month if range is long
+            let current = new Date(resolvedDateRange.start);
+            while (current <= resolvedDateRange.end) {
+                const monthStr = current.toISOString().slice(0, 7); // "YYYY-MM"
+                const monthLabel = current.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                const dayData = { day: monthLabel, income: 0, expense: 0, fullDate: monthStr };
+                
+                const monthTransactionsList = filteredMonthTransactions.filter(t => 
+                    t.createdAt.startsWith(monthStr) && 
+                    (dailyChartCategoryFilter === 'all' || t.categoryId === dailyChartCategoryFilter)
+                );
+                
+                monthTransactionsList.forEach(t => {
+                    const amount = Number(t.amount) || 0;
+                    const cat = categories.find(c => c.id === t.categoryId);
+                    const categoryLabel = cat ? cat.label : 'Other';
+                    
+                    if (t.type === 'income') {
+                        dayData.income += amount;
+                        dayData[`IN_${categoryLabel}`] = (dayData[`IN_${categoryLabel}`] || 0) + amount;
+                    } else if (t.type === 'expense') {
+                        dayData.expense += amount;
+                        dayData[`OUT_${categoryLabel}`] = (dayData[`OUT_${categoryLabel}`] || 0) + amount;
+                    }
+                });
+                
+                days.push(dayData);
+                current.setMonth(current.getMonth() + 1);
+            }
         }
+        
         return days;
-    }, [analyticsSource, filteredMonthTransactions, currentMonthKey, selectedDate, dailyChartCategoryFilter, categories]);
+    }, [analyticsSource, filteredMonthTransactions, resolvedDateRange, dailyChartCategoryFilter, categories]);
 
 
     // --- Actions ---
@@ -450,11 +599,23 @@ const FinanceModule = ({
             }
         }
 
+        const today = new Date();
+        let createdAtDate;
+        const selectedDateStr = newTransaction.date;
+        const todayDateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+        
+        if (selectedDateStr === todayDateStr) {
+            createdAtDate = today;
+        } else {
+            const parts = selectedDateStr.split('-').map(Number);
+            createdAtDate = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+        }
+
         const payload = {
             ...newTransaction,
             description,
             amount: parseFloat(newTransaction.amount),
-            createdAt: new Date(newTransaction.date).toISOString()
+            createdAt: createdAtDate.toISOString()
         };
 
         if (newTransaction.id) {
@@ -470,17 +631,15 @@ const FinanceModule = ({
     return (
         <div className="animate-in fade-in duration-500 pb-20 h-full flex flex-col">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-2 md:pb-6 mb-4 md:mb-8 gap-4">
-                <div>
-                    <div className="flex items-center gap-4">
-                        {/* No Title Here */}
-                        
+            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-2 md:pb-6 mb-2 md:mb-8 gap-3 md:gap-4">
+                <div className="w-full md:w-auto">
+                    <div className="flex items-center justify-between gap-4 w-full md:w-auto">
                         {/* Currency Selector */}
                         <div className="relative group">
-                            <button className="text-xl font-bold text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg">
+                            <button className="text-lg md:text-xl font-bold text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg">
                                 {CURRENCIES[currentCurrencyCode].symbol} <span className="text-[10px] uppercase align-top">{currentCurrencyCode}</span>
                             </button>
-                            <div className="absolute top-full left-0 mt-2 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl overflow-hidden hidden group-hover:block w-32 z-50 shadow-xl">
+                            <div className="absolute top-full left-0 mt-2 bg-white shadow-xl border border-slate-200 border border-slate-300 rounded-xl overflow-hidden hidden group-hover:block w-32 z-50">
                                 {Object.entries(CURRENCIES).map(([code, info]) => (
                                     <button 
                                         key={code}
@@ -492,29 +651,74 @@ const FinanceModule = ({
                                 ))}
                             </div>
                         </div>
+
+                        {/* Date Filter Type Tabs (Side-by-side with Currency on mobile) */}
+                        {dashboardTab !== 'budget' && (
+                            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 text-[9px] font-bold uppercase tracking-wider">
+                                <button 
+                                    onClick={() => setDateFilterType('month')} 
+                                    className={`px-2.5 py-1 rounded-md transition-all ${dateFilterType === 'month' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                >
+                                    Month
+                                </button>
+                                <button 
+                                    onClick={() => setDateFilterType('all')} 
+                                    className={`px-2.5 py-1 rounded-md transition-all ${dateFilterType === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                >
+                                    All
+                                </button>
+                                <button 
+                                    onClick={() => setDateFilterType('custom')} 
+                                    className={`px-2.5 py-1 rounded-md transition-all ${dateFilterType === 'custom' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                >
+                                    Custom
+                                </button>
+                            </div>
+                        )}
                     </div>
                     
-                    {/* Month Selector */}
-                    <div className="flex items-center gap-4 mt-2">
-                        <button onClick={() => adjustMonth(-1)} className="text-slate-500 hover:text-blue-600 transition-colors"><ArrowDownRight className="w-4 h-4 rotate-45" /></button>
-                        <span className="text-sm font-mono font-bold text-green-500 uppercase tracking-widest min-w-[140px] text-center">
-                            {getMonthLabel(selectedDate)}
-                        </span>
-                        <button onClick={() => adjustMonth(1)} className="text-slate-500 hover:text-blue-600 transition-colors"><ArrowUpRight className="w-4 h-4 rotate-45" /></button>
-                    </div>
+                    {/* Date Selector Month Switcher */}
+                    {(dashboardTab === 'budget' || (dashboardTab !== 'budget' && dateFilterType === 'month')) && (
+                        <div className="flex items-center justify-center md:justify-start gap-4 mt-2 bg-slate-50/50 md:bg-transparent py-1 px-3 md:p-0 rounded-lg w-full md:w-auto">
+                            <button onClick={() => adjustMonth(-1)} className="text-slate-500 hover:text-blue-600 transition-colors"><ArrowDownRight className="w-4 h-4 rotate-45" /></button>
+                            <span className="text-xs md:text-sm font-mono font-bold text-green-500 uppercase tracking-widest min-w-[125px] md:min-w-[140px] text-center">
+                                {getMonthLabel(selectedDate)}
+                            </span>
+                            <button onClick={() => adjustMonth(1)} className="text-slate-500 hover:text-blue-600 transition-colors"><ArrowUpRight className="w-4 h-4 rotate-45" /></button>
+                        </div>
+                    )}
+
+                    {/* Custom Date Inputs if Custom Selected */}
+                    {dashboardTab !== 'budget' && dateFilterType === 'custom' && (
+                        <div className="flex items-center justify-center md:justify-start gap-2 mt-2 flex-wrap w-full md:w-auto">
+                            <input 
+                                type="date" 
+                                value={customStartDate} 
+                                onChange={e => setCustomStartDate(e.target.value)} 
+                                className="bg-white border border-slate-200 text-[10px] font-bold text-slate-700 rounded-lg px-2 py-1 outline-none focus:border-blue-500"
+                            />
+                            <span className="text-[9px] font-bold uppercase text-slate-400">to</span>
+                            <input 
+                                type="date" 
+                                value={customEndDate} 
+                                onChange={e => setCustomEndDate(e.target.value)} 
+                                className="bg-white border border-slate-200 text-[10px] font-bold text-slate-700 rounded-lg px-2 py-1 outline-none focus:border-blue-500"
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {/* Navigation Tabs - Match Task/Portfolio Style */}
                  <div className="flex bg-white shadow-sm border border-slate-200/50 p-1 rounded-lg border border-slate-200 overflow-x-auto no-scrollbar w-full md:w-auto self-start md:self-end">
                     {[
-                        { id: 'history', label: 'History', color: 'bg-blue-600 text-slate-800 shadow-lg' },
-                        { id: 'overview', label: 'Analytics', color: 'bg-green-600 text-slate-800 shadow-lg' },
-                        { id: 'budget', label: 'Planning', color: 'bg-amber-600 text-slate-800 shadow-lg' }
+                        { id: 'history', label: 'History', color: 'bg-blue-600 text-white shadow-lg' },
+                        { id: 'overview', label: 'Analytics', color: 'bg-green-600 text-white shadow-lg' },
+                        { id: 'budget', label: 'Planning', color: 'bg-amber-600 text-white shadow-lg' }
                     ].map(t => (
                         <button
                             key={t.id}
                             onClick={() => setDashboardTab(t.id)}
-                            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${dashboardTab === t.id ? t.color : 'text-slate-500 hover:text-blue-600'}`}
+                            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${dashboardTab === t.id ? t.color : 'text-slate-500 hover:text-blue-600'}`}
                         >
                             {t.label}
                         </button>
@@ -524,36 +728,26 @@ const FinanceModule = ({
 
             {/* Content Switcher */}
             <div className="flex-1 flex flex-col">
-                    {/* Dashboard Nav - Replaced by Top Header Nav */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between pb-1 mb-8 gap-4">
-                        <div className="hidden md:flex items-center gap-8 overflow-x-auto w-full md:w-auto">
-                            {/* Hidden on desktop too as they are now in header? Or keep as sub-nav? 
-                                User asked for "same style as Portfolio", which has them in header. 
-                                So we should probably remove this secondary nav or make it just for the toggle if any.
-                                Actually, in the previous code, this was the primary way to switch tabs. 
-                                Now we have the buttons in the header (lines 294-308).
-                                So we can remove this block or hide it. 
-                                Let's remove the duplicate tabs and keep the analytics source toggle.
-                            */}
-                        </div>
-                        
-                        {/* Source Toggle for Analytics */}
-                        {dashboardTab === 'overview' && (
+                    {/* Source Toggle for Analytics */}
+                    {dashboardTab === 'overview' && (
+                        <div className="flex flex-col md:flex-row md:items-center justify-between pb-1 mb-8 gap-4">
                             <div className="flex bg-white shadow-sm border border-slate-200 rounded-lg p-1 border border-slate-200 mb-1 self-start md:self-auto w-full md:w-auto">
                                 <button onClick={() => setAnalyticsSource('actual')} className={`flex-1 md:flex-none px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'actual' ? 'bg-green-600 text-slate-800' : 'text-slate-500'}`}>Actuals</button>
                                 <button onClick={() => setAnalyticsSource('budget')} className={`flex-1 md:flex-none px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'budget' ? 'bg-amber-600 text-slate-800' : 'text-slate-500'}`}>Budget Plan</button>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     {/* --- BUDGET VIEW (Planning) --- */}
                     {dashboardTab === 'budget' && (
                         <div className="space-y-8 animate-in slide-in-from-bottom-2 fade-in">
                             {/* Projections based on PLAN */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <StatCard title="Projected Income" amount={projectedMonthlyIncome} subtext="Baseline Configuration" icon={TrendingUp} color="#3b82f6" formatMoney={formatMoney} />
                                 <StatCard title="Projected Expense" amount={projectedMonthlyExpense} subtext="Baseline Configuration" icon={TrendingDown} color="#ef4444" isNegative formatMoney={formatMoney} />
-                                <StatCard title="Projected Cash Flow" amount={projectedFreeCashFlow} subtext="Potential Saving" icon={Wallet} color="#10b981" formatMoney={formatMoney} />
+                                <div className="col-span-2 md:col-span-1">
+                                    <StatCard title="Projected Cash Flow" amount={projectedFreeCashFlow} subtext="Potential Saving" icon={Wallet} color="#10b981" formatMoney={formatMoney} />
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -622,9 +816,9 @@ const FinanceModule = ({
                     {dashboardTab === 'history' && (
                         <div className="space-y-4 animate-in slide-in-from-bottom-2 fade-in">
                             {/* Accounts Section */}
-                            <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+                            <div className="grid grid-cols-2 md:flex md:flex-row gap-4 pb-2 no-scrollbar">
                                 {accounts.map(acc => (
-                                    <div key={acc.id} onClick={() => { setEditingAccountData(acc); setIsEditingAccount(true); }} className="min-w-[150px] bg-white shadow-sm border border-slate-200 p-4 rounded-xl cursor-pointer hover:border-slate-300 transition-all flex flex-col gap-2 relative overflow-hidden group">
+                                    <div key={acc.id} onClick={() => { setEditingAccountData(acc); setIsEditingAccount(true); }} className="w-full md:min-w-[150px] bg-white shadow-sm border border-slate-200 p-4 rounded-xl cursor-pointer hover:border-slate-300 transition-all flex flex-col gap-2 relative overflow-hidden group">
                                         <div className="absolute top-0 right-0 p-12 rounded-full blur-2xl opacity-10" style={{ backgroundColor: acc.color || '#555' }} />
                                         <div className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
                                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: acc.color || '#555' }}></div>
@@ -635,16 +829,26 @@ const FinanceModule = ({
                                         </div>
                                     </div>
                                 ))}
-                                <button onClick={() => { setEditingAccountData({ label: '', initialBalance: 0, color: '#3b82f6' }); setIsEditingAccount(true); }} className="min-w-[150px] bg-slate-50 border border-dashed border-slate-300 text-slate-500 hover:text-blue-600 hover:border-blue-300 p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all">
+                                <button onClick={() => { setEditingAccountData({ label: '', initialBalance: 0, color: '#3b82f6' }); setIsEditingAccount(true); }} className="w-full md:min-w-[150px] bg-slate-50 border border-dashed border-slate-300 text-slate-500 hover:text-blue-600 hover:border-blue-300 p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all min-h-[80px]">
                                     <Plus className="w-5 h-5" />
                                     <span className="text-[10px] font-bold uppercase tracking-widest">New Account</span>
                                 </button>
                             </div>
 
                              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white shadow-sm border border-slate-200/40 p-4 rounded-xl border border-slate-200 gap-4">
-                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest shrink-0">Transactions • {getMonthLabel(selectedDate)}</h3>
+                                <div className="flex items-center justify-between w-full md:w-auto gap-2">
+                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest shrink-0">Transactions • {getDateRangeLabel()}</h3>
+                                    {viewMode === 'admin' && (
+                                        <button 
+                                            onClick={() => setIsAddingTransaction(true)}
+                                            className="md:hidden flex px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold uppercase transition-all items-center gap-1 shrink-0"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" /> Log
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="flex flex-wrap gap-2 items-center w-full md:w-auto">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1"><Filter className="w-3 h-3"/></span>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 hidden md:flex items-center gap-1"><Filter className="w-3 h-3"/></span>
                                     <select 
                                         value={historyFilter.type}
                                         onChange={e => setHistoryFilter({...historyFilter, type: e.target.value, categoryId: 'all'})}
@@ -673,7 +877,7 @@ const FinanceModule = ({
                                     <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block"></div>
                                     <button 
                                         onClick={() => setIsAddingTransaction(true)}
-                                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ml-auto md:ml-0"
+                                        className="hidden md:flex px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold uppercase transition-all items-center gap-2"
                                     >
                                         <Plus className="w-4 h-4" /> Log
                                     </button>
@@ -695,15 +899,15 @@ const FinanceModule = ({
                                         {/* Summary Stats for Current Filter/Slice */}
                                         <div className="grid grid-cols-3 gap-3 bg-white border border-slate-200 p-4 rounded-xl shadow-sm text-center">
                                             <div>
-                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtered Income</div>
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Income</div>
                                                 <div className="text-base font-black text-green-600 mt-1">+{formatMoney(filteredIncome)}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtered Expenses</div>
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Expenses</div>
                                                 <div className="text-base font-black text-red-600 mt-1">-{formatMoney(filteredExpense)}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtered Net</div>
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SUM</div>
                                                 <div className={`text-base font-black mt-1 ${filteredNet >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                                                     {filteredNet >= 0 ? '+' : ''}{formatMoney(filteredNet)}
                                                 </div>
@@ -749,7 +953,7 @@ const FinanceModule = ({
                                                                     <span>{group.dateLabel}</span>
                                                                     <div className="flex gap-3 font-mono">
                                                                         <span className={dailyNet >= 0 ? 'text-green-700' : 'text-red-600'}>
-                                                                            SUM: {dailyNet >= 0 ? '+' : ''}{formatMoney(dailyNet)}
+                                                                            {dailyNet >= 0 ? '+' : ''}{formatMoney(dailyNet)}
                                                                         </span>
                                                                     </div>
                                                                 </div>
@@ -783,7 +987,7 @@ const FinanceModule = ({
                                                                                 
                                                                                 {/* Edit/Delete Overlay */}
                                                                                 <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white p-1 rounded-lg border border-slate-300 shadow-xl">
-                                                                                     <button onClick={() => { setNewTransaction({...t, date: t.createdAt.split('T')[0]}); setIsAddingTransaction(true); }} className="p-2 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600"><Edit3 className="w-3 h-3" /></button>
+                                                                                     <button onClick={() => { setNewTransaction({...t, date: getLocalYYYYMMDD(t.createdAt)}); setIsAddingTransaction(true); }} className="p-2 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600"><Edit3 className="w-3 h-3" /></button>
                                                                                      <button onClick={() => transactionsActions.delete(t.id)} className="p-2 hover:bg-slate-200 rounded text-slate-500 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
                                                                                 </div>
                                                                             </div>
@@ -841,7 +1045,7 @@ const FinanceModule = ({
                              </div>
 
                              {/* Stats based on Toggle */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <StatCard 
                                     title={analyticsSource === 'actual' ? "Actual Income" : "Planned Income"} 
                                     amount={activeIncome} 
@@ -1350,7 +1554,8 @@ const FinanceModule = ({
                                             const total = categoryBreakdown.reduce((sum, i) => sum + i.value, 0);
                                             const percent = total > 0 ? ((item.value / total) * 100).toFixed(1) : 0;
                                             const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
-                                            const dailyAvg = item.value / daysInMonth;
+                                            const daysForAvg = analyticsSource === 'actual' ? activeDaysInMonth : daysInMonth;
+                                            const dailyAvg = item.value / daysForAvg;
 
                                             return (
                                                 <div 
