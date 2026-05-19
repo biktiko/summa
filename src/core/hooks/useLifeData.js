@@ -234,12 +234,13 @@ export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
             biometrics: filterForGuest(userData.biometrics),
             supplements: filterForGuest(userData.supplements),
             transactions: filterForGuest(userData.transactions),
-            categories: filterForGuest(userData.categories)
+            categories: filterForGuest(userData.categories),
+            accounts: filterForGuest(userData.accounts)
         } : {
             skills: [], projects: [], achievements: [],
             services: [], education: [], experience: [], languages: [], tasks: [], goals: [],
             balance: 0,
-            transactions: [], categories: []
+            transactions: [], categories: [], accounts: []
         },
         loading,
         setUserData,
@@ -271,6 +272,7 @@ export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
         supplementsActions: createCRUD('supplements', (u, d) => db.addSupplement(u, d), (id, d) => db.updateSupplement(id, d), (id) => db.deleteSupplement(id)),
         transactionsActions: createCRUD('transactions', (u, d) => db.addTransaction(u, d), (id, d) => db.updateTransaction(id, d), (id) => db.deleteTransaction(id)),
         categoriesActions: createCRUD('categories', (u, d) => db.addCategory(u, d), (id, d) => db.updateCategory(id, d), (id) => db.deleteCategory(id)),
+        accountsActions: createCRUD('accounts', (u, d) => db.addAccount(u, d), (id, d) => db.updateAccount(id, d), (id) => db.deleteAccount(id)),
 
         processTask,
         viewMode,

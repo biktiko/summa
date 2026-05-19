@@ -158,6 +158,9 @@ export const SEED_DATA = {
         { id: 'sup1', userId: 'u1', name: 'Magnesium', time: '21:00', isTaken: false, lastTakenDate: '' },
         { id: 'sup2', userId: 'u1', name: 'Omega-3', time: '09:00', isTaken: false, lastTakenDate: '' },
         { id: 'sup3', userId: 'u1', name: 'Vitamin D3', time: '09:00', isTaken: false, lastTakenDate: '' }
+    ],
+    accounts: [
+        { id: 'acc1', userId: 'u1', label: 'Cash', balance: 0, color: '#10b981' }
     ]
 };
 
@@ -207,7 +210,8 @@ export class MockDatabase {
             notes: db.notes ? db.notes.filter(s => s.userId === userId) : [],
             protocols: db.protocols ? db.protocols.filter(s => s.userId === userId) : [],
             biometrics: db.biometrics ? db.biometrics.filter(s => s.userId === userId) : [],
-            supplements: db.supplements ? db.supplements.filter(s => s.userId === userId) : []
+            supplements: db.supplements ? db.supplements.filter(s => s.userId === userId) : [],
+            accounts: db.accounts ? db.accounts.filter(s => s.userId === userId) : []
         };
     }
 
@@ -237,7 +241,14 @@ export class MockDatabase {
             newItemId = Date.now().toString();
         }
 
-        const newItem = { id: newItemId, userId, ...itemData };
+        const cleanData = {};
+        Object.keys(itemData).forEach(key => {
+            if (itemData[key] !== undefined && key !== 'id') {
+                cleanData[key] = itemData[key];
+            }
+        });
+
+        const newItem = { id: newItemId, userId, ...cleanData };
         db[collection].push(newItem);
         this._saveDb(db);
         return newItem;
@@ -248,7 +259,13 @@ export class MockDatabase {
         if (!db[collection]) return null;
         const index = db[collection].findIndex(i => i.id === itemId);
         if (index !== -1) {
-            db[collection][index] = { ...db[collection][index], ...updates };
+            const cleanUpdates = {};
+            Object.keys(updates).forEach(key => {
+                if (updates[key] !== undefined && key !== 'id') {
+                    cleanUpdates[key] = updates[key];
+                }
+            });
+            db[collection][index] = { ...db[collection][index], ...cleanUpdates };
             this._saveDb(db);
             return db[collection][index];
         }
@@ -332,6 +349,10 @@ export class MockDatabase {
     async updateSupplement(id, data) { return this._updateItem('supplements', id, data); }
     async deleteSupplement(id) { return this._deleteItem('supplements', id); }
 
+    async addAccount(userId, data) { return this._addItem('accounts', userId, data); }
+    async updateAccount(id, data) { return this._updateItem('accounts', id, data); }
+    async deleteAccount(id) { return this._deleteItem('accounts', id); }
+
     async authenticateUser(email, password) {
         const db = this._getDb();
         return db.users.find(u => u.email === email && u.password === password) || null;
@@ -402,39 +423,39 @@ export class FirestoreDatabase {
     // --- Generic CRUD ---
 
     async _addItem(collectionName, userId, itemData) {
-        // Auto-ID:
-        // const ref = doc(collection(firestore, collectionName));
-        // const id = ref.id;
-        
-        // OR let addDoc do it. But we want to include `id` in the doc for easy frontend access.
-        // We can just addDoc and then update it, or use doc() to mint ID then setDoc.
-        
-        // We'll trust Firestore auto IDs mostly, simplified ID generation:
+        const cleanData = {};
+        Object.keys(itemData).forEach(key => {
+            if (itemData[key] !== undefined && key !== 'id') {
+                cleanData[key] = itemData[key];
+            }
+        });
+
         const colRef = collection(firestore, collectionName);
         const docRef = await addDoc(colRef, {
              userId,
-             ...itemData,
-             // We'll override 'id' field with the document ID after creation, 
-             // OR usually it's better to rely on doc.id. 
-             // But existing frontend expects `item.id`.
+             ...cleanData,
         });
         
-        // Add the ID field to the document itself for consistency with frontend
         await updateDoc(docRef, { id: docRef.id });
 
-        return { id: docRef.id, userId, ...itemData };
+        return { id: docRef.id, userId, ...cleanData };
     }
 
     async _updateItem(collectionName, itemId, updates) {
         try {
+            const cleanUpdates = {};
+            Object.keys(updates).forEach(key => {
+                if (updates[key] !== undefined && key !== 'id') {
+                    cleanUpdates[key] = updates[key];
+                }
+            });
+
             const ref = doc(firestore, collectionName, itemId);
-            await updateDoc(ref, updates);
-            // Return updated data?
-            // Expensive to refetch. Just merge.
-            return { id: itemId, ...updates }; // Partial return, frontend usually replaces state
+            await updateDoc(ref, cleanUpdates);
+            return { id: itemId, ...cleanUpdates };
         } catch (e) {
             console.error(`Error updating ${collectionName}/${itemId}`, e);
-            return null;
+            return false;
         }
     }
 
@@ -487,7 +508,7 @@ export class FirestoreDatabase {
             'skills', 'languages', 'projects', 'services', 'education', 
             'experience', 'achievements', 'tasks', 'goals', 'backlog', 
             'notes', 'protocols', 'biometrics', 'supplements',
-            'transactions', 'categories'
+            'transactions', 'categories', 'accounts'
         ];
 
         const data = { ...user };
@@ -599,6 +620,10 @@ export class FirestoreDatabase {
     async updateCategory(id, data) { return this._updateItem('categories', id, data); }
     async deleteCategory(id) { return this._deleteItem('categories', id); }
 
+    async addAccount(userId, data) { return this._addItem('accounts', userId, data); }
+    async updateAccount(id, data) { return this._updateItem('accounts', id, data); }
+    async deleteAccount(id) { return this._deleteItem('accounts', id); }
+
 
 
     // --- Auth (Custom on top of Firestore) ---
@@ -694,7 +719,7 @@ export class FirestoreDatabase {
             'users', 'skills', 'languages', 'projects', 'services', 'education', 
             'experience', 'achievements', 'tasks', 'goals', 'backlog', 
             'notes', 'protocols', 'biometrics', 'supplements',
-            'transactions', 'categories'
+            'transactions', 'categories', 'accounts'
         ];
 
         const commitBatch = async () => {
