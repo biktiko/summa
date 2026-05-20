@@ -262,6 +262,10 @@ const FinanceModule = ({
     // Daily Spending Chart Filters
     const [dailyChartCategoryFilter, setDailyChartCategoryFilter] = useState('all');
 
+    // New state for Analytics improvements
+    const [showDailyAvgBreakdown, setShowDailyAvgBreakdown] = useState(false);
+    const [balanceGrouping, setBalanceGrouping] = useState('day'); // 'day' | 'week' | 'month'
+
     // Transaction Management State
     const [newTransaction, setNewTransaction] = useState({
         amount: '',
@@ -408,6 +412,213 @@ const FinanceModule = ({
     const activeIncome = analyticsSource === 'actual' ? monthActualIncome : projectedMonthlyIncome;
     const activeExpense = analyticsSource === 'actual' ? monthActualExpense : projectedMonthlyExpense;
     const activeBalance = activeIncome - activeExpense;
+
+    const activeDays = useMemo(() => {
+        if (dateFilterType === 'month') {
+            return activeDaysInMonth;
+        }
+        const diffTime = Math.abs(resolvedDateRange.end - resolvedDateRange.start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays > 0 ? diffDays : 1;
+    }, [dateFilterType, activeDaysInMonth, resolvedDateRange]);
+
+    const dailyAvgCategoryBreakdown = useMemo(() => {
+        const activeDaysCount = activeDays;
+        
+        // 1. Calculate for all defined expense categories
+        const breakdown = expenseCategories.map(cat => {
+            const actualTotal = filteredMonthTransactions
+                .filter(t => t.type === 'expense' && t.categoryId === cat.id)
+                .reduce((sum, t) => sum + Number(t.amount), 0);
+            const actualDaily = actualTotal / activeDaysCount;
+            const plannedDaily = (Number(cat.amount) || 0) / (Number(cat.period) || 30);
+            return {
+                id: cat.id,
+                label: cat.label,
+                color: cat.color || '#ef4444',
+                actualDaily,
+                plannedDaily,
+                actualTotal,
+                percent: plannedDaily > 0 ? (actualDaily / plannedDaily) * 100 : 0
+            };
+        });
+        
+        // 2. Also calculate for any "Other/Uncategorized" expenses
+        const uncategorizedTotal = filteredMonthTransactions
+            .filter(t => t.type === 'expense' && (!t.categoryId || !expenseCategories.some(c => c.id === t.categoryId)))
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+            
+        if (uncategorizedTotal > 0) {
+            const actualDaily = uncategorizedTotal / activeDaysCount;
+            breakdown.push({
+                id: 'uncategorized',
+                label: 'Other / Uncategorized',
+                color: '#64748b',
+                actualDaily,
+                plannedDaily: 0,
+                actualTotal: uncategorizedTotal,
+                percent: 0
+            });
+        }
+        
+        return breakdown.sort((a, b) => b.actualDaily - a.actualDaily);
+    }, [expenseCategories, filteredMonthTransactions, activeDays]);
+
+    const balanceHistoryData = useMemo(() => {
+        let currentBal = 0;
+        
+        // 1. Calculate start balance before resolvedDateRange.start
+        activeAnalyticAccountIds.forEach(accId => {
+            if (accId === 'legacy') {
+                // Legacy unallocated
+            } else {
+                const account = accounts.find(a => a.id === accId);
+                if (account) {
+                    currentBal += Number(account.initialBalance) || 0;
+                }
+            }
+        });
+
+        transactions.forEach(t => {
+            if (new Date(t.createdAt) < resolvedDateRange.start) {
+                const amount = Number(t.amount) || 0;
+                if (t.type === 'income') {
+                    const accId = t.accountId || 'legacy';
+                    if (activeAnalyticAccountIds.includes(accId)) {
+                        currentBal += amount;
+                    }
+                } else if (t.type === 'expense') {
+                    const accId = t.accountId || 'legacy';
+                    if (activeAnalyticAccountIds.includes(accId)) {
+                        currentBal -= amount;
+                    }
+                } else if (t.type === 'transfer') {
+                    if (activeAnalyticAccountIds.includes(t.accountId)) {
+                        currentBal -= amount;
+                    }
+                    if (activeAnalyticAccountIds.includes(t.toAccountId)) {
+                        currentBal += amount;
+                    }
+                }
+            }
+        });
+
+        // 2. Filter transactions that are within resolvedDateRange
+        const rangeTx = transactions
+            .filter(t => {
+                const d = new Date(t.createdAt);
+                return d >= resolvedDateRange.start && d <= resolvedDateRange.end;
+            })
+            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+        // 3. Generate points based on grouping
+        const points = [];
+        const start = new Date(resolvedDateRange.start);
+        const end = new Date(resolvedDateRange.end);
+
+        if (balanceGrouping === 'day') {
+            let curr = new Date(start);
+            while (curr <= end) {
+                const dayStr = curr.toISOString().slice(0, 10);
+                const dayTransactions = rangeTx.filter(t => t.createdAt.startsWith(dayStr));
+                
+                dayTransactions.forEach(t => {
+                    const amount = Number(t.amount) || 0;
+                    if (t.type === 'income') {
+                        const accId = t.accountId || 'legacy';
+                        if (activeAnalyticAccountIds.includes(accId)) currentBal += amount;
+                    } else if (t.type === 'expense') {
+                        const accId = t.accountId || 'legacy';
+                        if (activeAnalyticAccountIds.includes(accId)) currentBal -= amount;
+                    } else if (t.type === 'transfer') {
+                        if (activeAnalyticAccountIds.includes(t.accountId)) currentBal -= amount;
+                        if (activeAnalyticAccountIds.includes(t.toAccountId)) currentBal += amount;
+                    }
+                });
+
+                points.push({
+                    label: curr.getDate().toString(),
+                    fullDate: dayStr,
+                    balance: currentBal
+                });
+                
+                curr.setDate(curr.getDate() + 1);
+            }
+        } else if (balanceGrouping === 'week') {
+            let curr = new Date(start);
+            const dayOfWeek = curr.getDay();
+            const diff = curr.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+            curr.setDate(diff); // Set to Monday of that week
+            
+            while (curr <= end) {
+                const weekStart = new Date(curr);
+                const weekEnd = new Date(curr);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+                weekEnd.setHours(23, 59, 59, 999);
+
+                const weekTransactions = rangeTx.filter(t => {
+                    const d = new Date(t.createdAt);
+                    return d >= weekStart && d <= weekEnd;
+                });
+
+                weekTransactions.forEach(t => {
+                    const amount = Number(t.amount) || 0;
+                    if (t.type === 'income') {
+                        const accId = t.accountId || 'legacy';
+                        if (activeAnalyticAccountIds.includes(accId)) currentBal += amount;
+                    } else if (t.type === 'expense') {
+                        const accId = t.accountId || 'legacy';
+                        if (activeAnalyticAccountIds.includes(accId)) currentBal -= amount;
+                    } else if (t.type === 'transfer') {
+                        if (activeAnalyticAccountIds.includes(t.accountId)) currentBal -= amount;
+                        if (activeAnalyticAccountIds.includes(t.toAccountId)) currentBal += amount;
+                    }
+                });
+
+                const labelStr = `${weekStart.getDate()} ${weekStart.toLocaleDateString(undefined, {month:'short'})}`;
+                points.push({
+                    label: labelStr,
+                    fullDate: weekStart.toISOString().slice(0, 10),
+                    balance: currentBal
+                });
+                curr.setDate(curr.getDate() + 7);
+            }
+        } else {
+            let curr = new Date(start);
+            curr.setDate(1);
+            
+            while (curr <= end) {
+                const monthStr = curr.toISOString().slice(0, 7);
+                const nextMonth = new Date(curr.getFullYear(), curr.getMonth() + 1, 1);
+                const monthTransactionsList = rangeTx.filter(t => t.createdAt.startsWith(monthStr));
+
+                monthTransactionsList.forEach(t => {
+                    const amount = Number(t.amount) || 0;
+                    if (t.type === 'income') {
+                        const accId = t.accountId || 'legacy';
+                        if (activeAnalyticAccountIds.includes(accId)) currentBal += amount;
+                    } else if (t.type === 'expense') {
+                        const accId = t.accountId || 'legacy';
+                        if (activeAnalyticAccountIds.includes(accId)) currentBal -= amount;
+                    } else if (t.type === 'transfer') {
+                        if (activeAnalyticAccountIds.includes(t.accountId)) currentBal -= amount;
+                        if (activeAnalyticAccountIds.includes(t.toAccountId)) currentBal += amount;
+                    }
+                });
+
+                const labelStr = curr.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                points.push({
+                    label: labelStr,
+                    fullDate: monthStr,
+                    balance: currentBal
+                });
+
+                curr = nextMonth;
+            }
+        }
+
+        return points;
+    }, [transactions, accounts, activeAnalyticAccountIds, resolvedDateRange, balanceGrouping]);
 
     // Calculate Account Balances
     const getAccountBalance = React.useCallback((accountId) => {
@@ -1059,10 +1270,13 @@ const FinanceModule = ({
                                     icon={TrendingDown} color="#ef4444" isNegative formatMoney={formatMoney} 
                                 />
                                 <StatCard 
-                                    title="Monthly Net Flow" 
-                                    amount={activeBalance} 
-                                    subtext={activeBalance > 0 ? "Surplus" : "Deficit"} 
-                                    icon={Wallet} color={activeBalance >= 0 ? "#10b981" : "#ef4444"} formatMoney={formatMoney} 
+                                    title="Daily Avg Spend" 
+                                    amount={analyticsSource === 'actual' ? (monthActualExpense / activeDays) : (projectedMonthlyExpense / 30)} 
+                                    subtext={analyticsSource === 'actual' ? `Based on ${activeDays} days` : "Projected daily average"} 
+                                    icon={Calendar} 
+                                    color="#f59e0b" 
+                                    onClick={() => setShowDailyAvgBreakdown(!showDailyAvgBreakdown)}
+                                    formatMoney={formatMoney} 
                                 />
                                 <StatCard 
                                     title="Current Balance" 
@@ -1071,6 +1285,93 @@ const FinanceModule = ({
                                     icon={PieChart} color="#8b5cf6" formatMoney={formatMoney} 
                                 />
                             </div>
+
+                            {/* Daily Spending Breakdown Widget */}
+                            {showDailyAvgBreakdown && (
+                                <div className="bg-white shadow-sm border border-slate-200 p-6 rounded-2xl animate-in slide-in-from-top duration-300 relative overflow-hidden">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <div>
+                                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                                <Calendar className="w-4 h-4 text-amber-500" /> Daily Spending Breakdown
+                                            </h3>
+                                            <p className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">
+                                                Showing actual vs. planned daily average per category ({getDateRangeLabel()})
+                                            </p>
+                                        </div>
+                                        <button 
+                                            onClick={() => setShowDailyAvgBreakdown(false)}
+                                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-1 no-scrollbar">
+                                        {dailyAvgCategoryBreakdown.map((item, idx) => {
+                                            const hasBudget = item.plannedDaily > 0;
+                                            const isOver = hasBudget && item.actualDaily > item.plannedDaily;
+                                            const overAmount = isOver ? item.actualDaily - item.plannedDaily : 0;
+                                            
+                                            return (
+                                                <div 
+                                                    key={idx} 
+                                                    className="p-4 bg-slate-50/50 border border-slate-200 rounded-xl hover:shadow-sm hover:border-slate-300 transition-all flex flex-col justify-between"
+                                                >
+                                                    <div className="flex justify-between items-start gap-4 mb-2">
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            <div 
+                                                                className="w-2.5 h-2.5 rounded-full shrink-0" 
+                                                                style={{ backgroundColor: item.color }} 
+                                                            />
+                                                            <span className="font-bold text-slate-800 truncate text-xs">{item.label}</span>
+                                                        </div>
+                                                        <div className="text-right shrink-0">
+                                                            <div className="font-mono font-extrabold text-slate-800 text-xs">
+                                                                {formatMoney(item.actualDaily)} <span className="text-[9px] text-slate-400 font-normal">/ day</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="mt-1">
+                                                        <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                                            <span>
+                                                                {hasBudget 
+                                                                    ? `Budget: ${formatMoney(item.plannedDaily)} / day`
+                                                                    : 'No Plan Set'
+                                                                }
+                                                            </span>
+                                                            {hasBudget && (
+                                                                <span className={isOver ? 'text-red-500 font-extrabold' : 'text-slate-600'}>
+                                                                    {isOver 
+                                                                        ? `Over by ${formatMoney(overAmount)} / day`
+                                                                        : `${(100 - (item.actualDaily / item.plannedDaily) * 100).toFixed(0)}% Left`
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        {hasBudget && (
+                                                            <div className="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
+                                                                <div 
+                                                                    className="h-full rounded-full transition-all duration-1000" 
+                                                                    style={{ 
+                                                                        width: `${Math.min((item.actualDaily / item.plannedDaily) * 100, 100)}%`, 
+                                                                        backgroundColor: isOver ? '#ef4444' : item.color 
+                                                                    }} 
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                        {dailyAvgCategoryBreakdown.length === 0 && (
+                                            <div className="col-span-full text-center py-8 text-slate-400 italic text-xs">
+                                                No expenses recorded for this period.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                              <div className="grid md:grid-cols-2 gap-6">
                                 {/* Pie Chart */}
@@ -1149,10 +1450,92 @@ const FinanceModule = ({
                                     </div>
                                 </div>
                              </div>
+
+                             {/* Balance History Chart */}
+                             <div className="bg-white shadow-sm border border-slate-200 p-6 rounded-2xl h-[400px] min-h-[400px] flex flex-col relative group">
+                                 <div className="flex justify-between items-center mb-4">
+                                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                         <Wallet className="w-4 h-4 text-emerald-500"/> Balance History (Net Worth)
+                                     </h3>
+                                     <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 text-[9px] font-bold uppercase tracking-wider">
+                                         <button 
+                                             type="button"
+                                             onClick={() => setBalanceGrouping('day')} 
+                                             className={`px-2.5 py-1 rounded-md transition-all ${balanceGrouping === 'day' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                         >
+                                             Days
+                                         </button>
+                                         <button 
+                                             type="button"
+                                             onClick={() => setBalanceGrouping('week')} 
+                                             className={`px-2.5 py-1 rounded-md transition-all ${balanceGrouping === 'week' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                         >
+                                             Weeks
+                                         </button>
+                                         <button 
+                                             type="button"
+                                             onClick={() => setBalanceGrouping('month')} 
+                                             className={`px-2.5 py-1 rounded-md transition-all ${balanceGrouping === 'month' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                         >
+                                             Months
+                                         </button>
+                                     </div>
+                                 </div>
+                                 <div className="flex-1 w-full h-full min-h-0">
+                                     {balanceHistoryData.length > 0 ? (
+                                         <ResponsiveContainer width="99%" height="100%">
+                                             <AreaChart data={balanceHistoryData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                                                 <defs>
+                                                     <linearGradient id="balanceGrad" x1="0" y1="0" x2="0" y2="1">
+                                                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                                                         <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                                     </linearGradient>
+                                                 </defs>
+                                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                                 <XAxis 
+                                                     dataKey="label" 
+                                                     stroke="#94a3b8" 
+                                                     fontSize={10} 
+                                                     fontWeight={600}
+                                                     tickLine={false} 
+                                                     axisLine={false} 
+                                                     dy={10}
+                                                 />
+                                                 <YAxis 
+                                                     stroke="#94a3b8" 
+                                                     fontSize={10} 
+                                                     fontWeight={600}
+                                                     tickLine={false} 
+                                                     axisLine={false} 
+                                                     tickFormatter={val => formatMoney(val)}
+                                                     dx={-10}
+                                                 />
+                                                 <RechartsTooltip 
+                                                     contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
+                                                     itemStyle={{ color: '#fff', fontSize: '12px', fontFamily: 'monospace' }} 
+                                                     labelStyle={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }} 
+                                                     formatter={(val) => [formatMoney(val), "Net Worth"]} 
+                                                 />
+                                                 <Area 
+                                                     type="monotone" 
+                                                     dataKey="balance" 
+                                                     stroke="#10b981" 
+                                                     strokeWidth={2.5}
+                                                     fillOpacity={1} 
+                                                     fill="url(#balanceGrad)" 
+                                                 />
+                                             </AreaChart>
+                                         </ResponsiveContainer>
+                                     ) : (
+                                         <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                                             <span className="text-xs">No balance history data available</span>
+                                         </div>
+                                     )}
+                                 </div>
+                             </div>
                          </div>
                      )}
             </div>
-
 
             {/* --- MODALS --- */}
 
