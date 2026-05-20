@@ -186,7 +186,7 @@ const FinanceModule = ({
 
 
     // --- State ---
-    const [dashboardTab, setDashboardTab] = useState('budget'); // overview | budget | history
+    const [dashboardTab, setDashboardTab] = useState('history'); // overview | budget | history
     const [isAddingTransaction, setIsAddingTransaction] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [analyticsSource, setAnalyticsSource] = useState('actual'); // 'actual' | 'budget'
