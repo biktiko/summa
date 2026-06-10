@@ -235,12 +235,13 @@ export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
             supplements: filterForGuest(userData.supplements),
             transactions: filterForGuest(userData.transactions),
             categories: filterForGuest(userData.categories),
-            accounts: filterForGuest(userData.accounts)
+            accounts: filterForGuest(userData.accounts),
+            wishlists: filterForGuest(userData.wishlists)
         } : {
             skills: [], projects: [], achievements: [],
             services: [], education: [], experience: [], languages: [], tasks: [], goals: [],
             balance: 0,
-            transactions: [], categories: [], accounts: []
+            transactions: [], categories: [], accounts: [], wishlists: []
         },
         loading,
         setUserData,
@@ -273,6 +274,7 @@ export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
         transactionsActions: createCRUD('transactions', (u, d) => db.addTransaction(u, d), (id, d) => db.updateTransaction(id, d), (id) => db.deleteTransaction(id)),
         categoriesActions: createCRUD('categories', (u, d) => db.addCategory(u, d), (id, d) => db.updateCategory(id, d), (id) => db.deleteCategory(id)),
         accountsActions: createCRUD('accounts', (u, d) => db.addAccount(u, d), (id, d) => db.updateAccount(id, d), (id) => db.deleteAccount(id)),
+        wishlistActions: createCRUD('wishlists', (u, d) => db.addWishlist(u, d), (id, d) => db.updateWishlist(id, d), (id) => db.deleteWishlist(id)),
 
         processTask,
         viewMode,

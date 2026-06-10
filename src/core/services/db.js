@@ -161,6 +161,17 @@ export const SEED_DATA = {
     ],
     accounts: [
         { id: 'acc1', userId: 'u1', label: 'Cash', balance: 0, color: '#10b981' }
+    ],
+    wishlists: [
+        { id: 'w1', userId: 'u1', name: 'Samsung watch последней модели', category: 'Electronics', tags: ['gadgets'], price: 200000, priority: 'High', status: 'Wanted', isHidden: false },
+        { id: 'w2', userId: 'u1', name: 'Брендовые летние стильные костюмы', category: 'Clothing', tags: ['summer', 'style'], price: 150000, priority: 'Medium', status: 'Wanted', isHidden: false },
+        { id: 'w3', userId: 'u1', name: 'Качественные средства для ухода кожи', category: 'Health', tags: ['skincare'], price: 50000, priority: 'Medium', status: 'Wanted', isHidden: false },
+        { id: 'w4', userId: 'u1', name: 'Супер бритва машина', category: 'Electronics', tags: ['grooming'], price: 80000, priority: 'Low', status: 'Wanted', isHidden: false },
+        { id: 'w5', userId: 'u1', name: 'Супер-качественная спортивная обувь', category: 'Clothing', tags: ['sports', 'shoes'], price: 90000, priority: 'High', status: 'Wanted', isHidden: false },
+        { id: 'w6', userId: 'u1', name: 'Качественная обувь для походов в горы', category: 'Gear', tags: ['hiking', 'shoes'], price: 120000, priority: 'High', status: 'Wanted', isHidden: false },
+        { id: 'w7', userId: 'u1', name: 'Качественные штаны для походов', category: 'Gear', tags: ['hiking', 'clothing'], price: 60000, priority: 'Medium', status: 'Wanted', isHidden: false },
+        { id: 'w8', userId: 'u1', name: 'Халат для ванны', category: 'Home', tags: ['comfort'], price: 30000, priority: 'Low', status: 'Wanted', isHidden: false },
+        { id: 'w9', userId: 'u1', name: 'Рюкзак хороший для походов', category: 'Gear', tags: ['hiking', 'bags'], price: 70000, priority: 'High', status: 'Wanted', isHidden: false }
     ]
 };
 
@@ -211,7 +222,8 @@ export class MockDatabase {
             protocols: db.protocols ? db.protocols.filter(s => s.userId === userId) : [],
             biometrics: db.biometrics ? db.biometrics.filter(s => s.userId === userId) : [],
             supplements: db.supplements ? db.supplements.filter(s => s.userId === userId) : [],
-            accounts: db.accounts ? db.accounts.filter(s => s.userId === userId) : []
+            accounts: db.accounts ? db.accounts.filter(s => s.userId === userId) : [],
+            wishlists: db.wishlists ? db.wishlists.filter(s => s.userId === userId) : []
         };
     }
 
@@ -352,6 +364,10 @@ export class MockDatabase {
     async addAccount(userId, data) { return this._addItem('accounts', userId, data); }
     async updateAccount(id, data) { return this._updateItem('accounts', id, data); }
     async deleteAccount(id) { return this._deleteItem('accounts', id); }
+
+    async addWishlist(userId, data) { return this._addItem('wishlists', userId, data); }
+    async updateWishlist(id, data) { return this._updateItem('wishlists', id, data); }
+    async deleteWishlist(id) { return this._deleteItem('wishlists', id); }
 
     async authenticateUser(email, password) {
         const db = this._getDb();
@@ -508,7 +524,7 @@ export class FirestoreDatabase {
             'skills', 'languages', 'projects', 'services', 'education', 
             'experience', 'achievements', 'tasks', 'goals', 'backlog', 
             'notes', 'protocols', 'biometrics', 'supplements',
-            'transactions', 'categories', 'accounts'
+            'transactions', 'categories', 'accounts', 'wishlists'
         ];
 
         const data = { ...user };
@@ -624,6 +640,10 @@ export class FirestoreDatabase {
     async updateAccount(id, data) { return this._updateItem('accounts', id, data); }
     async deleteAccount(id) { return this._deleteItem('accounts', id); }
 
+    async addWishlist(userId, data) { return this._addItem('wishlists', userId, data); }
+    async updateWishlist(id, data) { return this._updateItem('wishlists', id, data); }
+    async deleteWishlist(id) { return this._deleteItem('wishlists', id); }
+
 
 
     // --- Auth (Custom on top of Firestore) ---
@@ -719,7 +739,7 @@ export class FirestoreDatabase {
             'users', 'skills', 'languages', 'projects', 'services', 'education', 
             'experience', 'achievements', 'tasks', 'goals', 'backlog', 
             'notes', 'protocols', 'biometrics', 'supplements',
-            'transactions', 'categories', 'accounts'
+            'transactions', 'categories', 'accounts', 'wishlists'
         ];
 
         const commitBatch = async () => {

@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react';
-import { Target, Activity, Globe, Coins, Sliders, CheckSquare, FileText, LayoutDashboard } from 'lucide-react';
+import { Target, Activity, Globe, Coins, Sliders, CheckSquare, FileText, LayoutDashboard, ShoppingBag } from 'lucide-react';
 import PortfolioModule from './Portfolio/PortfolioModule';
 import HealthModule from './Health/HealthModule';
 import SettingsModule from '../components/Settings/SettingsModule';
@@ -8,6 +8,7 @@ import FinanceModule from './Finance/FinanceModule';
 import TasksModule from './Tasks/TasksModule';
 import BlogModule from './Blog/BlogModule';
 import ProjectsModule from './Projects/ProjectsModule';
+import WishlistModule from './Wishlist/WishlistModule';
 
 
 const NetworkModule = () => <div className="p-8 text-slate-500 font-mono uppercase">Network Module // Offline</div>;
@@ -61,6 +62,13 @@ export const MODULES = [
         icon: Globe,
         component: NetworkModule,
         description: 'Connections & Communications'
+    },
+    {
+        id: 'wishlist',
+        label: 'Wishlist',
+        icon: ShoppingBag,
+        component: WishlistModule,
+        description: 'Product & Asset Wishlist'
     },
     {
         id: 'settings',

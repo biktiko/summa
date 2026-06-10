@@ -258,7 +258,7 @@ const FinanceModule = ({
     const [expandedChart, setExpandedChart] = useState(null);
 
     // History Filters
-    const [historyFilter, setHistoryFilter] = useState({ categoryId: 'all', type: 'all' });
+    const [historyFilter, setHistoryFilter] = useState({ categoryId: 'all', type: 'all', accountId: 'all', minAmount: '', maxAmount: '' });
 
     // Daily Spending Chart Filters
     const [dailyChartCategoryFilter, setDailyChartCategoryFilter] = useState('all');
@@ -1166,8 +1166,37 @@ const FinanceModule = ({
                                             ))}
                                         </select>
                                     )}
-                                    {(historyFilter.type !== 'all' || historyFilter.categoryId !== 'all') && (
-                                        <button onClick={() => setHistoryFilter({type:'all', categoryId:'all'})} className="text-[10px] text-blue-500 hover:underline font-bold px-2 shrink-0">Clear</button>
+                                    <select 
+                                        value={historyFilter.accountId}
+                                        onChange={e => setHistoryFilter({...historyFilter, accountId: e.target.value})}
+                                        className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 max-w-[150px] truncate"
+                                    >
+                                        <option value="all">All Accounts</option>
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>{acc.label}</option>
+                                        ))}
+                                    </select>
+                                    <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+                                        <span className="text-[9px] font-bold uppercase text-slate-400">Min:</span>
+                                        <input 
+                                            type="number" 
+                                            placeholder="0" 
+                                            value={historyFilter.minAmount}
+                                            onChange={e => setHistoryFilter({...historyFilter, minAmount: e.target.value})}
+                                            className="w-12 bg-transparent text-xs font-mono font-bold text-slate-700 outline-none"
+                                        />
+                                        <span className="text-slate-300">|</span>
+                                        <span className="text-[9px] font-bold uppercase text-slate-400">Max:</span>
+                                        <input 
+                                            type="number" 
+                                            placeholder="∞" 
+                                            value={historyFilter.maxAmount}
+                                            onChange={e => setHistoryFilter({...historyFilter, maxAmount: e.target.value})}
+                                            className="w-12 bg-transparent text-xs font-mono font-bold text-slate-700 outline-none"
+                                        />
+                                    </div>
+                                    {(historyFilter.type !== 'all' || historyFilter.categoryId !== 'all' || historyFilter.accountId !== 'all' || historyFilter.minAmount !== '' || historyFilter.maxAmount !== '') && (
+                                        <button onClick={() => setHistoryFilter({type:'all', categoryId:'all', accountId:'all', minAmount:'', maxAmount:''})} className="text-[10px] text-blue-500 hover:underline font-bold px-2 shrink-0">Clear</button>
                                     )}
                                     <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block"></div>
                                     <button 
@@ -1182,6 +1211,22 @@ const FinanceModule = ({
                                 const filteredList = monthTransactions.filter(t => {
                                     if (historyFilter.type !== 'all' && t.type !== historyFilter.type) return false;
                                     if (historyFilter.categoryId !== 'all' && t.categoryId !== historyFilter.categoryId) return false;
+                                    
+                                    // Account filter
+                                    if (historyFilter.accountId !== 'all') {
+                                        if (t.type === 'transfer') {
+                                            if (t.accountId !== historyFilter.accountId && t.toAccountId !== historyFilter.accountId) return false;
+                                        } else {
+                                            const accId = t.accountId || '';
+                                            if (accId !== historyFilter.accountId) return false;
+                                        }
+                                    }
+
+                                    // Amount range filter
+                                    const amount = Number(t.amount);
+                                    if (historyFilter.minAmount !== '' && amount < Number(historyFilter.minAmount)) return false;
+                                    if (historyFilter.maxAmount !== '' && amount > Number(historyFilter.maxAmount)) return false;
+
                                     return true;
                                 }).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
 
