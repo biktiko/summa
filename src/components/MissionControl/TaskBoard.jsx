@@ -1207,7 +1207,7 @@ Link: ${taskToAdd.link || 'None'}
                     </button>
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-6 w-full md:items-start">
+                <div className="flex flex-col md:flex-row gap-4 md:gap-6 w-full md:items-start">
                     {(() => {
                         const hasInProgress = moduleTasks.some(t => t.status === 'in_progress');
                         let todoSpan = 1;
@@ -1322,7 +1322,7 @@ Link: ${taskToAdd.link || 'None'}
                     </div>
                 </div>
 
-                <div className={`grid gap-4 ${displayMode === 'list' ? 'grid-cols-1 max-w-2xl' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+                <div className={`grid gap-4 items-start ${displayMode === 'list' ? 'grid-cols-1 max-w-2xl' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4'}`}>
                     {backlogTasks.map(task => (
                         <TaskCard
                             key={task.id}

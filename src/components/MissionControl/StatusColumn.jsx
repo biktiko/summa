@@ -46,7 +46,7 @@ export const StatusColumn = ({ title, status, color, moduleTasks, viewMode, disp
 
     return (
         <>
-            <div className={`flex-1 min-w-[300px] bg-slate-100 rounded-2xl p-2 md:p-4 border border-slate-200 flex flex-col ${displayMode === 'list' ? '' : 'min-h-[500px]'}`}>
+            <div className={`flex-1 min-w-[200px] md:min-w-[240px] bg-slate-100 rounded-2xl p-2 border border-slate-200 flex flex-col ${displayMode === 'list' ? '' : 'min-h-[500px]'}`}>
                 <div className={`hidden md:flex items-center justify-between mb-4 pb-2 border-b border-${color}-500/20`}>
                     <h3 className={`text-xs font-black uppercase tracking-widest text-${color}-500`}>{title}</h3>
                     <div className="flex items-center gap-3">

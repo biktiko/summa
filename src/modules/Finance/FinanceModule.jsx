@@ -193,6 +193,7 @@ const FinanceModule = ({
     const [dateFilterType, setDateFilterType] = useState('month'); // 'month' | 'all' | 'custom'
     const [customStartDate, setCustomStartDate] = useState('');
     const [customEndDate, setCustomEndDate] = useState('');
+    const [recurringExpensesSort, setRecurringExpensesSort] = useState('actual');
 
     // Currency Persistence
     const currentCurrencyCode = userData.gameplaySettings?.currency || 'AMD';
@@ -273,6 +274,8 @@ const FinanceModule = ({
         categoryId: '',
         accountId: '',
         toAccountId: '',
+        projectId: '',
+        projectStageId: '',
         description: '',
         date: getLocalYYYYMMDD()
     });
@@ -281,6 +284,7 @@ const FinanceModule = ({
     const transactions = useMemo(() => userData.transactions || [], [userData.transactions]);
     const categories = useMemo(() => userData.categories || [], [userData.categories]);
     const accounts = useMemo(() => userData.accounts || [], [userData.accounts]);
+    const projects = useMemo(() => userData.projects || [], [userData.projects]);
 
     const filterAccountsList = useMemo(() => {
         const list = [...accounts];
@@ -356,6 +360,36 @@ const FinanceModule = ({
         return list;
     }, [monthTransactions, activeAnalyticAccountIds]);
 
+    // Transactions filtered strictly for the selected month (used in Planning/Budget tab)
+    const planningMonthTransactions = useMemo(() => {
+        const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        end.setHours(23, 59, 59, 999);
+        
+        const list = [];
+        transactions.forEach(t => {
+            const tDate = new Date(t.createdAt);
+            if (tDate >= start && tDate <= end) {
+                if (t.type === 'transfer') {
+                    const isSourceSelected = activeAnalyticAccountIds.includes(t.accountId);
+                    const isDestSelected = activeAnalyticAccountIds.includes(t.toAccountId);
+                    if (isSourceSelected && !isDestSelected) {
+                        list.push({ ...t, type: 'expense', description: `${t.description || 'Transfer'} (Out)` });
+                    } else if (!isSourceSelected && isDestSelected) {
+                        list.push({ ...t, type: 'income', description: `${t.description || 'Transfer'} (In)` });
+                    }
+                } else {
+                    const accId = t.accountId || 'legacy';
+                    if (activeAnalyticAccountIds.includes(accId)) {
+                        list.push(t);
+                    }
+                }
+            }
+        });
+        return list;
+    }, [transactions, selectedDate, activeAnalyticAccountIds]);
+
     const monthActualIncome = filteredMonthTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
     const monthActualExpense = filteredMonthTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
     
@@ -392,6 +426,42 @@ const FinanceModule = ({
     // 2. Global Budget (Projected/Baseline)
     const incomeCategories = useMemo(() => categories.filter(c => c.type === 'income'), [categories]);
     const expenseCategories = useMemo(() => categories.filter(c => c.type === 'expense'), [categories]);
+
+    const sortedExpenseCategories = useMemo(() => {
+        const list = [...expenseCategories];
+        
+        const getActualSpent = (catId) => {
+            return planningMonthTransactions
+                .filter(t => t.type === 'expense' && t.categoryId === catId)
+                .reduce((sum, t) => sum + Number(t.amount), 0);
+        };
+        
+        const getPlannedMonthly = (item) => {
+            const amount = Number(item.amount) || 0;
+            const period = Number(item.period) || 30;
+            return (amount * 30) / period;
+        };
+
+        return list.sort((a, b) => {
+            if (recurringExpensesSort === 'actual') {
+                const actualA = getActualSpent(a.id);
+                const actualB = getActualSpent(b.id);
+                return actualB - actualA;
+            } else if (recurringExpensesSort === 'planned') {
+                const plannedA = getPlannedMonthly(a);
+                const plannedB = getPlannedMonthly(b);
+                
+                if (plannedA === 0 && plannedB > 0) return 1;
+                if (plannedB === 0 && plannedA > 0) return -1;
+                if (plannedA === 0 && plannedB === 0) {
+                    return getActualSpent(b.id) - getActualSpent(a.id);
+                }
+                
+                return plannedB - plannedA;
+            }
+            return 0;
+        });
+    }, [expenseCategories, planningMonthTransactions, recurringExpensesSort]);
 
     const calculateMonthlyProjection = (items) => items.reduce((acc, item) => {
         // Filter by Active Month
@@ -466,6 +536,7 @@ const FinanceModule = ({
 
     const balanceHistoryData = useMemo(() => {
         let currentBal = 0;
+        const today = new Date();
         
         // 1. Calculate start balance before resolvedDateRange.start
         activeAnalyticAccountIds.forEach(accId => {
@@ -519,6 +590,7 @@ const FinanceModule = ({
         if (balanceGrouping === 'day') {
             let curr = new Date(start);
             while (curr <= end) {
+                if (curr > today) break;
                 const dayStr = curr.toISOString().slice(0, 10);
                 const dayTransactions = rangeTx.filter(t => t.createdAt.startsWith(dayStr));
                 
@@ -552,6 +624,7 @@ const FinanceModule = ({
             
             while (curr <= end) {
                 const weekStart = new Date(curr);
+                if (weekStart > today) break;
                 const weekEnd = new Date(curr);
                 weekEnd.setDate(weekEnd.getDate() + 6);
                 weekEnd.setHours(23, 59, 59, 999);
@@ -588,6 +661,7 @@ const FinanceModule = ({
             curr.setDate(1);
             
             while (curr <= end) {
+                if (curr > today) break;
                 const monthStr = curr.toISOString().slice(0, 7);
                 const nextMonth = new Date(curr.getFullYear(), curr.getMonth() + 1, 1);
                 const monthTransactionsList = rangeTx.filter(t => t.createdAt.startsWith(monthStr));
@@ -836,7 +910,7 @@ const FinanceModule = ({
         }
 
         setIsAddingTransaction(false);
-        setNewTransaction({ ...newTransaction, id: undefined, amount: '', description: '', toAccountId: '' });
+        setNewTransaction({ ...newTransaction, id: undefined, amount: '', description: '', toAccountId: '', projectId: '', projectStageId: '' });
     };
 
     return (
@@ -985,7 +1059,7 @@ const FinanceModule = ({
                                                 onEdit={(item) => { setEditingCategoryData(item); setIsEditingCategory(true); }}
                                                 onDelete={categoriesActions.delete}
                                                 currencySymbol={currencySymbol}
-                                                actualAmount={filteredMonthTransactions.filter(t => t.type === 'income' && t.categoryId === cat.id).reduce((sum, t) => sum + Number(t.amount), 0)}
+                                                actualAmount={planningMonthTransactions.filter(t => t.type === 'income' && t.categoryId === cat.id).reduce((sum, t) => sum + Number(t.amount), 0)}
                                             />
                                         ))}
                                     </div>
@@ -995,12 +1069,22 @@ const FinanceModule = ({
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center bg-red-900/10 p-4 rounded-xl border border-red-500/20">
                                         <h3 className="text-sm font-black text-red-500 uppercase tracking-widest">Recurring Expenses</h3>
-                                        <button 
-                                            onClick={() => { setEditingCategoryData({ type: 'expense', label: '', amount: '', period: 30, color: '#ef4444' }); setIsEditingCategory(true); }}
-                                            className="p-2 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-blue-600 rounded-lg transition-all"
-                                        >
-                                            <Plus className="w-4 h-4" />
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <select
+                                                value={recurringExpensesSort}
+                                                onChange={e => setRecurringExpensesSort(e.target.value)}
+                                                className="bg-white/80 border border-red-500/20 text-[10px] font-bold text-red-700 uppercase tracking-wider rounded-lg px-2.5 py-1.5 outline-none focus:border-red-500/50 cursor-pointer animate-in fade-in"
+                                            >
+                                                <option value="actual">By Spent</option>
+                                                <option value="planned">By Budget</option>
+                                            </select>
+                                            <button 
+                                                onClick={() => { setEditingCategoryData({ type: 'expense', label: '', amount: '', period: 30, color: '#ef4444' }); setIsEditingCategory(true); }}
+                                                className="p-2 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-blue-600 rounded-lg transition-all"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="hidden md:grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-slate-400 px-4">
                                         <div className="col-span-3">Category</div>
@@ -1008,13 +1092,13 @@ const FinanceModule = ({
                                         <div className="col-span-6">Actual vs Planned Progress</div>
                                     </div>
                                     <div className="space-y-3">
-                                        {expenseCategories.map(cat => (
+                                        {sortedExpenseCategories.map(cat => (
                                             <BudgetRow 
                                                 key={cat.id} item={cat} isExpense={true} 
                                                 onEdit={(item) => { setEditingCategoryData(item); setIsEditingCategory(true); }}
                                                 onDelete={categoriesActions.delete}
                                                 currencySymbol={currencySymbol}
-                                                actualAmount={filteredMonthTransactions.filter(t => t.type === 'expense' && t.categoryId === cat.id).reduce((sum, t) => sum + Number(t.amount), 0)}
+                                                actualAmount={planningMonthTransactions.filter(t => t.type === 'expense' && t.categoryId === cat.id).reduce((sum, t) => sum + Number(t.amount), 0)}
                                             />
                                         ))}
                                     </div>
@@ -1255,36 +1339,48 @@ const FinanceModule = ({
                                  </button>
                              </div>
 
-                             {/* Stats based on Toggle */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatCard 
-                                    title={analyticsSource === 'actual' ? "Actual Income" : "Planned Income"} 
-                                    amount={activeIncome} 
-                                    subtext={getMonthLabel(selectedDate)} 
-                                    icon={TrendingUp} color="#3b82f6" formatMoney={formatMoney} 
-                                />
-                                <StatCard 
-                                    title={analyticsSource === 'actual' ? "Actual Expense" : "Planned Expense"} 
-                                    amount={activeExpense} 
-                                    subtext={analyticsSource === 'actual' ? "Real Spending" : "Projected Burn"} 
-                                    icon={TrendingDown} color="#ef4444" isNegative formatMoney={formatMoney} 
-                                />
-                                <StatCard 
-                                    title="Daily Avg Spend" 
-                                    amount={analyticsSource === 'actual' ? (monthActualExpense / activeDays) : (projectedMonthlyExpense / 30)} 
-                                    subtext={analyticsSource === 'actual' ? `Based on ${activeDays} days` : "Projected daily average"} 
-                                    icon={Calendar} 
-                                    color="#f59e0b" 
-                                    onClick={() => setShowDailyAvgBreakdown(!showDailyAvgBreakdown)}
-                                    formatMoney={formatMoney} 
-                                />
-                                <StatCard 
-                                    title="Current Balance" 
-                                    amount={totalCurrentLiquidity} 
-                                    subtext="All Time" 
-                                    icon={PieChart} color="#8b5cf6" formatMoney={formatMoney} 
-                                />
-                            </div>
+                            {/* Stats based on Toggle */}
+                            {(() => {
+                                const difference = activeIncome - activeExpense;
+                                const dailyProfit = analyticsSource === 'actual' ? (difference / (activeDays || 1)) : (difference / 30);
+                                const dailySpend = analyticsSource === 'actual' ? (monthActualExpense / (activeDays || 1)) : (projectedMonthlyExpense / 30);
+                                
+                                const stats = [
+                                    { title: analyticsSource === 'actual' ? "Actual Income" : "Planned Income", amount: activeIncome, color: "text-blue-500", bg: "bg-blue-100", icon: TrendingUp },
+                                    { title: analyticsSource === 'actual' ? "Actual Expense" : "Planned Expense", amount: activeExpense, color: "text-red-500", bg: "bg-red-100", icon: TrendingDown },
+                                    { title: "Net Difference", amount: difference, color: difference >= 0 ? "text-emerald-500" : "text-red-500", bg: difference >= 0 ? "bg-emerald-100" : "bg-red-100", icon: Wallet },
+                                    { title: "Daily Avg Spend", amount: dailySpend, color: "text-amber-500", bg: "bg-amber-100", icon: Calendar, onClick: () => setShowDailyAvgBreakdown(!showDailyAvgBreakdown) },
+                                    { title: "Daily Profit", amount: dailyProfit, color: dailyProfit >= 0 ? "text-emerald-500" : "text-red-500", bg: dailyProfit >= 0 ? "bg-emerald-100" : "bg-red-100", icon: TrendingUp },
+                                    { title: "Current Balance", amount: totalCurrentLiquidity, color: "text-purple-500", bg: "bg-purple-100", icon: PieChart }
+                                ];
+
+                                return (
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                                        {stats.map((s, i) => {
+                                            const Icon = s.icon;
+                                            return (
+                                                <div 
+                                                    key={i} 
+                                                    onClick={s.onClick} 
+                                                    className={`p-3.5 rounded-2xl border border-slate-200/60 bg-white shadow-sm flex flex-col justify-between relative overflow-hidden group ${s.onClick ? 'cursor-pointer hover:border-slate-300 hover:shadow-md transition-all' : ''}`}
+                                                >
+                                                    <div className="flex items-center gap-2 mb-2 relative z-10">
+                                                        <div className={`p-1.5 rounded-lg ${s.bg} ${s.color} bg-opacity-50`}>
+                                                            <Icon className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <div className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider leading-tight">{s.title}</div>
+                                                    </div>
+                                                    <div className="text-sm sm:text-base font-black text-slate-800 relative z-10">
+                                                        {s.amount < 0 ? '-' : ''}{formatMoney ? formatMoney(Math.abs(s.amount)) : `$${Math.abs(s.amount).toLocaleString()}`}
+                                                    </div>
+                                                    {/* subtle background glow */}
+                                                    <div className={`absolute -bottom-4 -right-4 w-16 h-16 rounded-full blur-2xl opacity-20 ${s.bg} z-0 group-hover:opacity-40 transition-opacity`} />
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })()}
 
                             {/* Daily Spending Breakdown Widget */}
                             {showDailyAvgBreakdown && (
@@ -1867,6 +1963,39 @@ const FinanceModule = ({
                                         onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
                                     />
                                 </div>
+                                
+                                {['income', 'expense'].includes(newTransaction.type) && projects.length > 0 && (
+                                    <>
+                                        <div className="space-y-1 col-span-1">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Link to Project (Optional)</label>
+                                            <select
+                                                className="w-full bg-white border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500"
+                                                value={newTransaction.projectId || ''}
+                                                onChange={e => setNewTransaction({ ...newTransaction, projectId: e.target.value, projectStageId: '' })}
+                                            >
+                                                <option value="">None</option>
+                                                {projects.filter(p => p.status !== 'Archived').map(p => (
+                                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        {newTransaction.projectId && (
+                                            <div className="space-y-1 col-span-1">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Project Stage</label>
+                                                <select
+                                                    className="w-full bg-white border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:border-blue-500"
+                                                    value={newTransaction.projectStageId || ''}
+                                                    onChange={e => setNewTransaction({ ...newTransaction, projectStageId: e.target.value })}
+                                                >
+                                                    <option value="">Select Stage</option>
+                                                    {projects.find(p => p.id === newTransaction.projectId)?.stages?.map(s => (
+                                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
                             </div>
 
                             <button type="submit" className="w-full py-3 bg-white text-black font-bold uppercase rounded-xl hover:bg-neutral-200 transition-colors mt-4">

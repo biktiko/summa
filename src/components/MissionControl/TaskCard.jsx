@@ -65,7 +65,7 @@ export const TaskCard = ({ task, viewMode, displayMode, editingId, editData, set
         <>
         <div 
             onClick={() => { if (editingId !== task.id) setIsDetailsOpen(true); }}
-            className={`group bg-white shadow-sm border border-slate-200 rounded-xl hover:border-blue-500/30 transition-all relative cursor-pointer break-inside-avoid ${task.isHidden ? 'opacity-60 border-red-900/30' : ''} ${displayMode === 'list' && editingId !== task.id ? 'p-1.5 md:p-2' : 'p-2 md:p-4'}`}
+            className={`group h-fit bg-white shadow-sm border border-slate-200 rounded-xl hover:border-blue-500/30 transition-all relative cursor-pointer break-inside-avoid ${task.isHidden ? 'opacity-60 border-red-900/30' : ''} ${displayMode === 'list' && editingId !== task.id ? 'p-1 md:p-1.5' : 'p-2 md:p-2.5'}`}
         >
             {editingId === task.id ? (
                 <TaskEditModal 
@@ -117,7 +117,7 @@ export const TaskCard = ({ task, viewMode, displayMode, editingId, editData, set
                     <div className="flex flex-col relative w-full">
                         {/* Mobile Header: ID & Actions */}
                         {/* Explicitly separate row for ID and Actions to ensure Title has full width below */}
-                        <div className="flex md:hidden items-center justify-between w-full mb-3 z-10 relative">
+                        <div className="flex md:hidden items-center justify-between w-full mb-1.5 z-10 relative">
                              <span className="text-[9px] font-mono text-slate-400 uppercase">#{task.sequenceNumber || (index !== undefined ? index + 1 : (task.id || '').slice(0, 4))}</span>
                              
                              <div className="flex items-center gap-1">
@@ -158,12 +158,12 @@ export const TaskCard = ({ task, viewMode, displayMode, editingId, editData, set
                         </div>
 
                         {/* Title Row (Mobile: Full Width, Desktop: Standard) */}
-                        <div className="flex flex-col w-full mb-2 z-0">
+                        <div className="flex flex-col w-full mb-1 z-0">
                              {/* Desktop ID (Hidden on Mobile as it is in header above) */}
                              <span className="hidden md:block text-[9px] font-mono text-slate-400 uppercase mb-0.5">#{task.sequenceNumber || (index !== undefined ? index + 1 : (task.id || '').slice(0, 4))}</span>
                              <h4 className="text-sm font-bold text-slate-700 leading-tight break-words w-full">{task.title}</h4>
-                             {task.description && (
-                                 <p className="text-xs text-slate-500 truncate mt-1">{task.description}</p>
+                             {task.description?.trim() && (
+                                 <p className="text-[11px] text-slate-500 truncate mt-0.5">{task.description}</p>
                              )}
                         </div>
                         
@@ -178,7 +178,7 @@ export const TaskCard = ({ task, viewMode, displayMode, editingId, editData, set
 
                         {/* Progress Bar if active */}
                          {task.targetValue > 0 && (
-                            <div className="space-y-1 mt-2">
+                            <div className="space-y-0.5 mt-1.5">
                                 <div className="flex justify-between text-[10px] uppercase font-bold tracking-wider text-slate-500">
                                     <span>Progress</span>
                                     <span>{progress.toFixed(0)}%</span>
@@ -190,7 +190,7 @@ export const TaskCard = ({ task, viewMode, displayMode, editingId, editData, set
                         )}
                         
                         {/* Footer Info Row */}
-                        <div className="flex flex-wrap items-end justify-between gap-2 mt-2 pt-2 border-t border-slate-200">
+                        <div className="flex flex-wrap items-center justify-between gap-1.5 mt-1.5 pt-1.5 border-t border-slate-200">
                              {/* Left: Deadline / Link */}
                             <div className="flex items-center gap-3">
                                 {task.deadline && (
@@ -259,7 +259,7 @@ export const TaskCard = ({ task, viewMode, displayMode, editingId, editData, set
 
                          {/* Subtasks (Collapsible/Inline) */}
                         {task.subtasks && task.subtasks.length > 0 && (
-                             <div className="space-y-1 bg-slate-50 p-2 rounded-lg mt-2">
+                             <div className="space-y-0.5 bg-slate-50 p-1.5 rounded-lg mt-1.5">
                                 <div className="text-[10px] uppercase font-bold text-slate-500 mb-1">Subtasks</div>
                                 {task.subtasks.map((sub, idx) => (
                                     <div key={sub.id || idx} className="flex items-center gap-2 group/sub">

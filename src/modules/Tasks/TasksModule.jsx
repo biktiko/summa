@@ -40,12 +40,6 @@ const TasksModule = ({
                          Tasks
                     </button>
                     <button
-                        onClick={() => setTab('projects')}
-                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${currentTab === 'projects' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}
-                    >
-                         Projects
-                    </button>
-                    <button
                         onClick={() => setTab('goals')}
                         className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${currentTab === 'goals' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500 hover:text-blue-600'}`}
                     >
@@ -78,18 +72,6 @@ const TasksModule = ({
                         toggleSectionVisibility={() => {}}
                         updateUser={updateUser}
                         userXP={userData.xp}
-                    />
-                ) : currentTab === 'projects' ? (
-                    <ProjectTasksView
-                        projects={userData.projects}
-                        tasks={userData.tasks}
-                        projectsActions={projectsActions}
-                        tasksActions={tasksActions}
-                        viewMode={viewMode}
-                        processTask={processTask}
-                        updateUser={updateUser}
-                        userXP={userData.xp}
-                        settings={userData}
                     />
                 ) : (
                     <GoalsBoard

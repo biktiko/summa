@@ -32,8 +32,25 @@ const SEED_DATA = {
         { id: 's4', userId: 'u1', name: 'English (Conversational)', level: 40, category: 'Languages', description: 'Daily standups.', links: [] }
     ],
     projects: [
-        { id: 'p1', userId: 'u1', name: 'Martin Star Analytics', status: 'Active', impact: '+15% Retention', link: '#' },
-        { id: 'p2', userId: 'u1', name: 'Life OS Prototype', status: 'In Development', impact: 'Architecture Stage', link: '#' }
+        { 
+            id: 'p1', userId: 'u1', name: 'Martin Star Analytics', status: 'Active', impact: '+15% Retention', 
+            description: 'Analytics dashboard for Martin Star',
+            client: 'Martin Star Ltd.', secretData: 'API Key: MS-9812739182', 
+            links: [{ id: 'l1', name: 'Repo', url: '#' }, { id: 'l2', name: 'Figma', url: '#' }],
+            stages: [
+                { id: 'st1', name: 'Design', expectedIncome: 500, status: 'Completed' },
+                { id: 'st2', name: 'Development', expectedIncome: 1500, status: 'Active' }
+            ],
+            isHidden: false
+        },
+        { 
+            id: 'p2', userId: 'u1', name: 'Life OS Prototype', status: 'In Development', impact: 'Architecture Stage',
+            description: 'Personal life management system',
+            client: 'Personal', secretData: '', 
+            links: [{ id: 'l3', name: 'GitHub', url: '#' }],
+            stages: [],
+            isHidden: false
+        }
     ],
     achievements: [
         { id: 'a1', userId: 'u1', title: 'Survivor', date: '2020-2023', type: 'Legacy' },

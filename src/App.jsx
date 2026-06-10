@@ -23,7 +23,7 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
 
   // Filter Modules based on Privacy/Visibility & Sort
   const visibleModules = useMemo(() => {
-    const defaultOrder = ['tasks', 'finance', 'blog', 'career', 'health', 'network'];
+    const defaultOrder = ['projects', 'finance', 'tasks', 'blog', 'career', 'health', 'network'];
     const order = userData?.moduleOrder || defaultOrder;
 
     const filtered = MODULES.filter(m => {

@@ -7,11 +7,19 @@ import SettingsModule from '../components/Settings/SettingsModule';
 import FinanceModule from './Finance/FinanceModule';
 import TasksModule from './Tasks/TasksModule';
 import BlogModule from './Blog/BlogModule';
+import ProjectsModule from './Projects/ProjectsModule';
 
 
 const NetworkModule = () => <div className="p-8 text-slate-500 font-mono uppercase">Network Module // Offline</div>;
 
 export const MODULES = [
+    {
+        id: 'projects',
+        label: 'Projects',
+        icon: LayoutDashboard,
+        component: ProjectsModule,
+        description: 'Project & Client Hub'
+    },
     {
         id: 'tasks',
         label: 'Tasks',

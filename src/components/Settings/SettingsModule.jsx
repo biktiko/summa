@@ -913,15 +913,19 @@ const SettingsModule = ({ userData, updateUser }) => {
                         <div className="flex items-center justify-between">
                              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                                 <Palette className="w-4 h-4 text-purple-500" />
-                                Active Modules & Ordering
+                                Active Modules
                             </h3>
                             <span className="text-[9px] bg-slate-100 border border-slate-200 px-2 py-1 rounded text-slate-500">Drag/Sort</span>
                         </div>
                        
                         <p className="text-[10px] text-slate-500 mb-2">Toggle modules to hide them. Use arrows to reorder navigation.</p>
                         <div className="grid grid-cols-1 gap-3">
-                            {(localData.moduleOrder || ['tasks', 'finance', 'blog', 'career', 'health', 'network']).map((modId, index, arr) => {
-                                const isHidden = (localData.hiddenModules || []).includes(modId);
+                            {(() => {
+                                const defaults = ['projects', 'finance', 'tasks', 'blog', 'career', 'health', 'network'];
+                                let current = localData.moduleOrder || defaults;
+                                defaults.forEach(m => { if (!current.includes(m)) current.push(m); });
+                                return current.map((modId, index, arr) => {
+                                    const isHidden = (localData.hiddenModules || []).includes(modId);
                                 return (
                                     <div key={modId} className={`p-3 rounded-xl border transition-all flex items-center justify-between group ${!isHidden ? 'bg-slate-50 border-slate-300' : 'bg-white shadow-sm border-slate-200 opacity-60'}`}>
                                         <div className="flex items-center gap-3">
@@ -989,7 +993,7 @@ const SettingsModule = ({ userData, updateUser }) => {
                                         </div>
                                     </div>
                                 );
-                            })}
+                            })})()}
                         </div>
                     </div>
                 </div>
