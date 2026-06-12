@@ -12,11 +12,6 @@ const WishlistModule = ({
 }) => {
     const { wishlists = [], balance = 0, accounts = [] } = userData || {};
 
-    // Calculate total liquid assets (similar to FinanceModule logic)
-    const totalLiquidAssets = useMemo(() => {
-        return accounts.reduce((sum, acc) => sum + (Number(acc.balance) || Number(acc.initialBalance) || 0), 0) + (Number(balance) || 0);
-    }, [accounts, balance]);
-
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All');
     const [priorityFilter, setPriorityFilter] = useState('All');
@@ -33,6 +28,7 @@ const WishlistModule = ({
         category: '',
         tags: '',
         price: '',
+        maxPrice: '',
         priority: 'Medium',
         status: 'Wanted',
         link: ''
@@ -53,8 +49,14 @@ const WishlistModule = ({
 
         // Sort
         items.sort((a, b) => {
-            if (sortBy === 'price_desc') return (Number(b.price) || 0) - (Number(a.price) || 0);
-            if (sortBy === 'price_asc') return (Number(a.price) || 0) - (Number(b.price) || 0);
+            const priceA = Number(a.price) || Number(a.maxPrice) || 0;
+            const priceB = Number(b.price) || Number(b.maxPrice) || 0;
+            if (sortBy === 'price_desc') return priceB - priceA;
+            if (sortBy === 'price_asc') {
+                if (priceA === 0) return 1; // Put unpriced items at the end
+                if (priceB === 0) return -1;
+                return priceA - priceB;
+            }
             if (sortBy === 'priority') {
                 const pVals = { 'High': 3, 'Medium': 2, 'Low': 1 };
                 return (pVals[b.priority] || 0) - (pVals[a.priority] || 0);
@@ -65,8 +67,26 @@ const WishlistModule = ({
         return items;
     }, [wishlists, statusFilter, categoryFilter, priorityFilter, searchTerm, sortBy]);
 
-    const totalEstimatedCost = useMemo(() => {
-        return filteredItems.filter(i => i.status !== 'Purchased').reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+    const targetCostRange = useMemo(() => {
+        let minSum = 0;
+        let maxSum = 0;
+        let hasAnyRange = false;
+        
+        filteredItems.forEach(item => {
+            if (item.status === 'Purchased') return;
+            
+            const minVal = Number(item.price) || 0;
+            const maxVal = Number(item.maxPrice) || minVal;
+            
+            minSum += minVal;
+            maxSum += maxVal;
+            
+            if (item.maxPrice && Number(item.maxPrice) > minVal) {
+                hasAnyRange = true;
+            }
+        });
+        
+        return { minSum, maxSum, hasAnyRange };
     }, [filteredItems]);
 
     const totalPurchasedCost = useMemo(() => {
@@ -82,6 +102,7 @@ const WishlistModule = ({
                 category: item.category || '',
                 tags: (item.tags || []).join(', '),
                 price: item.price || '',
+                maxPrice: item.maxPrice || '',
                 priority: item.priority || 'Medium',
                 status: item.status || 'Wanted',
                 link: item.link || ''
@@ -93,6 +114,7 @@ const WishlistModule = ({
                 category: categories[0] || 'Uncategorized',
                 tags: '',
                 price: '',
+                maxPrice: '',
                 priority: 'Medium',
                 status: 'Wanted',
                 link: ''
@@ -112,7 +134,8 @@ const WishlistModule = ({
 
         const processedData = {
             ...formData,
-            price: Number(formData.price) || 0,
+            price: formData.price === '' ? null : Number(formData.price),
+            maxPrice: formData.maxPrice === '' ? null : Number(formData.maxPrice),
             tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean)
         };
 
@@ -137,8 +160,24 @@ const WishlistModule = ({
         await wishlistActions.update(item.id, { status: newStatus });
     };
 
-    const formatMoney = (amount) => {
-        return `֏ ${(Number(amount) || 0).toLocaleString()}`;
+    const formatMoney = (minPrice, maxPrice) => {
+        const hasMin = minPrice !== null && minPrice !== undefined && minPrice !== '';
+        const hasMax = maxPrice !== null && maxPrice !== undefined && maxPrice !== '';
+        
+        if (!hasMin && !hasMax) return 'Price TBA';
+        
+        const minVal = Number(minPrice) || 0;
+        const maxVal = Number(maxPrice) || 0;
+        
+        if (hasMin && hasMax && maxVal > minVal) {
+            return `֏ ${minVal.toLocaleString()} - ${maxVal.toLocaleString()}`;
+        }
+        
+        if (hasMin) {
+            return `֏ ${minVal.toLocaleString()}`;
+        }
+        
+        return `֏ ${maxVal.toLocaleString()}`;
     };
 
     return (
@@ -166,38 +205,18 @@ const WishlistModule = ({
                     )}
                 </div>
 
-                <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="md:col-span-3 grid grid-cols-1 gap-4">
                     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
                         <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
                             <Target className="w-3.5 h-3.5 text-rose-500" /> Target Cost
                         </div>
                         <div className="text-2xl font-black text-slate-800">
-                            {formatMoney(totalEstimatedCost)}
+                            {targetCostRange.hasAnyRange 
+                                ? `֏ ${targetCostRange.minSum.toLocaleString()} - ${targetCostRange.maxSum.toLocaleString()}`
+                                : `֏ ${targetCostRange.minSum.toLocaleString()}`
+                            }
                         </div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">Pending items in view</div>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
-                            <Wallet className="w-3.5 h-3.5 text-emerald-500" /> Liquid Assets
-                        </div>
-                        <div className="text-2xl font-black text-slate-800">
-                            {formatMoney(totalLiquidAssets)}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">Cash + Accounts</div>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center relative overflow-hidden">
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
-                            <Activity className="w-3.5 h-3.5 text-blue-500" /> Affordability
-                        </div>
-                        <div className="text-2xl font-black text-slate-800">
-                            {totalEstimatedCost === 0 ? '0%' : `${Math.min(100, Math.floor((totalLiquidAssets / totalEstimatedCost) * 100))}%`}
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-1.5 mt-3 overflow-hidden">
-                            <div 
-                                className={`h-full rounded-full ${totalLiquidAssets >= totalEstimatedCost ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                                style={{ width: `${Math.min(100, (totalLiquidAssets / (totalEstimatedCost || 1)) * 100)}%` }}
-                            />
-                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">Total estimated cost of priced items</div>
                     </div>
                 </div>
             </div>
@@ -265,60 +284,79 @@ const WishlistModule = ({
                     <p className="text-xs font-bold max-w-sm">Try adjusting your filters or add a new item to your wishlist.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                     {filteredItems.map(item => (
-                        <div key={item.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group flex flex-col">
-                            <div className="flex justify-between items-start mb-3">
-                                <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-md ${
-                                    item.priority === 'High' ? 'bg-rose-50 text-rose-600' :
-                                    item.priority === 'Medium' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'
-                                }`}>
-                                    {item.priority}
-                                </span>
-                                {viewMode === 'admin' && (
-                                    <button onClick={() => openForm(item)} className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                        <Edit2 className="w-3.5 h-3.5" />
-                                    </button>
-                                )}
-                            </div>
-                            
-                            <h3 className="text-sm font-bold text-slate-800 mb-1 line-clamp-2 min-h-[40px]">
-                                {item.link ? (
-                                    <a href={item.link} target="_blank" rel="noreferrer" className="hover:text-blue-600 hover:underline">{item.name}</a>
-                                ) : item.name}
-                            </h3>
-                            
-                            <div className="text-xl font-black text-slate-800 mb-4">
-                                {formatMoney(item.price)}
-                            </div>
+                        <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group flex flex-col justify-between min-h-[140px]">
+                            <div>
+                                <div className="flex justify-between items-start gap-2 mb-1">
+                                    <h3 className="text-xs font-bold text-slate-800 line-clamp-2 flex-1 min-h-[32px]">
+                                        {item.link ? (
+                                            <a href={item.link} target="_blank" rel="noreferrer" className="hover:text-blue-600 hover:underline">{item.name}</a>
+                                        ) : item.name}
+                                    </h3>
+                                    {viewMode === 'admin' && (
+                                        <button onClick={() => openForm(item)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all shrink-0">
+                                            <Edit2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
 
-                            <div className="flex flex-wrap gap-1.5 mb-4 mt-auto">
-                                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider rounded">
-                                    {item.category || 'Uncategorized'}
-                                </span>
-                                {item.tags && item.tags.map(tag => (
-                                    <span key={tag} className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider rounded">
-                                        <Tag className="w-2.5 h-2.5" />
-                                        {tag}
+                                <div className="flex justify-between items-baseline mb-2">
+                                    <div className={`text-sm font-black text-slate-800 ${(!item.price && !item.maxPrice) ? 'italic text-slate-400 font-bold text-xs' : ''}`}>
+                                        {formatMoney(item.price, item.maxPrice)}
+                                    </div>
+                                    <span className={`px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest rounded ${
+                                        item.priority === 'High' ? 'bg-rose-50 text-rose-600' :
+                                        item.priority === 'Medium' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'
+                                    }`}>
+                                        {item.priority}
                                     </span>
-                                ))}
+                                </div>
+
+                                <div className="flex flex-wrap gap-1 mb-2">
+                                    <span className="px-1.5 py-0.5 bg-slate-50 border border-slate-150 text-slate-500 text-[8px] font-bold uppercase tracking-wider rounded">
+                                        {item.category || 'Uncategorized'}
+                                    </span>
+                                    {item.tags && item.tags.slice(0, 2).map(tag => (
+                                        <span key={tag} className="flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50/50 text-blue-600 text-[8px] font-bold uppercase tracking-wider rounded">
+                                            <Tag className="w-2 h-2" />
+                                            {tag}
+                                        </span>
+                                    ))}
+                                    {item.tags && item.tags.length > 2 && (
+                                        <span className="px-1 py-0.5 bg-slate-50 text-slate-400 text-[8px] font-bold rounded">
+                                            +{item.tags.length - 2}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                                <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between mt-1">
+                                <div className={`text-[9px] font-black uppercase tracking-widest flex items-center gap-1 ${
                                     item.status === 'Purchased' ? 'text-emerald-500' :
                                     item.status === 'Planning' ? 'text-blue-500' : 'text-slate-400'
                                 }`}>
-                                    {item.status === 'Purchased' && <Check className="w-3.5 h-3.5" />}
+                                    {item.status === 'Purchased' && <Check className="w-3 h-3" />}
                                     {item.status}
                                 </div>
-                                {viewMode === 'admin' && item.status !== 'Purchased' && (
-                                    <button 
-                                        onClick={() => handleStatusToggle(item, 'Purchased')}
-                                        className="text-[10px] font-bold uppercase tracking-wider text-white bg-slate-800 hover:bg-emerald-500 px-3 py-1.5 rounded-lg transition-colors shadow-sm"
-                                    >
-                                        Mark Bought
-                                    </button>
+                                {viewMode === 'admin' && (
+                                    item.status === 'Purchased' ? (
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleStatusToggle(item, 'Wanted')}
+                                            className="text-[9px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2 py-1 rounded transition-colors"
+                                        >
+                                            Undo
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleStatusToggle(item, 'Purchased')}
+                                            className="text-[9px] font-bold uppercase tracking-wider text-white bg-slate-800 hover:bg-emerald-500 px-2 py-1 rounded transition-colors shadow-sm"
+                                        >
+                                            Mark Bought
+                                        </button>
+                                    )
                                 )}
                             </div>
                         </div>
@@ -349,26 +387,36 @@ const WishlistModule = ({
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Price (AMD)</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Min Price (AMD)</label>
                                     <input 
-                                        type="number" required
+                                        type="number"
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                                         value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})}
-                                        placeholder="0"
+                                        placeholder="0 or empty"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Category</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Max Price (AMD)</label>
                                     <input 
-                                        type="text" required list="categories"
+                                        type="number"
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                                        value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}
-                                        placeholder="Electronics"
+                                        value={formData.maxPrice} onChange={e => setFormData({...formData, maxPrice: e.target.value})}
+                                        placeholder="Optional range"
                                     />
-                                    <datalist id="categories">
-                                        {categories.map(c => <option key={c} value={c} />)}
-                                    </datalist>
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Category</label>
+                                <input 
+                                    type="text" required list="categories"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                    value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}
+                                    placeholder="Electronics"
+                                />
+                                <datalist id="categories">
+                                    {categories.map(c => <option key={c} value={c} />)}
+                                </datalist>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

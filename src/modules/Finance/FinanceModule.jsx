@@ -313,7 +313,7 @@ const FinanceModule = ({
             const dates = transactions.map(t => new Date(t.createdAt)).filter(d => !isNaN(d.getTime()));
             if (dates.length > 0) {
                 start = new Date(Math.min(...dates));
-                end = new Date(Math.max(...dates));
+                end = new Date(); // Calculate up to today
             } else {
                 start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
                 end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
