@@ -280,11 +280,15 @@ const FinanceModule = ({
         date: getLocalYYYYMMDD()
     });
 
+    // Projects Analytics State
+    const [projectClientFilter, setProjectClientFilter] = useState('all');
+    const [projectStatusFilter, setProjectStatusFilter] = useState('all');
+
     // --- Data Processing (Month-Aware) ---
     const transactions = useMemo(() => userData.transactions || [], [userData.transactions]);
+    const projects = useMemo(() => userData.projects || [], [userData.projects]);
     const categories = useMemo(() => userData.categories || [], [userData.categories]);
     const accounts = useMemo(() => userData.accounts || [], [userData.accounts]);
-    const projects = useMemo(() => userData.projects || [], [userData.projects]);
 
     const filterAccountsList = useMemo(() => {
         const list = [...accounts];
@@ -998,7 +1002,8 @@ const FinanceModule = ({
                     {[
                         { id: 'history', label: 'History', color: 'bg-blue-600 text-white shadow-lg' },
                         { id: 'overview', label: 'Analytics', color: 'bg-green-600 text-white shadow-lg' },
-                        { id: 'budget', label: 'Planning', color: 'bg-amber-600 text-white shadow-lg' }
+                        { id: 'budget', label: 'Planning', color: 'bg-amber-600 text-white shadow-lg' },
+                        { id: 'projects', label: 'Projects', color: 'bg-indigo-600 text-white shadow-lg' }
                     ].map(t => (
                         <button
                             key={t.id}
@@ -1108,6 +1113,170 @@ const FinanceModule = ({
                     )}
 
                     {/* --- HISTORY VIEW --- */}
+                    {/* --- PROJECTS VIEW --- */}
+                    {dashboardTab === 'projects' && (() => {
+                        // Projects filtering logic
+                        let filteredProjects = projects;
+                        
+                        if (projectStatusFilter !== 'all') {
+                            filteredProjects = filteredProjects.filter(p => p.status === projectStatusFilter);
+                        }
+                        if (projectClientFilter !== 'all') {
+                            filteredProjects = filteredProjects.filter(p => p.client === projectClientFilter);
+                        }
+                        if (dateFilterType === 'month') {
+                            const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+                            const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59);
+                            filteredProjects = filteredProjects.filter(p => {
+                                const d = new Date(p.receivedAt || p.createdAt || p.id);
+                                return d >= startOfMonth && d <= endOfMonth;
+                            });
+                        } else if (dateFilterType === 'custom') {
+                            const start = customStartDate ? new Date(customStartDate) : null;
+                            const end = customEndDate ? new Date(customEndDate) : null;
+                            if (start) start.setHours(0,0,0,0);
+                            if (end) end.setHours(23,59,59,999);
+                            filteredProjects = filteredProjects.filter(p => {
+                                const d = new Date(p.receivedAt || p.createdAt || p.id);
+                                if (start && d < start) return false;
+                                if (end && d > end) return false;
+                                return true;
+                            });
+                        }
+
+                        // Computations
+                        let totalExpected = 0;
+                        let totalGrossReceived = 0;
+                        let totalProjectExpenses = 0;
+
+                        filteredProjects.forEach(p => {
+                            // Expected
+                            const expected = p.stages?.reduce((sum, s) => sum + (Number(s.expectedIncome) || 0), 0) || 0;
+                            totalExpected += expected;
+                            
+                            // Transactions
+                            const pTx = transactions.filter(t => t.projectId === p.id);
+                            pTx.forEach(t => {
+                                if (t.type === 'income') totalGrossReceived += (Number(t.amount) || 0);
+                                else if (t.type === 'expense') totalProjectExpenses += (Number(t.amount) || 0);
+                            });
+                        });
+
+                        const netProfit = totalGrossReceived - totalProjectExpenses;
+
+                        // Clients dropdown extraction from all projects (not filtered)
+                        const allClients = [...new Set(projects.map(p => p.client).filter(Boolean))].sort();
+
+                        return (
+                            <div className="space-y-6 animate-in slide-in-from-bottom-2 fade-in">
+                                <div className="flex flex-wrap gap-4 items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Client:</span>
+                                        <select 
+                                            value={projectClientFilter} 
+                                            onChange={e => setProjectClientFilter(e.target.value)}
+                                            className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 rounded-lg px-2 py-1 outline-none focus:border-blue-500"
+                                        >
+                                            <option value="all">All Clients</option>
+                                            {allClients.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Status:</span>
+                                        <select 
+                                            value={projectStatusFilter} 
+                                            onChange={e => setProjectStatusFilter(e.target.value)}
+                                            className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 rounded-lg px-2 py-1 outline-none focus:border-blue-500"
+                                        >
+                                            <option value="all">All Statuses</option>
+                                            <option value="Active">Active</option>
+                                            <option value="In Development">In Development</option>
+                                            <option value="Completed">Completed</option>
+                                            <option value="Archived">Archived</option>
+                                            <option value="Rejected">Rejected</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Summary Cards */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Expected</div>
+                                        <div className="text-2xl font-black text-slate-800">
+                                            {formatMoney(totalExpected)}
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-5 rounded-2xl border border-blue-200 shadow-sm relative overflow-hidden bg-blue-50/30">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-1">Gross Received</div>
+                                        <div className="text-2xl font-black text-blue-600">
+                                            {formatMoney(totalGrossReceived)}
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-5 rounded-2xl border border-red-200 shadow-sm relative overflow-hidden bg-red-50/30">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Total Expenses</div>
+                                        <div className="text-2xl font-black text-red-600">
+                                            {formatMoney(totalProjectExpenses)}
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm relative overflow-hidden bg-emerald-50/50">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1">Net Profit</div>
+                                        <div className="text-2xl font-black text-emerald-600">
+                                            {formatMoney(netProfit)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Projects List / Detail */}
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                    <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                                        <h3 className="text-xs font-black uppercase tracking-widest text-slate-700">Project Breakdown</h3>
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase">{filteredProjects.length} Projects</span>
+                                    </div>
+                                    <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto no-scrollbar">
+                                        {filteredProjects.length === 0 ? (
+                                            <div className="p-8 text-center text-slate-400 text-xs font-bold uppercase tracking-wider">No projects match filters</div>
+                                        ) : (
+                                            filteredProjects.map(p => {
+                                                const exp = p.stages?.reduce((sum, s) => sum + (Number(s.expectedIncome) || 0), 0) || 0;
+                                                const pTx = transactions.filter(t => t.projectId === p.id);
+                                                const act = pTx.filter(t => t.type === 'income').reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+                                                const prjExp = pTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+                                                const net = act - prjExp;
+
+                                                return (
+                                                    <div key={p.id} className="p-4 hover:bg-slate-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-bold text-sm text-slate-800 truncate mb-1">{p.name || 'Untitled'}</div>
+                                                            <div className="flex flex-wrap gap-2 text-[10px] uppercase font-bold text-slate-500">
+                                                                <span className={p.status === 'Completed' ? 'text-green-500' : p.status === 'Rejected' ? 'text-red-500' : 'text-amber-500'}>{p.status}</span>
+                                                                {p.client && <><span className="text-slate-300">•</span><span className="truncate max-w-[100px]">{p.client}</span></>}
+                                                                {p.category && <><span className="text-slate-300">•</span><span className="text-blue-500">{p.category}</span></>}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-6 shrink-0 text-right">
+                                                            <div>
+                                                                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Expected</div>
+                                                                <div className="text-xs font-black text-slate-700">{formatMoney(exp)}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Received</div>
+                                                                <div className="text-xs font-black text-blue-600">{formatMoney(act)}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Net</div>
+                                                                <div className={`text-xs font-black ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatMoney(net)}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
                     {dashboardTab === 'history' && (
                         <div className="space-y-4 animate-in slide-in-from-bottom-2 fade-in">
                             {/* Accounts Section */}
