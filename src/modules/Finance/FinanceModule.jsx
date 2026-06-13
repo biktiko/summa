@@ -105,7 +105,8 @@ const BudgetRow = ({ item, isExpense, actualAmount = 0, onEdit, onDelete, curren
             statusColor = 'text-red-500';
             progressColor = '#ef4444'; // Red alert
         } else {
-            statusText = `${(100 - percent).toFixed(0)}% Left`;
+            const remaining = Math.max(0, plannedMonthly - actualAmount);
+            statusText = `${(100 - percent).toFixed(0)}% Left (${currencySymbol}${space}${remaining.toLocaleString(undefined, {maximumFractionDigits:0})} remaining)`;
             statusColor = 'text-slate-500';
         }
     } else {
@@ -480,6 +481,24 @@ const FinanceModule = ({
     const projectedMonthlyIncome = calculateMonthlyProjection(incomeCategories);
     const projectedMonthlyExpense = calculateMonthlyProjection(expenseCategories);
     const projectedFreeCashFlow = projectedMonthlyIncome - projectedMonthlyExpense;
+
+    const totalRemainingExpense = useMemo(() => {
+        return expenseCategories.reduce((sum, cat) => {
+            const activeMonths = cat.activeMonths || Array.from({length: 12}, (_, i) => i);
+            if (!activeMonths.includes(selectedDate.getMonth())) return sum;
+
+            const amount = Number(cat.amount) || 0;
+            const period = Number(cat.period) || 30;
+            const plannedMonthly = (amount * 30) / period;
+
+            const actualSpent = planningMonthTransactions
+                .filter(t => t.type === 'expense' && t.categoryId === cat.id)
+                .reduce((acc, t) => acc + Number(t.amount), 0);
+
+            const remaining = Math.max(0, plannedMonthly - actualSpent);
+            return sum + remaining;
+        }, 0);
+    }, [expenseCategories, planningMonthTransactions, selectedDate]);
     // burnRateDaily removed (unused)
 
     // 3. Analytics Data Source Switcher
@@ -1035,9 +1054,8 @@ const FinanceModule = ({
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <StatCard title="Projected Income" amount={projectedMonthlyIncome} subtext="Baseline Configuration" icon={TrendingUp} color="#3b82f6" formatMoney={formatMoney} />
                                 <StatCard title="Projected Expense" amount={projectedMonthlyExpense} subtext="Baseline Configuration" icon={TrendingDown} color="#ef4444" isNegative formatMoney={formatMoney} />
-                                <div className="col-span-2 md:col-span-1">
-                                    <StatCard title="Projected Cash Flow" amount={projectedFreeCashFlow} subtext="Potential Saving" icon={Wallet} color="#10b981" formatMoney={formatMoney} />
-                                </div>
+                                <StatCard title="Projected Cash Flow" amount={projectedFreeCashFlow} subtext="Potential Saving" icon={Wallet} color="#10b981" formatMoney={formatMoney} />
+                                <StatCard title="Remaining to Spend" amount={totalRemainingExpense} subtext="Left in current budget" icon={Calculator} color="#f59e0b" formatMoney={formatMoney} />
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1073,7 +1091,12 @@ const FinanceModule = ({
                                 {/* Expense Section */}
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center bg-red-900/10 p-4 rounded-xl border border-red-500/20">
-                                        <h3 className="text-sm font-black text-red-500 uppercase tracking-widest">Recurring Expenses</h3>
+                                        <div className="flex flex-col">
+                                            <h3 className="text-sm font-black text-red-500 uppercase tracking-widest">Recurring Expenses</h3>
+                                            <span className="text-[10px] text-red-400 font-bold mt-0.5">
+                                                Remaining to spend: {formatMoney(totalRemainingExpense)}
+                                            </span>
+                                        </div>
                                         <div className="flex items-center gap-2">
                                             <select
                                                 value={recurringExpensesSort}
