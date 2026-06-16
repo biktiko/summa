@@ -7,17 +7,34 @@ import {
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-    PieChart as RePieChart, Pie, Cell, Legend, BarChart, Bar
+    PieChart as RePieChart, Pie, Cell, Legend, BarChart, Bar, ReferenceLine
 } from 'recharts';
 
 // --- Helper Components ---
 
-const CustomTooltip = ({ active, payload, label, selectedDate, getMonthLabel, formatMoney }) => {
+const CustomTooltip = ({ active, payload, label, selectedDate, getMonthLabel, formatMoney, categories = [] }) => {
     if (active && payload && payload.length) {
-        const filteredPayload = payload.filter(p => Number(p.value) > 0);
-        if (filteredPayload.length === 0) return null;
-        
-        const fullDateVal = payload[0]?.payload?.fullDate;
+        const rawData = payload[0].payload;
+        if (!rawData) return null;
+
+        const items = [];
+        Object.keys(rawData).forEach(key => {
+            if (key.startsWith('IN_') || key.startsWith('OUT_')) {
+                const val = Number(rawData[key]);
+                if (Math.abs(val) > 0) {
+                    const isIncome = key.startsWith('IN_');
+                    const name = key.slice(3);
+                    const cat = categories.find(c => c.label === name);
+                    const fill = cat?.color || (isIncome ? '#10b981' : '#ef4444');
+                    items.push({ name, value: val, fill });
+                }
+            }
+        });
+
+        items.sort((a, b) => b.value - a.value);
+        const netVal = Number(rawData.net) || 0;
+
+        const fullDateVal = rawData.fullDate;
         let headerLabel = label;
         if (fullDateVal) {
             const dateObj = new Date(fullDateVal);
@@ -31,23 +48,33 @@ const CustomTooltip = ({ active, payload, label, selectedDate, getMonthLabel, fo
         } else {
             headerLabel = (getMonthLabel && selectedDate) ? `${getMonthLabel(selectedDate)} ${label}` : label;
         }
-        
+
         return (
             <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl shadow-xl text-xs text-white max-w-[280px]">
-                <p className="font-bold mb-2 uppercase tracking-wider text-[10px] text-slate-400">
+                <p className="font-bold mb-1 uppercase tracking-wider text-[10px] text-slate-400">
                     {headerLabel}
                 </p>
-                <div className="space-y-1.5 max-h-[250px] overflow-y-auto pr-1 no-scrollbar">
-                    {filteredPayload.map((p, idx) => (
-                        <div key={idx} className="flex justify-between gap-4 items-center">
-                            <span className="flex items-center gap-1.5 font-semibold text-slate-300 font-sans">
-                                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: p.fill }} />
-                                {p.name}
-                            </span>
-                            <span className="font-mono font-bold">{formatMoney ? formatMoney(p.value) : p.value}</span>
-                        </div>
-                    ))}
+                <div className="flex justify-between items-center pb-1.5 mb-1.5 border-b border-slate-800">
+                    <span className="font-bold text-slate-300">Net Flow</span>
+                    <span className={`font-mono font-black ${netVal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {netVal >= 0 ? '+' : ''}{formatMoney(netVal)}
+                    </span>
                 </div>
+                {items.length > 0 ? (
+                    <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1 no-scrollbar">
+                        {items.map((p, idx) => (
+                            <div key={idx} className="flex justify-between gap-4 items-center">
+                                <span className="flex items-center gap-1.5 font-semibold text-slate-400 font-sans">
+                                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: p.fill }} />
+                                    {p.name}
+                                </span>
+                                <span className="font-mono font-bold text-slate-200">{formatMoney(p.value)}</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-[10px] text-slate-500 italic">No transactions</p>
+                )}
             </div>
         );
     }
@@ -267,6 +294,8 @@ const FinanceModule = ({
     // New state for Analytics improvements
     const [showDailyAvgBreakdown, setShowDailyAvgBreakdown] = useState(false);
     const [balanceGrouping, setBalanceGrouping] = useState('day'); // 'day' | 'week' | 'month'
+    const [spendingGrouping, setSpendingGrouping] = useState('day'); // 'day' | 'week' | 'month'
+    const [spendingChartType, setSpendingChartType] = useState('bar'); // 'bar' | 'line'
 
     // Transaction Management State
     const [newTransaction, setNewTransaction] = useState({
@@ -774,13 +803,9 @@ const FinanceModule = ({
     const dailyActivity = useMemo(() => {
         if (analyticsSource === 'budget') return []; // Budget has no daily distribution
         
-        const diffTime = Math.abs(resolvedDateRange.end - resolvedDateRange.start);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
         const days = [];
         
-        // If range is within 62 days, show daily bars
-        if (diffDays <= 62) {
+        if (spendingGrouping === 'day') {
             let current = new Date(resolvedDateRange.start);
             while (current <= resolvedDateRange.end) {
                 const dayStr = current.toISOString().slice(0, 10); // "YYYY-MM-DD"
@@ -803,47 +828,100 @@ const FinanceModule = ({
                         dayData[`IN_${categoryLabel}`] = (dayData[`IN_${categoryLabel}`] || 0) + amount;
                     } else if (t.type === 'expense') {
                         dayData.expense += amount;
-                        dayData[`OUT_${categoryLabel}`] = (dayData[`OUT_${categoryLabel}`] || 0) + amount;
+                        dayData[`OUT_${categoryLabel}`] = (dayData[`OUT_${categoryLabel}`] || 0) - amount; // Negative!
                     }
                 });
                 
+                dayData.net = dayData.income - dayData.expense;
                 days.push(dayData);
                 current.setDate(current.getDate() + 1);
             }
-        } else {
-            // Group by Month if range is long
+        } else if (spendingGrouping === 'week') {
             let current = new Date(resolvedDateRange.start);
+            // Move to Monday of the current week
+            const dayOfWeek = current.getDay();
+            const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+            current.setDate(current.getDate() + distanceToMonday);
+            current.setHours(0, 0, 0, 0);
+
             while (current <= resolvedDateRange.end) {
-                const monthStr = current.toISOString().slice(0, 7); // "YYYY-MM"
-                const monthLabel = current.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-                const dayData = { day: monthLabel, income: 0, expense: 0, fullDate: monthStr };
-                
-                const monthTransactionsList = filteredMonthTransactions.filter(t => 
-                    t.createdAt.startsWith(monthStr) && 
-                    (dailyChartCategoryFilter === 'all' || t.categoryId === dailyChartCategoryFilter)
-                );
-                
+                const weekStart = new Date(current);
+                const weekEnd = new Date(current);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+                weekEnd.setHours(23, 59, 59, 999);
+
+                const weekLabel = `${weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+                const weekData = { day: weekLabel, income: 0, expense: 0, fullDate: weekStart.toISOString().slice(0, 10) };
+
+                const weekTransactions = filteredMonthTransactions.filter(t => {
+                    const tDate = new Date(t.createdAt);
+                    return tDate >= weekStart && tDate <= weekEnd &&
+                           (dailyChartCategoryFilter === 'all' || t.categoryId === dailyChartCategoryFilter);
+                });
+
+                weekTransactions.forEach(t => {
+                    const amount = Number(t.amount) || 0;
+                    const cat = categories.find(c => c.id === t.categoryId);
+                    const categoryLabel = cat ? cat.label : 'Other';
+
+                    if (t.type === 'income') {
+                        weekData.income += amount;
+                        weekData[`IN_${categoryLabel}`] = (weekData[`IN_${categoryLabel}`] || 0) + amount;
+                    } else if (t.type === 'expense') {
+                        weekData.expense += amount;
+                        weekData[`OUT_${categoryLabel}`] = (weekData[`OUT_${categoryLabel}`] || 0) - amount; // Negative!
+                    }
+                });
+
+                weekData.net = weekData.income - weekData.expense;
+                if (weekEnd >= resolvedDateRange.start && weekStart <= resolvedDateRange.end) {
+                    days.push(weekData);
+                }
+
+                current.setDate(current.getDate() + 7);
+            }
+        } else if (spendingGrouping === 'month') {
+            let current = new Date(resolvedDateRange.start);
+            current.setDate(1);
+            current.setHours(0, 0, 0, 0);
+
+            while (current <= resolvedDateRange.end) {
+                const monthStart = new Date(current);
+                const monthEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
+                monthEnd.setHours(23, 59, 59, 999);
+
+                const monthStr = monthStart.toISOString().slice(0, 7); // "YYYY-MM"
+                const monthLabel = monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                const monthData = { day: monthLabel, income: 0, expense: 0, fullDate: monthStr };
+
+                const monthTransactionsList = filteredMonthTransactions.filter(t => {
+                    const tDate = new Date(t.createdAt);
+                    return tDate >= monthStart && tDate <= monthEnd &&
+                           (dailyChartCategoryFilter === 'all' || t.categoryId === dailyChartCategoryFilter);
+                });
+
                 monthTransactionsList.forEach(t => {
                     const amount = Number(t.amount) || 0;
                     const cat = categories.find(c => c.id === t.categoryId);
                     const categoryLabel = cat ? cat.label : 'Other';
-                    
+
                     if (t.type === 'income') {
-                        dayData.income += amount;
-                        dayData[`IN_${categoryLabel}`] = (dayData[`IN_${categoryLabel}`] || 0) + amount;
+                        monthData.income += amount;
+                        monthData[`IN_${categoryLabel}`] = (monthData[`IN_${categoryLabel}`] || 0) + amount;
                     } else if (t.type === 'expense') {
-                        dayData.expense += amount;
-                        dayData[`OUT_${categoryLabel}`] = (dayData[`OUT_${categoryLabel}`] || 0) + amount;
+                        monthData.expense += amount;
+                        monthData[`OUT_${categoryLabel}`] = (monthData[`OUT_${categoryLabel}`] || 0) - amount; // Negative!
                     }
                 });
-                
-                days.push(dayData);
+
+                monthData.net = monthData.income - monthData.expense;
+                days.push(monthData);
                 current.setMonth(current.getMonth() + 1);
             }
         }
         
         return days;
-    }, [analyticsSource, filteredMonthTransactions, resolvedDateRange, dailyChartCategoryFilter, categories]);
+    }, [analyticsSource, filteredMonthTransactions, resolvedDateRange, dailyChartCategoryFilter, categories, spendingGrouping]);
 
 
     // --- Actions ---
@@ -1744,13 +1822,61 @@ const FinanceModule = ({
 
                                 {/* Daily Spending Bar Chart */}
                                 <div className="bg-white shadow-sm border border-slate-200/40 p-6 rounded-2xl border border-slate-200 h-[400px] min-h-[400px] flex flex-col relative group">
-                                    <div className="flex justify-between items-center mb-4">
+                                    <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
                                         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                                            <TrendingUp className="w-4 h-4 text-blue-500"/> {analyticsSource === 'actual' ? 'Daily Spending Flow' : 'Daily Projection (Not Available)'}
+                                            <TrendingUp className="w-4 h-4 text-blue-500"/> {analyticsSource === 'actual' ? 'Spending Flow' : 'Daily Projection (Not Available)'}
                                         </h3>
-                                        {analyticsSource !== 'budget' && dailyActivity.length > 0 && (
-                                            <button onClick={() => setExpandedChart('bar')} className="text-slate-400 hover:text-slate-800 transition-colors opacity-0 group-hover:opacity-100"><Maximize2 className="w-4 h-4" /></button>
-                                        )}
+                                        <div className="flex items-center gap-3 flex-wrap">
+                                            {analyticsSource !== 'budget' && (
+                                                <>
+                                                    {/* Grouping Toggle */}
+                                                    <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 text-[9px] font-bold uppercase tracking-wider">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => setSpendingGrouping('day')} 
+                                                            className={`px-2.5 py-1 rounded-md transition-all ${spendingGrouping === 'day' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                                        >
+                                                            Days
+                                                        </button>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => setSpendingGrouping('week')} 
+                                                            className={`px-2.5 py-1 rounded-md transition-all ${spendingGrouping === 'week' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                                        >
+                                                            Weeks
+                                                        </button>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => setSpendingGrouping('month')} 
+                                                            className={`px-2.5 py-1 rounded-md transition-all ${spendingGrouping === 'month' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                                        >
+                                                            Months
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Chart Type Toggle */}
+                                                    <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 text-[9px] font-bold uppercase tracking-wider">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => setSpendingChartType('bar')} 
+                                                            className={`px-2.5 py-1 rounded-md transition-all ${spendingChartType === 'bar' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                                        >
+                                                            Bar
+                                                        </button>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => setSpendingChartType('line')} 
+                                                            className={`px-2.5 py-1 rounded-md transition-all ${spendingChartType === 'line' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                                        >
+                                                            Line
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                            {analyticsSource !== 'budget' && dailyActivity.length > 0 && (
+                                                <button onClick={() => setExpandedChart('bar')} className="text-slate-400 hover:text-slate-800 transition-colors opacity-0 group-hover:opacity-100"><Maximize2 className="w-4 h-4" /></button>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="flex-1 w-full h-full min-h-0">
                                     {analyticsSource === 'budget' ? (
@@ -1758,23 +1884,37 @@ const FinanceModule = ({
                                             Budget is averaged daily. Switch to 'Actuals' to see daily transactions.
                                         </div>
                                     ) : dailyActivity.length > 0 ? (
-                                        <ResponsiveContainer width="99%" height="100%">
-                                            <BarChart data={dailyActivity}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-                                                <XAxis dataKey="day" stroke="#666" fontSize={10} tickLine={false} axisLine={false} interval={2} />
-                                                <YAxis stroke="#666" fontSize={10} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} />
-                                                <RechartsTooltip content={<CustomTooltip selectedDate={selectedDate} getMonthLabel={getMonthLabel} formatMoney={formatMoney} />} />
-                                                {incomeCategories.map(c => (
-                                                    <Bar key={c.id} dataKey={`IN_${c.label}`} name={c.label} stackId="income" fill={c.color || '#10b981'} radius={[0, 0, 0, 0]} />
-                                                ))}
-                                                <Bar dataKey="IN_Other" name="Other Income" stackId="income" fill="#64748b" radius={[0, 0, 0, 0]} />
-                                                
-                                                {expenseCategories.map(c => (
-                                                    <Bar key={c.id} dataKey={`OUT_${c.label}`} name={c.label} stackId="expense" fill={c.color || '#ef4444'} radius={[0, 0, 0, 0]} />
-                                                ))}
-                                                <Bar dataKey="OUT_Other" name="Other Expense" stackId="expense" fill="#475569" radius={[0, 0, 0, 0]} />
-                                            </BarChart>
-                                        </ResponsiveContainer>
+                                        spendingChartType === 'bar' ? (
+                                            <ResponsiveContainer width="99%" height="100%">
+                                                <BarChart data={dailyActivity}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+                                                    <XAxis dataKey="day" stroke="#666" fontSize={10} tickLine={false} axisLine={false} interval={spendingGrouping === 'day' ? 2 : 0} />
+                                                    <YAxis stroke="#666" fontSize={10} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} />
+                                                    <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
+                                                    <RechartsTooltip content={<CustomTooltip selectedDate={selectedDate} getMonthLabel={getMonthLabel} formatMoney={formatMoney} categories={categories} />} />
+                                                    {incomeCategories.map(c => (
+                                                        <Bar key={c.id} dataKey={`IN_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#10b981'} radius={[4, 4, 0, 0]} />
+                                                    ))}
+                                                    <Bar dataKey="IN_Other" name="Other Income" stackId="spending" fill="#64748b" radius={[4, 4, 0, 0]} />
+                                                    
+                                                    {expenseCategories.map(c => (
+                                                        <Bar key={c.id} dataKey={`OUT_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#ef4444'} radius={[0, 0, 4, 4]} />
+                                                    ))}
+                                                    <Bar dataKey="OUT_Other" name="Other Expense" stackId="spending" fill="#475569" radius={[0, 0, 4, 4]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        ) : (
+                                            <ResponsiveContainer width="99%" height="100%">
+                                                <LineChart data={dailyActivity}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+                                                    <XAxis dataKey="day" stroke="#666" fontSize={10} tickLine={false} axisLine={false} interval={spendingGrouping === 'day' ? 2 : 0} />
+                                                    <YAxis stroke="#666" fontSize={10} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} />
+                                                    <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
+                                                    <RechartsTooltip content={<CustomTooltip selectedDate={selectedDate} getMonthLabel={getMonthLabel} formatMoney={formatMoney} categories={categories} />} />
+                                                    <Line type="monotone" dataKey="net" name="Net Flow" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1 }} activeDot={{ r: 5 }} />
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        )
                                     ) : (
                                         <div className="h-full flex flex-col items-center justify-center text-slate-400">
                                             <span className="text-xs">No transactions found for {getMonthLabel(selectedDate)}</span>
@@ -2249,22 +2389,50 @@ const FinanceModule = ({
                         <div className="flex items-center gap-4 flex-wrap">
                             <h2 className="text-xl md:text-2xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
                                 {expandedChart === 'pie' ? <PieChart className="w-6 h-6 md:w-8 md:h-8 text-purple-500" /> : <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-blue-500" />}
-                                {expandedChart === 'pie' ? (analyticsSource === 'actual' ? 'Spending Breakdown (Actual)' : 'Budget Allocation (Planned)') : 'Daily Spending Flow'}
+                                {expandedChart === 'pie' ? (analyticsSource === 'actual' ? 'Spending Breakdown (Actual)' : 'Budget Allocation (Planned)') : 'Spending Flow'}
                             </h2>
                             {expandedChart === 'bar' && (
-                                <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm ml-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Category:</span>
-                                    <select
-                                        value={dailyChartCategoryFilter}
-                                        onChange={e => setDailyChartCategoryFilter(e.target.value)}
-                                        className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-3 py-1 outline-none focus:border-blue-500 max-w-[180px] truncate"
-                                    >
-                                        <option value="all">All Categories</option>
-                                        {categories.map(c => (
-                                            <option key={c.id} value={c.id}>{c.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <>
+                                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm ml-2">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Category:</span>
+                                        <select
+                                            value={dailyChartCategoryFilter}
+                                            onChange={e => setDailyChartCategoryFilter(e.target.value)}
+                                            className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-3 py-1 outline-none focus:border-blue-500 max-w-[180px] truncate"
+                                        >
+                                            <option value="all">All Categories</option>
+                                            {categories.map(c => (
+                                                <option key={c.id} value={c.id}>{c.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Grouping:</span>
+                                        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 text-[9px] font-bold uppercase tracking-wider">
+                                            <button 
+                                                type="button"
+                                                onClick={() => setSpendingGrouping('day')} 
+                                                className={`px-2 py-1 rounded-md transition-all ${spendingGrouping === 'day' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                            >
+                                                Days
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setSpendingGrouping('week')} 
+                                                className={`px-2 py-1 rounded-md transition-all ${spendingGrouping === 'week' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                            >
+                                                Weeks
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setSpendingGrouping('month')} 
+                                                className={`px-2 py-1 rounded-md transition-all ${spendingGrouping === 'month' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                            >
+                                                Months
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
                             )}
                         </div>
                         <button onClick={() => setExpandedChart(null)} className="p-3 bg-white shadow-sm border border-slate-200 hover:bg-slate-100 rounded-full transition-colors flex items-center justify-center shrink-0">
@@ -2345,82 +2513,38 @@ const FinanceModule = ({
                         {expandedChart === 'bar' && dailyActivity.length > 0 && (
                             <div className="flex flex-col w-full h-full">
                                 {/* Chart Section */}
-                                <div className="w-full h-[40vh] md:h-3/5 p-6 md:p-8 border-b border-slate-200 shrink-0">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={dailyActivity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-                                            <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickMargin={8} />
-                                            <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} tickMargin={8} />
-                                            <RechartsTooltip content={<CustomTooltip selectedDate={selectedDate} getMonthLabel={getMonthLabel} formatMoney={formatMoney} />} />
-                                            {incomeCategories.map(c => (
-                                                <Bar key={c.id} dataKey={`IN_${c.label}`} name={c.label} stackId="income" fill={c.color || '#10b981'} radius={[0, 0, 0, 0]} maxBarSize={40} />
-                                            ))}
-                                            <Bar dataKey="IN_Other" name="Other Income" stackId="income" fill="#64748b" radius={[0, 0, 0, 0]} maxBarSize={40} />
-                                            
-                                            {expenseCategories.map(c => (
-                                                <Bar key={c.id} dataKey={`OUT_${c.label}`} name={c.label} stackId="expense" fill={c.color || '#ef4444'} radius={[0, 0, 0, 0]} maxBarSize={40} />
-                                            ))}
-                                            <Bar dataKey="OUT_Other" name="Other Expense" stackId="expense" fill="#475569" radius={[0, 0, 0, 0]} maxBarSize={40} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                                {/* Details List Section */}
-                                <div className="w-full h-auto flex-1 p-6 md:p-8 bg-slate-50/50 overflow-y-auto">
-                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 sticky top-0 bg-slate-50/90 backdrop-blur pb-2 z-10">Daily Ledger</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 pb-8">
-                                        {dailyActivity.filter(d => d.income > 0 || d.expense > 0).sort((a,b) => parseInt(b.day) - parseInt(a.day)).map((day, idx) => {
-                                            const net = day.income - day.expense;
-                                            const dayTx = filteredMonthTransactions.filter(t => 
-                                                t.createdAt.startsWith(day.fullDate) && 
-                                                (dailyChartCategoryFilter === 'all' || t.categoryId === dailyChartCategoryFilter)
-                                            );
-                                            return (
-                                                <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-blue-300 transition-colors">
-                                                    <div className="flex justify-between items-center mb-3">
-                                                        <div className="text-xs font-black text-slate-800 uppercase bg-slate-100 px-3 py-1 rounded-lg">
-                                                            {getMonthLabel(selectedDate)} {day.day}
-                                                        </div>
-                                                        <div className={`text-xs font-black ${net >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                                            {net >= 0 ? '+' : ''}{formatMoney(net)} Net
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex justify-between text-[11px] font-bold bg-slate-50 p-2 rounded-lg">
-                                                        <div className="text-green-600 flex flex-col">
-                                                            <span className="text-[9px] text-slate-400">IN</span>
-                                                            {formatMoney(day.income)}
-                                                        </div>
-                                                        <div className="text-red-600 flex flex-col text-right">
-                                                            <span className="text-[9px] text-slate-400">OUT</span>
-                                                            {formatMoney(day.expense)}
-                                                        </div>
-                                                    </div>
-                                                    {dayTx.length > 0 && (
-                                                        <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5 max-h-[120px] overflow-y-auto no-scrollbar">
-                                                            {dayTx.map(t => {
-                                                                const cat = categories.find(c => c.id === t.categoryId);
-                                                                return (
-                                                                    <div key={t.id} className="flex justify-between items-center text-[10px]">
-                                                                        <span className="truncate text-slate-600 flex items-center gap-1.5 max-w-[70%]">
-                                                                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: t.type === 'transfer' ? '#3b82f6' : (cat?.color || '#94a3b8') }} />
-                                                                            <span className="font-medium truncate">{t.description || (t.type === 'transfer' ? 'Transfer' : 'Uncategorized')}</span>
-                                                                        </span>
-                                                                        <span className={`font-mono font-bold shrink-0 ${t.type === 'income' ? 'text-green-600' : t.type === 'expense' ? 'text-red-600' : 'text-blue-600'}`}>
-                                                                            {t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''}{formatMoney(t.amount)}
-                                                                        </span>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                        {dailyActivity.filter(d => d.income > 0 || d.expense > 0).length === 0 && (
-                                            <div className="col-span-full text-center p-8 text-slate-400 italic text-sm border border-dashed border-slate-300 rounded-xl">
-                                                No activity recorded this month.
-                                            </div>
-                                        )}
-                                    </div>
+                                <div className="w-full h-full p-6 md:p-12">
+                                    {spendingChartType === 'bar' ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={dailyActivity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+                                                <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickMargin={8} interval={spendingGrouping === 'day' ? 2 : 0} />
+                                                <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} tickMargin={8} />
+                                                <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
+                                                <RechartsTooltip content={<CustomTooltip selectedDate={selectedDate} getMonthLabel={getMonthLabel} formatMoney={formatMoney} categories={categories} />} />
+                                                {incomeCategories.map(c => (
+                                                    <Bar key={c.id} dataKey={`IN_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#10b981'} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                                ))}
+                                                <Bar dataKey="IN_Other" name="Other Income" stackId="spending" fill="#64748b" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                                
+                                                {expenseCategories.map(c => (
+                                                    <Bar key={c.id} dataKey={`OUT_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#ef4444'} radius={[0, 0, 4, 4]} maxBarSize={40} />
+                                                ))}
+                                                <Bar dataKey="OUT_Other" name="Other Expense" stackId="spending" fill="#475569" radius={[0, 0, 4, 4]} maxBarSize={40} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={dailyActivity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+                                                <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickMargin={8} interval={spendingGrouping === 'day' ? 2 : 0} />
+                                                <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} tickMargin={8} />
+                                                <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
+                                                <RechartsTooltip content={<CustomTooltip selectedDate={selectedDate} getMonthLabel={getMonthLabel} formatMoney={formatMoney} categories={categories} />} />
+                                                <Line type="monotone" dataKey="net" name="Net Flow" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1 }} activeDot={{ r: 5 }} />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    )}
                                 </div>
                             </div>
                         )}
