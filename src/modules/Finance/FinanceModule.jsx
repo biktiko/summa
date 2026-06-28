@@ -9,6 +9,12 @@ import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
     PieChart as RePieChart, Pie, Cell, Legend, BarChart, Bar, ReferenceLine
 } from 'recharts';
+import { 
+    exportTransactionsToExcel, 
+    exportAnalyticsToExcel, 
+    exportBudgetToExcel, 
+    exportProjectsToExcel 
+} from './utils/financeExport';
 
 // --- Helper Components ---
 
@@ -295,7 +301,7 @@ const FinanceModule = ({
     const [showDailyAvgBreakdown, setShowDailyAvgBreakdown] = useState(false);
     const [balanceGrouping, setBalanceGrouping] = useState('day'); // 'day' | 'week' | 'month'
     const [spendingGrouping, setSpendingGrouping] = useState('day'); // 'day' | 'week' | 'month'
-    const [spendingChartType, setSpendingChartType] = useState('bar'); // 'bar' | 'line'
+    const [balanceChartMode, setBalanceChartMode] = useState('net_worth'); // 'net_worth' | 'net_flow'
 
     // Transaction Management State
     const [newTransaction, setNewTransaction] = useState({
@@ -646,6 +652,7 @@ const FinanceModule = ({
                 const dayStr = curr.toISOString().slice(0, 10);
                 const dayTransactions = rangeTx.filter(t => t.createdAt.startsWith(dayStr));
                 
+                let prevBal = currentBal;
                 dayTransactions.forEach(t => {
                     const amount = Number(t.amount) || 0;
                     if (t.type === 'income') {
@@ -663,7 +670,8 @@ const FinanceModule = ({
                 points.push({
                     label: curr.getDate().toString(),
                     fullDate: dayStr,
-                    balance: currentBal
+                    balance: currentBal,
+                    netFlow: currentBal - prevBal
                 });
                 
                 curr.setDate(curr.getDate() + 1);
@@ -686,6 +694,7 @@ const FinanceModule = ({
                     return d >= weekStart && d <= weekEnd;
                 });
 
+                let prevBal = currentBal;
                 weekTransactions.forEach(t => {
                     const amount = Number(t.amount) || 0;
                     if (t.type === 'income') {
@@ -704,7 +713,8 @@ const FinanceModule = ({
                 points.push({
                     label: labelStr,
                     fullDate: weekStart.toISOString().slice(0, 10),
-                    balance: currentBal
+                    balance: currentBal,
+                    netFlow: currentBal - prevBal
                 });
                 curr.setDate(curr.getDate() + 7);
             }
@@ -718,6 +728,7 @@ const FinanceModule = ({
                 const nextMonth = new Date(curr.getFullYear(), curr.getMonth() + 1, 1);
                 const monthTransactionsList = rangeTx.filter(t => t.createdAt.startsWith(monthStr));
 
+                let prevBal = currentBal;
                 monthTransactionsList.forEach(t => {
                     const amount = Number(t.amount) || 0;
                     if (t.type === 'income') {
@@ -736,7 +747,8 @@ const FinanceModule = ({
                 points.push({
                     label: labelStr,
                     fullDate: monthStr,
-                    balance: currentBal
+                    balance: currentBal,
+                    netFlow: currentBal - prevBal
                 });
 
                 curr = nextMonth;
@@ -924,6 +936,63 @@ const FinanceModule = ({
     }, [analyticsSource, filteredMonthTransactions, resolvedDateRange, dailyChartCategoryFilter, categories, spendingGrouping]);
 
 
+    // --- Export Actions ---
+    const handleExport = () => {
+        const dateLabel = getDateRangeLabel();
+        if (dashboardTab === 'history') {
+            const filteredList = monthTransactions.filter(t => {
+                if (historyFilter.type !== 'all' && t.type !== historyFilter.type) return false;
+                if (historyFilter.categoryId !== 'all' && t.categoryId !== historyFilter.categoryId) return false;
+                if (historyFilter.accountId !== 'all') {
+                    if (t.type === 'transfer') {
+                        if (t.accountId !== historyFilter.accountId && t.toAccountId !== historyFilter.accountId) return false;
+                    } else {
+                        const accId = t.accountId || '';
+                        if (accId !== historyFilter.accountId) return false;
+                    }
+                }
+                const amount = Number(t.amount);
+                if (historyFilter.minAmount !== '' && amount < Number(historyFilter.minAmount)) return false;
+                if (historyFilter.maxAmount !== '' && amount > Number(historyFilter.maxAmount)) return false;
+                return true;
+            }).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+            exportTransactionsToExcel(filteredList, categories, accounts, dateLabel);
+        } else if (dashboardTab === 'overview') {
+            exportAnalyticsToExcel(dailyActivity, categoryBreakdown, balanceHistoryData, activeDaysInMonth, dateLabel);
+        } else if (dashboardTab === 'budget') {
+            exportBudgetToExcel(categories, planningMonthTransactions, dateLabel, selectedDate.getMonth());
+        } else if (dashboardTab === 'projects') {
+            let filteredProjects = projects;
+            if (projectStatusFilter !== 'all') {
+                filteredProjects = filteredProjects.filter(p => p.status === projectStatusFilter);
+            }
+            if (projectClientFilter !== 'all') {
+                filteredProjects = filteredProjects.filter(p => p.client === projectClientFilter);
+            }
+            if (dateFilterType === 'month') {
+                const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+                const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59);
+                filteredProjects = filteredProjects.filter(p => {
+                    const d = new Date(p.receivedAt || p.createdAt || p.id);
+                    return d >= startOfMonth && d <= endOfMonth;
+                });
+            } else if (dateFilterType === 'custom') {
+                const start = customStartDate ? new Date(customStartDate) : null;
+                const end = customEndDate ? new Date(customEndDate) : null;
+                if (start) start.setHours(0,0,0,0);
+                if (end) end.setHours(23,59,59,999);
+                filteredProjects = filteredProjects.filter(p => {
+                    const d = new Date(p.receivedAt || p.createdAt || p.id);
+                    if (start && d < start) return false;
+                    if (end && d > end) return false;
+                    return true;
+                });
+            }
+            exportProjectsToExcel(filteredProjects, transactions, dateLabel);
+        }
+    };
+
+
     // --- Actions ---
 
     const handleSaveAccount = async (e) => {
@@ -1094,8 +1163,13 @@ const FinanceModule = ({
                     )}
                 </div>
 
-                {/* Navigation Tabs - Match Task/Portfolio Style */}
-                 <div className="flex bg-white shadow-sm border border-slate-200/50 p-1 rounded-lg border border-slate-200 overflow-x-auto no-scrollbar w-full md:w-auto self-start md:self-end">
+                <div className="flex items-center gap-2 mt-4 md:mt-0 flex-wrap w-full md:w-auto justify-center md:justify-end">
+                    <button onClick={handleExport} title="Export to Excel" className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm shrink-0 flex items-center justify-center text-slate-600 hover:text-green-600 group h-full">
+                        <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                        <span className="ml-2 text-[10px] font-bold uppercase tracking-wider hidden md:inline">Export</span>
+                    </button>
+                    {/* Navigation Tabs - Match Task/Portfolio Style */}
+                    <div className="flex bg-white shadow-sm border border-slate-200/50 p-1 rounded-lg border border-slate-200 overflow-x-auto no-scrollbar w-full md:w-auto self-start md:self-end">
                     {[
                         { id: 'history', label: 'History', color: 'bg-blue-600 text-white shadow-lg' },
                         { id: 'overview', label: 'Analytics', color: 'bg-green-600 text-white shadow-lg' },
@@ -1110,6 +1184,7 @@ const FinanceModule = ({
                             {t.label}
                         </button>
                     ))}
+                </div>
                 </div>
             </div>
 
@@ -1854,23 +1929,7 @@ const FinanceModule = ({
                                                         </button>
                                                     </div>
 
-                                                    {/* Chart Type Toggle */}
-                                                    <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 text-[9px] font-bold uppercase tracking-wider">
-                                                        <button 
-                                                            type="button"
-                                                            onClick={() => setSpendingChartType('bar')} 
-                                                            className={`px-2.5 py-1 rounded-md transition-all ${spendingChartType === 'bar' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                                                        >
-                                                            Bar
-                                                        </button>
-                                                        <button 
-                                                            type="button"
-                                                            onClick={() => setSpendingChartType('line')} 
-                                                            className={`px-2.5 py-1 rounded-md transition-all ${spendingChartType === 'line' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                                                        >
-                                                            Line
-                                                        </button>
-                                                    </div>
+
                                                 </>
                                             )}
                                             {analyticsSource !== 'budget' && dailyActivity.length > 0 && (
@@ -1884,9 +1943,8 @@ const FinanceModule = ({
                                             Budget is averaged daily. Switch to 'Actuals' to see daily transactions.
                                         </div>
                                     ) : dailyActivity.length > 0 ? (
-                                        spendingChartType === 'bar' ? (
                                             <ResponsiveContainer width="99%" height="100%">
-                                                <BarChart data={dailyActivity}>
+                                                <BarChart data={dailyActivity} stackOffset="sign">
                                                     <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
                                                     <XAxis dataKey="day" stroke="#666" fontSize={10} tickLine={false} axisLine={false} interval={spendingGrouping === 'day' ? 2 : 0} />
                                                     <YAxis stroke="#666" fontSize={10} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} />
@@ -1903,18 +1961,6 @@ const FinanceModule = ({
                                                     <Bar dataKey="OUT_Other" name="Other Expense" stackId="spending" fill="#475569" radius={[0, 0, 4, 4]} />
                                                 </BarChart>
                                             </ResponsiveContainer>
-                                        ) : (
-                                            <ResponsiveContainer width="99%" height="100%">
-                                                <LineChart data={dailyActivity}>
-                                                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-                                                    <XAxis dataKey="day" stroke="#666" fontSize={10} tickLine={false} axisLine={false} interval={spendingGrouping === 'day' ? 2 : 0} />
-                                                    <YAxis stroke="#666" fontSize={10} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} />
-                                                    <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
-                                                    <RechartsTooltip content={<CustomTooltip selectedDate={selectedDate} getMonthLabel={getMonthLabel} formatMoney={formatMoney} categories={categories} />} />
-                                                    <Line type="monotone" dataKey="net" name="Net Flow" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1 }} activeDot={{ r: 5 }} />
-                                                </LineChart>
-                                            </ResponsiveContainer>
-                                        )
                                     ) : (
                                         <div className="h-full flex flex-col items-center justify-center text-slate-400">
                                             <span className="text-xs">No transactions found for {getMonthLabel(selectedDate)}</span>
@@ -1926,32 +1972,51 @@ const FinanceModule = ({
 
                              {/* Balance History Chart */}
                              <div className="bg-white shadow-sm border border-slate-200 p-6 rounded-2xl h-[400px] min-h-[400px] flex flex-col relative group">
-                                 <div className="flex justify-between items-center mb-4">
+                                 <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
                                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                                         <Wallet className="w-4 h-4 text-emerald-500"/> Balance History (Net Worth)
+                                         <Wallet className="w-4 h-4 text-emerald-500"/> Balance History
                                      </h3>
-                                     <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 text-[9px] font-bold uppercase tracking-wider">
-                                         <button 
-                                             type="button"
-                                             onClick={() => setBalanceGrouping('day')} 
-                                             className={`px-2.5 py-1 rounded-md transition-all ${balanceGrouping === 'day' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                                         >
-                                             Days
-                                         </button>
-                                         <button 
-                                             type="button"
-                                             onClick={() => setBalanceGrouping('week')} 
-                                             className={`px-2.5 py-1 rounded-md transition-all ${balanceGrouping === 'week' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                                         >
-                                             Weeks
-                                         </button>
-                                         <button 
-                                             type="button"
-                                             onClick={() => setBalanceGrouping('month')} 
-                                             className={`px-2.5 py-1 rounded-md transition-all ${balanceGrouping === 'month' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                                         >
-                                             Months
-                                         </button>
+                                     <div className="flex items-center gap-3 flex-wrap">
+                                         <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 text-[9px] font-bold uppercase tracking-wider">
+                                             <button 
+                                                 type="button"
+                                                 onClick={() => setBalanceChartMode('net_worth')} 
+                                                 className={`px-2.5 py-1 rounded-md transition-all ${balanceChartMode === 'net_worth' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                             >
+                                                 Balance
+                                             </button>
+                                             <button 
+                                                 type="button"
+                                                 onClick={() => setBalanceChartMode('net_flow')} 
+                                                 className={`px-2.5 py-1 rounded-md transition-all ${balanceChartMode === 'net_flow' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                             >
+                                                 Net Flow
+                                             </button>
+                                         </div>
+                                         <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 text-[9px] font-bold uppercase tracking-wider">
+                                             <button 
+                                                 type="button"
+                                                 onClick={() => setBalanceGrouping('day')} 
+                                                 className={`px-2.5 py-1 rounded-md transition-all ${balanceGrouping === 'day' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                             >
+                                                 Days
+                                             </button>
+                                             <button 
+                                                 type="button"
+                                                 onClick={() => setBalanceGrouping('week')} 
+                                                 className={`px-2.5 py-1 rounded-md transition-all ${balanceGrouping === 'week' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                             >
+                                                 Weeks
+                                             </button>
+                                             <button 
+                                                 type="button"
+                                                 onClick={() => setBalanceGrouping('month')} 
+                                                 className={`px-2.5 py-1 rounded-md transition-all ${balanceGrouping === 'month' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                             >
+                                                 Months
+                                             </button>
+                                         </div>
+                                         <button onClick={() => setExpandedChart('area')} className="text-slate-400 hover:text-slate-800 transition-colors opacity-0 group-hover:opacity-100"><Maximize2 className="w-4 h-4" /></button>
                                      </div>
                                  </div>
                                  <div className="flex-1 w-full h-full min-h-0">
@@ -1960,8 +2025,8 @@ const FinanceModule = ({
                                              <AreaChart data={balanceHistoryData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                                                  <defs>
                                                      <linearGradient id="balanceGrad" x1="0" y1="0" x2="0" y2="1">
-                                                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                                                         <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                                         <stop offset="5%" stopColor={balanceChartMode === 'net_worth' ? "#10b981" : "#3b82f6"} stopOpacity={0.2}/>
+                                                         <stop offset="95%" stopColor={balanceChartMode === 'net_worth' ? "#10b981" : "#3b82f6"} stopOpacity={0}/>
                                                      </linearGradient>
                                                  </defs>
                                                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -1987,12 +2052,12 @@ const FinanceModule = ({
                                                      contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
                                                      itemStyle={{ color: '#fff', fontSize: '12px', fontFamily: 'monospace' }} 
                                                      labelStyle={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }} 
-                                                     formatter={(val) => [formatMoney(val), "Net Worth"]} 
+                                                     formatter={(val) => [formatMoney(val), balanceChartMode === 'net_worth' ? "Net Worth" : "Net Flow"]} 
                                                  />
                                                  <Area 
                                                      type="monotone" 
-                                                     dataKey="balance" 
-                                                     stroke="#10b981" 
+                                                     dataKey={balanceChartMode === 'net_worth' ? "balance" : "netFlow"} 
+                                                     stroke={balanceChartMode === 'net_worth' ? "#10b981" : "#3b82f6"} 
                                                      strokeWidth={2.5}
                                                      fillOpacity={1} 
                                                      fill="url(#balanceGrad)" 
@@ -2510,13 +2575,63 @@ const FinanceModule = ({
                             </>
                         )}
 
+                        {expandedChart === 'area' && balanceHistoryData.length > 0 && (
+                            <div className="flex flex-col w-full h-full">
+                                {/* Chart Section */}
+                                <div className="w-full h-full p-6 md:p-12">
+                                     <ResponsiveContainer width="100%" height="100%">
+                                         <AreaChart data={balanceHistoryData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                                             <defs>
+                                                 <linearGradient id="balanceGradExpand" x1="0" y1="0" x2="0" y2="1">
+                                                     <stop offset="5%" stopColor={balanceChartMode === 'net_worth' ? "#10b981" : "#3b82f6"} stopOpacity={0.2}/>
+                                                     <stop offset="95%" stopColor={balanceChartMode === 'net_worth' ? "#10b981" : "#3b82f6"} stopOpacity={0}/>
+                                                 </linearGradient>
+                                             </defs>
+                                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                             <XAxis 
+                                                 dataKey="label" 
+                                                 stroke="#94a3b8" 
+                                                 fontSize={12} 
+                                                 fontWeight={600}
+                                                 tickLine={false} 
+                                                 axisLine={false} 
+                                                 tickMargin={12}
+                                             />
+                                             <YAxis 
+                                                 stroke="#94a3b8" 
+                                                 fontSize={12} 
+                                                 fontWeight={600}
+                                                 tickLine={false} 
+                                                 axisLine={false} 
+                                                 tickFormatter={val => formatMoney(val)}
+                                                 tickMargin={12}
+                                             />
+                                             <RechartsTooltip 
+                                                 contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
+                                                 itemStyle={{ color: '#fff', fontSize: '14px', fontFamily: 'monospace' }} 
+                                                 labelStyle={{ color: '#94a3b8', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }} 
+                                                 formatter={(val) => [formatMoney(val), balanceChartMode === 'net_worth' ? "Net Worth" : "Net Flow"]} 
+                                             />
+                                             <Area 
+                                                 type="monotone" 
+                                                 dataKey={balanceChartMode === 'net_worth' ? "balance" : "netFlow"} 
+                                                 stroke={balanceChartMode === 'net_worth' ? "#10b981" : "#3b82f6"} 
+                                                 strokeWidth={3}
+                                                 fillOpacity={1} 
+                                                 fill="url(#balanceGradExpand)" 
+                                             />
+                                         </AreaChart>
+                                     </ResponsiveContainer>
+                                </div>
+                            </div>
+                        )}
+
                         {expandedChart === 'bar' && dailyActivity.length > 0 && (
                             <div className="flex flex-col w-full h-full">
                                 {/* Chart Section */}
                                 <div className="w-full h-full p-6 md:p-12">
-                                    {spendingChartType === 'bar' ? (
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={dailyActivity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                            <BarChart data={dailyActivity} stackOffset="sign" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                                 <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
                                                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickMargin={8} interval={spendingGrouping === 'day' ? 2 : 0} />
                                                 <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} tickMargin={8} />
@@ -2533,18 +2648,6 @@ const FinanceModule = ({
                                                 <Bar dataKey="OUT_Other" name="Other Expense" stackId="spending" fill="#475569" radius={[0, 0, 4, 4]} maxBarSize={40} />
                                             </BarChart>
                                         </ResponsiveContainer>
-                                    ) : (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={dailyActivity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-                                                <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickMargin={8} interval={spendingGrouping === 'day' ? 2 : 0} />
-                                                <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} tickMargin={8} />
-                                                <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
-                                                <RechartsTooltip content={<CustomTooltip selectedDate={selectedDate} getMonthLabel={getMonthLabel} formatMoney={formatMoney} categories={categories} />} />
-                                                <Line type="monotone" dataKey="net" name="Net Flow" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 1 }} activeDot={{ r: 5 }} />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    )}
                                 </div>
                             </div>
                         )}
