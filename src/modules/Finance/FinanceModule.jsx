@@ -390,6 +390,7 @@ const FinanceModule = ({
     const [lookbackDateRange, setLookbackDateRange] = useState({ start: defaultLookback.toISOString().slice(0, 10), end: new Date().toISOString().slice(0, 10) });
     
     const [selectedPredictionCategories, setSelectedPredictionCategories] = useState([]); // array of category IDs, empty means all
+    const [planningAccountId, setPlanningAccountId] = useState('all');
     const [isAddingExpected, setIsAddingExpected] = useState(false);
     const [isEditingExpectedId, setIsEditingExpectedId] = useState(null);
     const [expectedForm, setExpectedForm] = useState({ date: defaultTarget.toISOString().slice(0, 10), description: '', amount: '', type: 'expense', categoryId: '' });
@@ -1429,7 +1430,18 @@ const FinanceModule = ({
                         // 1. Calculate Daily Average Spend & Income (Lookback)
                         const lookbackTx = transactions.filter(t => {
                             const d = new Date(t.date || t.createdAt);
-                            return d >= lookbackStart && d <= lookbackEnd;
+                            if (d < lookbackStart || d > lookbackEnd) return false;
+                            
+                            if (planningAccountId !== 'all') {
+                                if (t.type === 'transfer') {
+                                    if (t.accountId !== planningAccountId && t.toAccountId !== planningAccountId) return false;
+                                } else {
+                                    const accId = t.accountId || 'legacy';
+                                    if (accId !== planningAccountId) return false;
+                                }
+                            }
+                            
+                            return true;
                         });
                         
                         let effectiveLookbackStart = lookbackStart;
@@ -1443,8 +1455,16 @@ const FinanceModule = ({
                         
                         const lookbackDays = Math.max(1, Math.floor((lookbackEnd - effectiveLookbackStart) / (1000 * 60 * 60 * 24)) + 1);
                         
-                        const lookbackExpenses = lookbackTx.filter(t => t.type === 'expense');
-                        const lookbackIncomes = lookbackTx.filter(t => t.type === 'income');
+                        const lookbackExpenses = lookbackTx.filter(t => {
+                            if (t.type === 'expense') return true;
+                            if (planningAccountId !== 'all' && t.type === 'transfer' && t.accountId === planningAccountId) return true;
+                            return false;
+                        });
+                        const lookbackIncomes = lookbackTx.filter(t => {
+                            if (t.type === 'income') return true;
+                            if (planningAccountId !== 'all' && t.type === 'transfer' && t.toAccountId === planningAccountId) return true;
+                            return false;
+                        });
 
                         const filteredLookbackExpenses = selectedPredictionCategories.length > 0 
                             ? lookbackExpenses.filter(t => selectedPredictionCategories.includes(t.categoryId))
@@ -1515,7 +1535,12 @@ const FinanceModule = ({
                         // We need to calculate running balance correctly. 
                         // If predictionStart < today, we need historical balance. 
                         // The easiest way is to calculate from initial accounts balance up to predictionStart, then run loop.
-                        let runningBalance = accounts.reduce((sum, a) => sum + (Number(a.initialBalance) || 0), 0);
+                        let runningBalance = 0;
+                        accounts.forEach(a => {
+                            if (planningAccountId === 'all' || a.id === planningAccountId) {
+                                runningBalance += (Number(a.initialBalance) || 0);
+                            }
+                        });
                         const txList = [...transactions].sort((a,b) => new Date(a.date || a.createdAt) - new Date(b.date || b.createdAt));
                         
                         // Fast forward balance up to predictionStart
@@ -1524,8 +1549,21 @@ const FinanceModule = ({
                             const d = new Date(t.date || t.createdAt);
                             d.setHours(0,0,0,0);
                             if (d < predictionStart) {
-                                if (t.type === 'income') runningBalance += Number(t.amount);
-                                if (t.type === 'expense') runningBalance -= Number(t.amount);
+                                if (planningAccountId !== 'all') {
+                                    if (t.type === 'transfer') {
+                                        if (t.accountId === planningAccountId) runningBalance -= Number(t.amount);
+                                        if (t.toAccountId === planningAccountId) runningBalance += Number(t.amount);
+                                    } else {
+                                        const accId = t.accountId || 'legacy';
+                                        if (accId === planningAccountId) {
+                                            if (t.type === 'income') runningBalance += Number(t.amount);
+                                            if (t.type === 'expense') runningBalance -= Number(t.amount);
+                                        }
+                                    }
+                                } else {
+                                    if (t.type === 'income') runningBalance += Number(t.amount);
+                                    if (t.type === 'expense') runningBalance -= Number(t.amount);
+                                }
                             }
                         });
                         
@@ -1533,14 +1571,23 @@ const FinanceModule = ({
                         let windowExpectedIncome = 0;
                         let windowPredictedExpenses = 0;
                         
+                        // Add the starting point to the graph (1 day before the window starts)
+                        const startPointDate = new Date(predictionStart);
+                        startPointDate.setDate(startPointDate.getDate() - 1);
+                        chartData.push({
+                            date: formatDateStr(startPointDate),
+                            balance: windowStartingBalance,
+                            shortDate: startPointDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        });
+                        
                         for (let i = 0; i <= daysInWindow; i++) {
                             const d = new Date(predictionStart);
                             d.setDate(d.getDate() + i);
                             d.setHours(0,0,0,0);
                             const dateStr = formatDateStr(d);
                             
-                            if (d < today) {
-                                // Real history
+                            // 1. Real history (past and today)
+                            if (d <= today) {
                                 const todaysTx = txList.filter(t => {
                                     const td = new Date(t.date || t.createdAt);
                                     return formatDateStr(td) === dateStr;
@@ -1548,21 +1595,42 @@ const FinanceModule = ({
                                 let dayInc = 0;
                                 let dayExp = 0;
                                 todaysTx.forEach(t => {
-                                    if (t.type === 'income') dayInc += Number(t.amount);
-                                    if (t.type === 'expense') dayExp += Number(t.amount);
+                                    if (planningAccountId !== 'all') {
+                                        if (t.type === 'transfer') {
+                                            if (t.accountId === planningAccountId) {
+                                                runningBalance -= Number(t.amount);
+                                                dayExp += Number(t.amount);
+                                            }
+                                            if (t.toAccountId === planningAccountId) {
+                                                runningBalance += Number(t.amount);
+                                                dayInc += Number(t.amount);
+                                            }
+                                        } else {
+                                            const accId = t.accountId || 'legacy';
+                                            if (accId === planningAccountId) {
+                                                if (t.type === 'income') { dayInc += Number(t.amount); runningBalance += Number(t.amount); }
+                                                if (t.type === 'expense') { dayExp += Number(t.amount); runningBalance -= Number(t.amount); }
+                                            }
+                                        }
+                                    } else {
+                                        if (t.type === 'income') { dayInc += Number(t.amount); runningBalance += Number(t.amount); }
+                                        if (t.type === 'expense') { dayExp += Number(t.amount); runningBalance -= Number(t.amount); }
+                                    }
                                 });
-                                runningBalance += dayInc;
-                                runningBalance -= dayExp;
                                 windowExpectedIncome += dayInc;
                                 windowPredictedExpenses += dayExp;
-                            } else {
-                                // Prediction
-                                if (d > today) {
-                                    let dayRecurringInc = 0;
-                                    
-                                    if (planningMode === 'history') {
-                                        dayRecurringInc = dailyRecurringIncome;
-                                    } else {
+                            }
+                            
+                            // 2. Prediction baselines (strictly future)
+                            if (d > today) {
+                                let dayRecurringInc = 0;
+                                const accountObj = accounts.find(a => a.id === planningAccountId);
+                                const isMain = planningAccountId === 'all' || (accountObj && accountObj.label.toLowerCase().includes('main'));
+                                
+                                if (planningMode === 'history') {
+                                    if (isMain) dayRecurringInc = dailyRecurringIncome;
+                                } else {
+                                    if (isMain) {
                                         const activeIncomeCategories = categories.filter(c => c.type === 'income');
                                         activeIncomeCategories.forEach(c => {
                                             const transferDay = Number(c.dayOfTransfer) || 1;
@@ -1574,26 +1642,34 @@ const FinanceModule = ({
                                             }
                                         });
                                     }
-                                    
-                                    runningBalance += dayRecurringInc;
-                                    runningBalance -= dailyAverageSpend;
-                                    windowExpectedIncome += dayRecurringInc;
-                                    windowPredictedExpenses += dailyAverageSpend;
                                 }
                                 
-                                if (planningMode === 'project') {
-                                    const todaysIncEvents = expectedIncomeEvents.filter(e => e.date === dateStr);
-                                    todaysIncEvents.forEach(e => {
+                                runningBalance += dayRecurringInc;
+                                runningBalance -= dailyAverageSpend;
+                                windowExpectedIncome += dayRecurringInc;
+                                windowPredictedExpenses += dailyAverageSpend;
+                            }
+                            
+                            // 3. Expected Specific Events (today and future)
+                            if (d >= today && planningMode === 'project') {
+                                const accountObj = accounts.find(a => a.id === planningAccountId);
+                                const isMain = planningAccountId === 'all' || (accountObj && accountObj.label.toLowerCase().includes('main'));
+                                
+                                const todaysIncEvents = expectedIncomeEvents.filter(e => e.date === dateStr);
+                                todaysIncEvents.forEach(e => {
+                                    if (isMain) {
                                         runningBalance += e.amount;
                                         windowExpectedIncome += e.amount;
-                                    });
-                                    
-                                    const todaysExpEvents = expectedExpenseEvents.filter(e => e.date === dateStr);
-                                    todaysExpEvents.forEach(e => {
+                                    }
+                                });
+                                
+                                const todaysExpEvents = expectedExpenseEvents.filter(e => e.date === dateStr);
+                                todaysExpEvents.forEach(e => {
+                                    if (isMain) {
                                         runningBalance -= e.amount;
                                         windowPredictedExpenses += e.amount;
-                                    });
-                                }
+                                    }
+                                });
                             }
                             
                             chartData.push({
@@ -1657,6 +1733,19 @@ const FinanceModule = ({
                                             { label: 'Custom', isCustom: true }
                                         ]} 
                                     />
+                                    <div className="flex-[2] space-y-1 w-full md:w-auto">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Planning Account</label>
+                                        <select 
+                                            value={planningAccountId}
+                                            onChange={e => setPlanningAccountId(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 h-[38px] outline-none focus:border-blue-500"
+                                        >
+                                            <option value="all">All Accounts</option>
+                                            {accounts.map(acc => (
+                                                <option key={acc.id} value={acc.id}>{acc.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                     <div className="flex-[2] space-y-1 w-full relative group">
                                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Expense Categories</label>
                                         <div className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 font-bold cursor-pointer flex justify-between items-center h-[38px]">
@@ -1712,13 +1801,7 @@ const FinanceModule = ({
                                         <div className="text-2xl font-black text-blue-600">
                                             {formatMoney(windowExpectedIncome)}
                                         </div>
-                                        {planningMode === 'history' ? (
-                                            <div className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-wider">
-                                                Based on {formatMoney(dailyRecurringIncome)}/day avg
-                                            </div>
-                                        ) : (
-                                            <div className="text-[9px] text-blue-400 font-bold mt-1">In selected window</div>
-                                        )}
+                                        <div className="text-[9px] text-blue-400 font-bold mt-1">Based on {formatMoney(windowExpectedIncome / (daysInWindow + 1))}/day avg</div>
                                         <Target className="w-12 h-12 absolute -right-3 -bottom-3 text-blue-100 opacity-50" />
                                     </div>
                                     <div className="bg-white p-5 rounded-2xl border border-red-200 shadow-sm relative overflow-hidden bg-red-50/30">
@@ -1726,7 +1809,7 @@ const FinanceModule = ({
                                         <div className="text-2xl font-black text-red-600">
                                             {formatMoney(windowPredictedExpenses)}
                                         </div>
-                                        <div className="text-[9px] text-red-400 font-bold mt-1">Based on {formatMoney(dailyAverageSpend)}/day avg</div>
+                                        <div className="text-[9px] text-red-400 font-bold mt-1">{formatMoney(windowPredictedExpenses / (daysInWindow + 1))}/day avg</div>
                                         <TrendingDown className="w-12 h-12 absolute -right-3 -bottom-3 text-red-100 opacity-50" />
                                     </div>
                                     <div className={`bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden ${balanceBgClass}`}>
