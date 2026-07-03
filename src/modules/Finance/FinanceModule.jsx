@@ -3,7 +3,7 @@ import {
     LayoutDashboard, DollarSign, PieChart, TrendingUp, TrendingDown,
     CreditCard, Wallet, Plus, ArrowUpRight, ArrowDownRight, Filter,
     Download, Settings, CheckSquare, Eye, EyeOff, Trash2, X, ChevronDown,
-    Calendar, Calculator, Edit3, Save as SaveIcon, Maximize2
+    Calendar, Calculator, Edit3, Save as SaveIcon, Maximize2, Target, ChevronRight, CheckCircle2
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -15,6 +15,62 @@ import {
     exportBudgetToExcel, 
     exportProjectsToExcel 
 } from './utils/financeExport';
+
+const DateRangePicker = ({ label, range, setRange, presets }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [isCustom, setIsCustom] = useState(false);
+
+    let activePreset = presets.find(p => !p.isCustom && p.getRange().start === range.start && p.getRange().end === range.end)?.label;
+    if (!activePreset) activePreset = isCustom ? 'Custom Range' : `${new Date(range.start).toLocaleDateString()} - ${new Date(range.end).toLocaleDateString()}`;
+
+    return (
+        <div className="flex-[1.5] space-y-1 w-full relative z-40">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{label}</label>
+            <div 
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 font-bold cursor-pointer flex justify-between items-center h-[38px] transition-all ${isOpen ? 'ring-2 ring-blue-500/20 border-blue-500' : ''}`}
+            >
+                <span className="truncate flex items-center gap-2">
+                    <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                    {activePreset}
+                </span>
+                <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-90' : 'rotate-0'}`} />
+            </div>
+            {isOpen && (
+                <div className="absolute top-[60px] left-0 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] overflow-hidden w-72 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="p-2 border-b border-slate-100 bg-slate-50">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase px-2 mb-1">Quick Select</div>
+                        <div className="grid grid-cols-2 gap-1">
+                            {presets.filter(p => !p.isCustom).map(p => (
+                                <button
+                                    key={p.label}
+                                    onClick={() => { setRange(p.getRange()); setIsCustom(false); setIsOpen(false); }}
+                                    className={`text-[10px] p-2 rounded-lg font-bold transition-colors text-left ${activePreset === p.label ? 'bg-blue-100 text-blue-700' : 'hover:bg-slate-200 text-slate-600'}`}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="p-3">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase mb-2 flex justify-between items-center">
+                            <span>Custom Range</span>
+                            <button onClick={() => setIsCustom(true)} className="text-blue-500 hover:text-blue-700">Select</button>
+                        </div>
+                        {isCustom && (
+                            <div className="flex flex-col gap-2">
+                                <input type="date" value={range.start} onChange={e => setRange({...range, start: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-blue-500 font-bold" />
+                                <div className="text-center text-slate-300 font-black text-xs">TO</div>
+                                <input type="date" value={range.end} onChange={e => setRange({...range, end: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-blue-500 font-bold" />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+            {isOpen && <div className="fixed inset-0 z-[90]" onClick={() => setIsOpen(false)}></div>}
+        </div>
+    );
+};
 
 // --- Helper Components ---
 
@@ -320,11 +376,30 @@ const FinanceModule = ({
     const [projectClientFilter, setProjectClientFilter] = useState('all');
     const [projectStatusFilter, setProjectStatusFilter] = useState('all');
 
+    // Planning/Coming Analytics State
+    const [planningMode, setPlanningMode] = useState('project'); // 'history' | 'project'
+    
+    // Default prediction target: 30 days from now
+    const defaultTarget = new Date();
+    defaultTarget.setDate(defaultTarget.getDate() + 30);
+    const [predictionDateRange, setPredictionDateRange] = useState({ start: new Date().toISOString().slice(0, 10), end: defaultTarget.toISOString().slice(0, 10) });
+    
+    // Default lookback start: 15 days ago
+    const defaultLookback = new Date();
+    defaultLookback.setDate(defaultLookback.getDate() - 15);
+    const [lookbackDateRange, setLookbackDateRange] = useState({ start: defaultLookback.toISOString().slice(0, 10), end: new Date().toISOString().slice(0, 10) });
+    
+    const [selectedPredictionCategories, setSelectedPredictionCategories] = useState([]); // array of category IDs, empty means all
+    const [isAddingExpected, setIsAddingExpected] = useState(false);
+    const [isEditingExpectedId, setIsEditingExpectedId] = useState(null);
+    const [expectedForm, setExpectedForm] = useState({ date: defaultTarget.toISOString().slice(0, 10), description: '', amount: '', type: 'expense', categoryId: '' });
+
     // --- Data Processing (Month-Aware) ---
     const transactions = useMemo(() => userData.transactions || [], [userData.transactions]);
     const projects = useMemo(() => userData.projects || [], [userData.projects]);
     const categories = useMemo(() => userData.categories || [], [userData.categories]);
     const accounts = useMemo(() => userData.accounts || [], [userData.accounts]);
+    const expectedTransactions = useMemo(() => userData.expectedTransactions || [], [userData.expectedTransactions]);
 
     const filterAccountsList = useMemo(() => {
         const list = [...accounts];
@@ -994,7 +1069,46 @@ const FinanceModule = ({
 
 
     // --- Actions ---
+    
+    const handleAddExpectedTransaction = (e) => {
+        e.preventDefault();
+        if (!expectedForm.date || !expectedForm.amount || !expectedForm.description) return;
+        
+        if (isEditingExpectedId) {
+            updateUser({
+                expectedTransactions: expectedTransactions.map(t => 
+                    t.id === isEditingExpectedId ? { ...t, ...expectedForm } : t
+                )
+            });
+            setIsEditingExpectedId(null);
+        } else {
+            const newTx = { ...expectedForm, id: Date.now().toString() };
+            updateUser({ expectedTransactions: [...expectedTransactions, newTx] });
+        }
+        
+        setExpectedForm({ date: expectedForm.date, description: '', amount: '', type: 'expense', categoryId: '' });
+        setIsAddingExpected(false);
+    };
 
+    const handleDeleteExpectedTransaction = (id) => {
+        updateUser({ expectedTransactions: expectedTransactions.filter(t => t.id !== id) });
+    };
+
+    const handleConfirmExpectedTransaction = (et) => {
+        setNewTransaction({
+            type: et.type,
+            amount: et.amount,
+            categoryId: et.categoryId || '',
+            accountId: accounts[0]?.id || '',
+            toAccountId: '',
+            description: et.description,
+            date: et.date,
+            projectId: '',
+            projectStageId: '',
+            _fromExpectedTxId: et.id
+        });
+        setIsAddingTransaction(true);
+    };
     const handleSaveAccount = async (e) => {
         e.preventDefault();
         if (!editingAccountData.label) return;
@@ -1079,8 +1193,12 @@ const FinanceModule = ({
             await transactionsActions.add(payload);
         }
 
+        if (newTransaction._fromExpectedTxId) {
+            handleDeleteExpectedTransaction(newTransaction._fromExpectedTxId);
+        }
+
         setIsAddingTransaction(false);
-        setNewTransaction({ ...newTransaction, id: undefined, amount: '', description: '', toAccountId: '', projectId: '', projectStageId: '' });
+        setNewTransaction({ ...newTransaction, id: undefined, amount: '', description: '', toAccountId: '', projectId: '', projectStageId: '', _fromExpectedTxId: undefined });
     };
 
     return (
@@ -1174,7 +1292,7 @@ const FinanceModule = ({
                         { id: 'history', label: 'History', color: 'bg-blue-600 text-white shadow-lg' },
                         { id: 'overview', label: 'Analytics', color: 'bg-green-600 text-white shadow-lg' },
                         { id: 'budget', label: 'Planning', color: 'bg-amber-600 text-white shadow-lg' },
-                        { id: 'projects', label: 'Projects', color: 'bg-indigo-600 text-white shadow-lg' }
+                        { id: 'projects', label: 'Coming', color: 'bg-indigo-600 text-white shadow-lg' }
                     ].map(t => (
                         <button
                             key={t.id}
@@ -1289,166 +1407,489 @@ const FinanceModule = ({
                     )}
 
                     {/* --- HISTORY VIEW --- */}
-                    {/* --- PROJECTS VIEW --- */}
+                    {/* --- COMING VIEW --- */}
                     {dashboardTab === 'projects' && (() => {
-                        // Projects filtering logic
-                        let filteredProjects = projects;
+                        // Current Balance
+                        // --- PREDICTIVE CASH FLOW ENGINE ---
                         
-                        if (projectStatusFilter !== 'all') {
-                            filteredProjects = filteredProjects.filter(p => p.status === projectStatusFilter);
-                        }
-                        if (projectClientFilter !== 'all') {
-                            filteredProjects = filteredProjects.filter(p => p.client === projectClientFilter);
-                        }
-                        if (dateFilterType === 'month') {
-                            const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-                            const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59);
-                            filteredProjects = filteredProjects.filter(p => {
-                                const d = new Date(p.receivedAt || p.createdAt || p.id);
-                                return d >= startOfMonth && d <= endOfMonth;
-                            });
-                        } else if (dateFilterType === 'custom') {
-                            const start = customStartDate ? new Date(customStartDate) : null;
-                            const end = customEndDate ? new Date(customEndDate) : null;
-                            if (start) start.setHours(0,0,0,0);
-                            if (end) end.setHours(23,59,59,999);
-                            filteredProjects = filteredProjects.filter(p => {
-                                const d = new Date(p.receivedAt || p.createdAt || p.id);
-                                if (start && d < start) return false;
-                                if (end && d > end) return false;
-                                return true;
-                            });
-                        }
-
-                        // Computations
-                        let totalExpected = 0;
-                        let totalGrossReceived = 0;
-                        let totalProjectExpenses = 0;
-
-                        filteredProjects.forEach(p => {
-                            // Expected
-                            const expected = p.stages?.reduce((sum, s) => sum + (Number(s.expectedIncome) || 0), 0) || 0;
-                            totalExpected += expected;
-                            
-                            // Transactions
-                            const pTx = transactions.filter(t => t.projectId === p.id);
-                            pTx.forEach(t => {
-                                if (t.type === 'income') totalGrossReceived += (Number(t.amount) || 0);
-                                else if (t.type === 'expense') totalProjectExpenses += (Number(t.amount) || 0);
-                            });
+                        const currentBalance = accounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
+                        
+                        const formatDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                        
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        
+                        const lookbackStart = new Date(lookbackDateRange.start + 'T00:00:00');
+                        const lookbackEnd = new Date(lookbackDateRange.end + 'T23:59:59');
+                        
+                        const predictionStart = new Date(predictionDateRange.start + 'T00:00:00');
+                        const predictionEnd = new Date(predictionDateRange.end + 'T23:59:59');
+                        const daysInWindow = Math.max(1, Math.floor((predictionEnd - predictionStart) / (1000 * 60 * 60 * 24)));
+                        
+                        // 1. Calculate Daily Average Spend & Income (Lookback)
+                        const lookbackTx = transactions.filter(t => {
+                            const d = new Date(t.date || t.createdAt);
+                            return d >= lookbackStart && d <= lookbackEnd;
                         });
+                        
+                        let effectiveLookbackStart = lookbackStart;
+                        if (lookbackTx.length > 0) {
+                            const firstTxDate = new Date(Math.min(...lookbackTx.map(t => new Date(t.date || t.createdAt))));
+                            if (firstTxDate > effectiveLookbackStart) {
+                                effectiveLookbackStart = firstTxDate;
+                                effectiveLookbackStart.setHours(0,0,0,0);
+                            }
+                        }
+                        
+                        const lookbackDays = Math.max(1, Math.floor((lookbackEnd - effectiveLookbackStart) / (1000 * 60 * 60 * 24)) + 1);
+                        
+                        const lookbackExpenses = lookbackTx.filter(t => t.type === 'expense');
+                        const lookbackIncomes = lookbackTx.filter(t => t.type === 'income');
 
-                        const netProfit = totalGrossReceived - totalProjectExpenses;
+                        const filteredLookbackExpenses = selectedPredictionCategories.length > 0 
+                            ? lookbackExpenses.filter(t => selectedPredictionCategories.includes(t.categoryId))
+                            : lookbackExpenses;
+                            
+                        const totalLookbackSpend = filteredLookbackExpenses.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+                        const dailyAverageSpend = totalLookbackSpend / lookbackDays;
+                        
+                        const expectedIncomeEvents = [];
+                        const expectedExpenseEvents = [];
+                        
+                        let dailyRecurringIncome = 0;
+                        if (planningMode === 'history') {
+                            const totalLookbackIncome = lookbackIncomes.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+                            const dailyAverageIncome = totalLookbackIncome / lookbackDays;
+                            dailyRecurringIncome = dailyAverageIncome;
+                        } else {
+                            // Project / Expected Mode
+                            // Income:
+                            projects.filter(p => p.status !== 'Rejected' && p.status !== 'Archived').forEach(p => {
+                                p.stages?.forEach(s => {
+                                    if (s.status === 'Rejected' || s.status === 'Not Started') return;
+                                    
+                                    const expDate = s.expectedPaymentDate ? new Date(s.expectedPaymentDate) : today;
+                                    let effectiveDate = expDate < today ? today : expDate; // Overdue is expected today
+                                    
+                                    if (effectiveDate >= today && effectiveDate <= predictionEnd) {
+                                        const stageIncome = transactions.filter(t => t.projectStageId === s.id && t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+                                        const totalExpected = Number(s.expectedNetIncome) || 0;
+                                        const remainingNet = Math.max(0, totalExpected - stageIncome);
+                                        
+                                        if (remainingNet > 0) {
+                                            expectedIncomeEvents.push({
+                                                date: formatDateStr(effectiveDate),
+                                                amount: remainingNet,
+                                                label: `${p.name} - ${s.name} (Overdue/Expected)`
+                                            });
+                                        }
+                                    }
+                                });
+                            });
+                            
+                            // Expenses: Expected History
+                            expectedTransactions.forEach(et => {
+                                const etDate = new Date(et.date + 'T00:00:00');
+                                let effectiveDate = etDate < today ? today : etDate;
+                                if (effectiveDate >= today && effectiveDate <= predictionEnd) {
+                                    if (et.type === 'expense') {
+                                        expectedExpenseEvents.push({
+                                            date: formatDateStr(effectiveDate),
+                                            amount: Number(et.amount),
+                                            label: et.description || 'Expected Expense'
+                                        });
+                                    } else {
+                                        expectedIncomeEvents.push({
+                                            date: formatDateStr(effectiveDate),
+                                            amount: Number(et.amount),
+                                            label: et.description || 'Expected Income'
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                        
+                        // 2. Generate Chart Data & Summary Stats in the target window
+                        const chartData = [];
+                        
+                        // We need to calculate running balance correctly. 
+                        // If predictionStart < today, we need historical balance. 
+                        // The easiest way is to calculate from initial accounts balance up to predictionStart, then run loop.
+                        let runningBalance = accounts.reduce((sum, a) => sum + (Number(a.initialBalance) || 0), 0);
+                        const txList = [...transactions].sort((a,b) => new Date(a.date || a.createdAt) - new Date(b.date || b.createdAt));
+                        
+                        // Fast forward balance up to predictionStart
+                        predictionStart.setHours(0,0,0,0);
+                        txList.forEach(t => {
+                            const d = new Date(t.date || t.createdAt);
+                            d.setHours(0,0,0,0);
+                            if (d < predictionStart) {
+                                if (t.type === 'income') runningBalance += Number(t.amount);
+                                if (t.type === 'expense') runningBalance -= Number(t.amount);
+                            }
+                        });
+                        
+                        let windowStartingBalance = runningBalance;
+                        let windowExpectedIncome = 0;
+                        let windowPredictedExpenses = 0;
+                        
+                        for (let i = 0; i <= daysInWindow; i++) {
+                            const d = new Date(predictionStart);
+                            d.setDate(d.getDate() + i);
+                            d.setHours(0,0,0,0);
+                            const dateStr = formatDateStr(d);
+                            
+                            if (d < today) {
+                                // Real history
+                                const todaysTx = txList.filter(t => {
+                                    const td = new Date(t.date || t.createdAt);
+                                    return formatDateStr(td) === dateStr;
+                                });
+                                let dayInc = 0;
+                                let dayExp = 0;
+                                todaysTx.forEach(t => {
+                                    if (t.type === 'income') dayInc += Number(t.amount);
+                                    if (t.type === 'expense') dayExp += Number(t.amount);
+                                });
+                                runningBalance += dayInc;
+                                runningBalance -= dayExp;
+                                windowExpectedIncome += dayInc;
+                                windowPredictedExpenses += dayExp;
+                            } else {
+                                // Prediction
+                                if (d > today) {
+                                    let dayRecurringInc = 0;
+                                    
+                                    if (planningMode === 'history') {
+                                        dayRecurringInc = dailyRecurringIncome;
+                                    } else {
+                                        const activeIncomeCategories = categories.filter(c => c.type === 'income');
+                                        activeIncomeCategories.forEach(c => {
+                                            const transferDay = Number(c.dayOfTransfer) || 1;
+                                            const maxDaysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                                            const actualTransferDay = Math.min(transferDay, maxDaysInMonth);
+                                            
+                                            if (d.getDate() === actualTransferDay) {
+                                                dayRecurringInc += (Number(c.amount) || 0);
+                                            }
+                                        });
+                                    }
+                                    
+                                    runningBalance += dayRecurringInc;
+                                    runningBalance -= dailyAverageSpend;
+                                    windowExpectedIncome += dayRecurringInc;
+                                    windowPredictedExpenses += dailyAverageSpend;
+                                }
+                                
+                                if (planningMode === 'project') {
+                                    const todaysIncEvents = expectedIncomeEvents.filter(e => e.date === dateStr);
+                                    todaysIncEvents.forEach(e => {
+                                        runningBalance += e.amount;
+                                        windowExpectedIncome += e.amount;
+                                    });
+                                    
+                                    const todaysExpEvents = expectedExpenseEvents.filter(e => e.date === dateStr);
+                                    todaysExpEvents.forEach(e => {
+                                        runningBalance -= e.amount;
+                                        windowPredictedExpenses += e.amount;
+                                    });
+                                }
+                            }
+                            
+                            chartData.push({
+                                date: dateStr,
+                                balance: runningBalance,
+                                shortDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                            });
+                        }
 
-                        // Clients dropdown extraction from all projects (not filtered)
-                        const allClients = [...new Set(projects.map(p => p.client).filter(Boolean))].sort();
+                        // Determine safety color
+                        const projectedEndBalance = runningBalance;
+                        const isSafe = projectedEndBalance >= 0;
+                        const balanceColorClass = isSafe ? 'text-indigo-700' : 'text-red-600';
+                        const balanceBgClass = isSafe ? 'bg-indigo-50/30 border-indigo-200' : 'bg-red-50/30 border-red-200';
 
                         return (
-                            <div className="space-y-6 animate-in slide-in-from-bottom-2 fade-in">
-                                <div className="flex flex-wrap gap-4 items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Client:</span>
-                                        <select 
-                                            value={projectClientFilter} 
-                                            onChange={e => setProjectClientFilter(e.target.value)}
-                                            className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 rounded-lg px-2 py-1 outline-none focus:border-blue-500"
-                                        >
-                                            <option value="all">All Clients</option>
-                                            {allClients.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
+                            <div className="space-y-6 animate-in slide-in-from-bottom-2 fade-in relative">
+                                
+                                {/* Control Panel */}
+                                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-end relative z-30">
+                                    <div className="flex-1 space-y-1 w-full">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Planning Mode</label>
+                                        <div className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1 flex font-bold text-xs h-[38px]">
+                                            <button 
+                                                className={`flex-1 rounded-md transition-colors ${planningMode === 'history' ? 'bg-white shadow-sm text-blue-600 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
+                                                onClick={() => setPlanningMode('history')}
+                                            >
+                                                History
+                                            </button>
+                                            <button 
+                                                className={`flex-1 rounded-md transition-colors ${planningMode === 'project' ? 'bg-white shadow-sm text-blue-600 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
+                                                onClick={() => setPlanningMode('project')}
+                                            >
+                                                Expected
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Status:</span>
-                                        <select 
-                                            value={projectStatusFilter} 
-                                            onChange={e => setProjectStatusFilter(e.target.value)}
-                                            className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 rounded-lg px-2 py-1 outline-none focus:border-blue-500"
-                                        >
-                                            <option value="all">All Statuses</option>
-                                            <option value="Active">Active</option>
-                                            <option value="In Development">In Development</option>
-                                            <option value="Completed">Completed</option>
-                                            <option value="Archived">Archived</option>
-                                            <option value="Rejected">Rejected</option>
-                                        </select>
+                                    <DateRangePicker 
+                                        label="Lookback Window" 
+                                        range={lookbackDateRange} 
+                                        setRange={setLookbackDateRange} 
+                                        presets={[
+                                            { label: 'This Month', getRange: () => { const d = new Date(); return { start: formatDateStr(new Date(d.getFullYear(), d.getMonth(), 1)), end: formatDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0)) }}},
+                                            { label: 'Last Month', getRange: () => { const d = new Date(); return { start: formatDateStr(new Date(d.getFullYear(), d.getMonth() - 1, 1)), end: formatDateStr(new Date(d.getFullYear(), d.getMonth(), 0)) }}},
+                                            { label: 'Last 30 Days', getRange: () => { const d = new Date(); const prev = new Date(d); prev.setDate(prev.getDate() - 30); return { start: formatDateStr(prev), end: formatDateStr(d) }}},
+                                            { label: 'Last 90 Days', getRange: () => { const d = new Date(); const prev = new Date(d); prev.setDate(prev.getDate() - 90); return { start: formatDateStr(prev), end: formatDateStr(d) }}},
+                                            { label: 'All Time (Past)', getRange: () => { const d = new Date(); const prev = new Date(d); prev.setFullYear(prev.getFullYear() - 1); return { start: formatDateStr(prev), end: formatDateStr(d) }}},
+                                            { label: 'Custom', isCustom: true }
+                                        ]} 
+                                    />
+                                    <DateRangePicker 
+                                        label="Prediction Window" 
+                                        range={predictionDateRange} 
+                                        setRange={setPredictionDateRange} 
+                                        presets={[
+                                            { label: 'This Month', getRange: () => { const d = new Date(); return { start: formatDateStr(new Date(d.getFullYear(), d.getMonth(), 1)), end: formatDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0)) }}},
+                                            { label: 'Next Month', getRange: () => { const d = new Date(); return { start: formatDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 1)), end: formatDateStr(new Date(d.getFullYear(), d.getMonth() + 2, 0)) }}},
+                                            { label: 'Next 30 Days', getRange: () => { const d = new Date(); const next = new Date(d); next.setDate(next.getDate() + 30); return { start: formatDateStr(d), end: formatDateStr(next) }}},
+                                            { label: 'Next 90 Days', getRange: () => { const d = new Date(); const next = new Date(d); next.setDate(next.getDate() + 90); return { start: formatDateStr(d), end: formatDateStr(next) }}},
+                                            { label: 'All Time (Future)', getRange: () => { const d = new Date(); const next = new Date(d); next.setFullYear(next.getFullYear() + 1); return { start: formatDateStr(d), end: formatDateStr(next) }}},
+                                            { label: 'Custom', isCustom: true }
+                                        ]} 
+                                    />
+                                    <div className="flex-[2] space-y-1 w-full relative group">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Expense Categories</label>
+                                        <div className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 font-bold cursor-pointer flex justify-between items-center h-[38px]">
+                                            <span className="truncate">
+                                                {selectedPredictionCategories.length === 0 
+                                                    ? 'All Expense Categories' 
+                                                    : `${selectedPredictionCategories.length} Categories Selected`}
+                                            </span>
+                                            <ChevronRight className="w-4 h-4 text-slate-400 rotate-90" />
+                                        </div>
+                                        <div className="absolute top-[60px] left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl z-50 hidden group-hover:block max-h-64 overflow-y-auto p-2">
+                                            <div className="text-[10px] text-slate-400 font-bold mb-2 uppercase px-2">Filter Predicted Expenses</div>
+                                            <div 
+                                                className={`p-2 rounded-lg cursor-pointer text-xs font-bold mb-1 ${selectedPredictionCategories.length === 0 ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-700'}`}
+                                                onClick={() => setSelectedPredictionCategories([])}
+                                            >
+                                                All Categories
+                                            </div>
+                                            {categories.filter(c => c.type === 'expense').map(c => (
+                                                <div 
+                                                    key={c.id} 
+                                                    className={`p-2 rounded-lg cursor-pointer text-xs font-bold flex items-center justify-between mb-1 ${selectedPredictionCategories.includes(c.id) ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-700'}`}
+                                                    onClick={() => {
+                                                        if (selectedPredictionCategories.includes(c.id)) {
+                                                            setSelectedPredictionCategories(selectedPredictionCategories.filter(id => id !== c.id));
+                                                        } else {
+                                                            setSelectedPredictionCategories([...selectedPredictionCategories, c.id]);
+                                                        }
+                                                    }}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: c.color}}></div>
+                                                        {c.label}
+                                                    </div>
+                                                    {selectedPredictionCategories.includes(c.id) && <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Summary Cards */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Expected</div>
-                                        <div className="text-2xl font-black text-slate-800">
-                                            {formatMoney(totalExpected)}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 relative z-20">
+                                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden bg-slate-50/50">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Window Starting Balance</div>
+                                        <div className="text-2xl font-black text-slate-700">
+                                            {formatMoney(windowStartingBalance)}
                                         </div>
+                                        <div className="text-[9px] text-slate-400 font-bold mt-1">On {new Date(predictionDateRange.start).toLocaleDateString()}</div>
                                     </div>
                                     <div className="bg-white p-5 rounded-2xl border border-blue-200 shadow-sm relative overflow-hidden bg-blue-50/30">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-1">Gross Received</div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-1">Window Expected Income</div>
                                         <div className="text-2xl font-black text-blue-600">
-                                            {formatMoney(totalGrossReceived)}
+                                            {formatMoney(windowExpectedIncome)}
                                         </div>
+                                        {planningMode === 'history' ? (
+                                            <div className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-wider">
+                                                Based on {formatMoney(dailyRecurringIncome)}/day avg
+                                            </div>
+                                        ) : (
+                                            <div className="text-[9px] text-blue-400 font-bold mt-1">In selected window</div>
+                                        )}
+                                        <Target className="w-12 h-12 absolute -right-3 -bottom-3 text-blue-100 opacity-50" />
                                     </div>
                                     <div className="bg-white p-5 rounded-2xl border border-red-200 shadow-sm relative overflow-hidden bg-red-50/30">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Total Expenses</div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Window Predicted Expenses</div>
                                         <div className="text-2xl font-black text-red-600">
-                                            {formatMoney(totalProjectExpenses)}
+                                            {formatMoney(windowPredictedExpenses)}
                                         </div>
+                                        <div className="text-[9px] text-red-400 font-bold mt-1">Based on {formatMoney(dailyAverageSpend)}/day avg</div>
+                                        <TrendingDown className="w-12 h-12 absolute -right-3 -bottom-3 text-red-100 opacity-50" />
                                     </div>
-                                    <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm relative overflow-hidden bg-emerald-50/50">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1">Net Profit</div>
-                                        <div className="text-2xl font-black text-emerald-600">
-                                            {formatMoney(netProfit)}
+                                    <div className={`bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden ${balanceBgClass}`}>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Projected End Balance</div>
+                                        <div className={`text-2xl font-black ${balanceColorClass}`}>
+                                            {formatMoney(projectedEndBalance)}
                                         </div>
+                                        <div className="text-[9px] text-slate-500 font-bold mt-1">On {new Date(predictionDateRange.end).toLocaleDateString()}</div>
+                                        <Wallet className={`w-12 h-12 absolute -right-3 -bottom-3 opacity-50 ${isSafe ? 'text-indigo-100' : 'text-red-100'}`} />
                                     </div>
                                 </div>
 
-                                {/* Projects List / Detail */}
-                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                    <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-slate-700">Project Breakdown</h3>
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase">{filteredProjects.length} Projects</span>
+                                {/* Main Chart */}
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 relative z-10">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Cash Flow Projection</h3>
+                                        <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-500"></div> Projected Balance</div>
+                                        </div>
                                     </div>
-                                    <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto no-scrollbar">
-                                        {filteredProjects.length === 0 ? (
-                                            <div className="p-8 text-center text-slate-400 text-xs font-bold uppercase tracking-wider">No projects match filters</div>
-                                        ) : (
-                                            filteredProjects.map(p => {
-                                                const exp = p.stages?.reduce((sum, s) => sum + (Number(s.expectedIncome) || 0), 0) || 0;
-                                                const pTx = transactions.filter(t => t.projectId === p.id);
-                                                const act = pTx.filter(t => t.type === 'income').reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-                                                const prjExp = pTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-                                                const net = act - prjExp;
+                                    <div className="h-[400px] w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                                <defs>
+                                                    <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor={isSafe ? '#6366f1' : '#ef4444'} stopOpacity={0.3}/>
+                                                        <stop offset="95%" stopColor={isSafe ? '#6366f1' : '#ef4444'} stopOpacity={0}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                                <XAxis dataKey="shortDate" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} dy={10} />
+                                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} tickFormatter={(val) => `֏${(val/1000)}k`} />
+                                                <RechartsTooltip 
+                                                    contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', padding: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
+                                                    itemStyle={{ color: '#fff', fontSize: '14px', fontWeight: 'bold' }} 
+                                                    labelStyle={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', fontWeight: 'bold' }}
+                                                    formatter={(val) => formatMoney(val)} 
+                                                />
+                                                <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" />
+                                                <Area 
+                                                    type="monotone" 
+                                                    dataKey="balance" 
+                                                    name="Balance"
+                                                    stroke={isSafe ? '#6366f1' : '#ef4444'} 
+                                                    strokeWidth={3}
+                                                    fillOpacity={1} 
+                                                    fill="url(#colorBalance)" 
+                                                    activeDot={{ r: 6, strokeWidth: 0, fill: isSafe ? '#6366f1' : '#ef4444' }}
+                                                />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
 
-                                                return (
-                                                    <div key={p.id} className="p-4 hover:bg-slate-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="font-bold text-sm text-slate-800 truncate mb-1">{p.name || 'Untitled'}</div>
-                                                            <div className="flex flex-wrap gap-2 text-[10px] uppercase font-bold text-slate-500">
-                                                                <span className={p.status === 'Completed' ? 'text-green-500' : p.status === 'Rejected' ? 'text-red-500' : 'text-amber-500'}>{p.status}</span>
-                                                                {p.client && <><span className="text-slate-300">•</span><span className="truncate max-w-[100px]">{p.client}</span></>}
-                                                                {p.category && <><span className="text-slate-300">•</span><span className="text-blue-500">{p.category}</span></>}
+                                {/* Expected History Section */}
+                                {planningMode === 'project' && (
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden relative z-10 mt-6">
+                                        <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Expected History</h3>
+                                            <button 
+                                                onClick={() => {
+                                                    if (isAddingExpected) {
+                                                        setIsEditingExpectedId(null);
+                                                        setExpectedForm({ date: expectedForm.date, description: '', amount: '', type: 'expense', categoryId: '' });
+                                                    }
+                                                    setIsAddingExpected(!isAddingExpected);
+                                                }}
+                                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold uppercase transition-all flex items-center gap-1"
+                                            >
+                                                {isAddingExpected ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                                                {isAddingExpected ? 'Cancel' : 'Plan Transaction'}
+                                            </button>
+                                        </div>
+                                        
+                                        {isAddingExpected && (
+                                            <div className="p-4 bg-blue-50/50 border-b border-slate-200">
+                                                <form onSubmit={handleAddExpectedTransaction} className="flex flex-wrap items-end gap-3">
+                                                    <div className="flex-1 min-w-[150px]">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Date</label>
+                                                        <input type="date" required value={expectedForm.date} onChange={e => setExpectedForm({...expectedForm, date: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:border-blue-500" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-[150px]">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Type</label>
+                                                        <select value={expectedForm.type} onChange={e => setExpectedForm({...expectedForm, type: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:border-blue-500">
+                                                            <option value="expense">Expense</option>
+                                                            <option value="income">Income</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex-[2] min-w-[200px]">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Description</label>
+                                                        <input type="text" required placeholder="e.g. Taxes, Vacation, New Laptop" value={expectedForm.description} onChange={e => setExpectedForm({...expectedForm, description: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:border-blue-500" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-[150px]">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Category</label>
+                                                        <select value={expectedForm.categoryId} onChange={e => setExpectedForm({...expectedForm, categoryId: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:border-blue-500">
+                                                            <option value="">Uncategorized</option>
+                                                            {categories.filter(c => c.type === expectedForm.type).map(c => (
+                                                                <option key={c.id} value={c.id}>{c.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex-1 min-w-[120px]">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Amount</label>
+                                                        <input type="number" required placeholder="0" value={expectedForm.amount} onChange={e => setExpectedForm({...expectedForm, amount: e.target.value})} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:border-blue-500" />
+                                                    </div>
+                                                    <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-xs hover:bg-blue-700 transition-colors h-[34px]">
+                                                        {isEditingExpectedId ? 'Save' : 'Add'}
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        )}
+                                        
+                                        <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto no-scrollbar">
+                                            {expectedTransactions.length === 0 ? (
+                                                <div className="p-8 text-center text-slate-400 text-xs font-bold uppercase tracking-wider">No planned transactions</div>
+                                            ) : (
+                                                [...expectedTransactions].sort((a,b) => new Date(a.date) - new Date(b.date)).map((et) => {
+                                                    const cat = categories.find(c => c.id === et.categoryId);
+                                                    return (
+                                                    <div key={et.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center gap-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat?.color || '#94a3b8' }} />
+                                                            <div>
+                                                                <div className="font-bold text-sm text-slate-800">{et.description}</div>
+                                                                <div className="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-2">
+                                                                    <Calendar className="w-3 h-3"/> {et.date} {cat && `• ${cat.label}`}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-6 shrink-0 text-right">
-                                                            <div>
-                                                                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Expected</div>
-                                                                <div className="text-xs font-black text-slate-700">{formatMoney(exp)}</div>
+                                                        <div className="text-right flex items-center gap-4">
+                                                            <div className={`text-sm font-black ${et.type === 'expense' ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                                {et.type === 'expense' ? '-' : '+'}{formatMoney(et.amount)}
                                                             </div>
-                                                            <div>
-                                                                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Received</div>
-                                                                <div className="text-xs font-black text-blue-600">{formatMoney(act)}</div>
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Net</div>
-                                                                <div className={`text-xs font-black ${net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatMoney(net)}</div>
+                                                            <div className="flex gap-1">
+                                                                <button onClick={() => {
+                                                                    setExpectedForm({
+                                                                        date: et.date,
+                                                                        description: et.description,
+                                                                        amount: et.amount,
+                                                                        type: et.type || 'expense',
+                                                                        categoryId: et.categoryId || ''
+                                                                    });
+                                                                    setIsEditingExpectedId(et.id);
+                                                                    setIsAddingExpected(true);
+                                                                }} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
+                                                                    <Edit3 className="w-4 h-4" />
+                                                                </button>
+                                                                <button onClick={() => handleConfirmExpectedTransaction(et)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Confirm (Move to real history)">
+                                                                    <CheckCircle2 className="w-4 h-4" />
+                                                                </button>
+                                                                <button onClick={() => handleDeleteExpectedTransaction(et.id)} className="p-1.5 text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors" title="Delete">
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                );
-                                            })
-                                        )}
+                                                )})
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
+
+
                             </div>
                         );
                     })()}
@@ -2544,7 +2985,7 @@ const FinanceModule = ({
                                                     key={idx} 
                                                     onClick={() => {
                                                         if (item.id) {
-                                                            setHistoryFilter({ categoryId: item.id, type: analyticsSource === 'budget' ? 'expense' : 'all' });
+                                                            setHistoryFilter({ type: analyticsSource === 'budget' ? 'expense' : 'all', categoryId: item.id, accountId: 'all', minAmount: '', maxAmount: '' });
                                                             setDashboardTab('history');
                                                             setExpandedChart(null);
                                                         }

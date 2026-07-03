@@ -59,7 +59,8 @@ const SettingsModule = ({ userData, updateUser }) => {
             paginationEnabled: true,
             tasksPerPage: 6,
             listPaginationEnabled: false,
-            listTasksPerPage: 20
+            listTasksPerPage: 20,
+            sidebarOpenByDefault: true
         }
     });
 
@@ -466,6 +467,31 @@ const SettingsModule = ({ userData, updateUser }) => {
                     <hr className="border-slate-200" />
 
                     <div>
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-blue-500/10 rounded-lg">
+                                <Monitor className="w-5 h-5 text-blue-500" />
+                            </div>
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Layout Configurations</h3>
+                        </div>
+
+                        <div className="p-6 rounded-2xl border border-slate-200 bg-white/50 space-y-4 mb-8">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">Desktop Sidebar</h4>
+                                    <p className="text-[10px] text-slate-500 mt-1">Keep the left navigation menu open by default on desktop screens.</p>
+                                </div>
+                                <button
+                                    onClick={() => setLocalData({
+                                        ...localData,
+                                        appearance: { ...localData.appearance, sidebarOpenByDefault: localData.appearance.sidebarOpenByDefault === false ? true : false }
+                                    })}
+                                    className={`w-12 h-6 rounded-full transition-all relative ${(localData.appearance.sidebarOpenByDefault !== false) ? 'bg-blue-600 shadow-lg shadow-blue-500/20' : 'bg-slate-300'}`}
+                                >
+                                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${(localData.appearance.sidebarOpenByDefault !== false) ? 'left-7' : 'left-1'}`} />
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="flex items-center gap-3 mb-6">
                             <div className="p-2 bg-blue-500/10 rounded-lg">
                                 <FileSpreadsheet className="w-5 h-5 text-blue-500" />

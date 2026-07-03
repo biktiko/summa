@@ -57,7 +57,14 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
   const [lastActiveTabId, setLastActiveTabId] = useState(MODULES[0].id);
   const [currentModuleView, setCurrentModuleView] = useState('dashboard'); 
   const [activeTaskTab, setActiveTaskTab] = useState('missions');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(userData?.appearance?.sidebarOpenByDefault ?? true);
+  
+  // Ensure the sidebar state correctly applies the user's preference when loaded
+  useEffect(() => {
+    if (userData?.appearance?.sidebarOpenByDefault !== undefined) {
+        setIsSidebarOpen(userData.appearance.sidebarOpenByDefault);
+    }
+  }, [userData?.appearance?.sidebarOpenByDefault]);
   const [activeMobileMenu, setActiveMobileMenu] = useState(false);
 
   // Initialize Active Tab - synced safely

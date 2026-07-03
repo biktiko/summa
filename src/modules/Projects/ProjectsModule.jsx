@@ -56,7 +56,7 @@ const ProjectsModule = ({
     }, [projects, statusFilter, clientFilter, searchTerm]);
 
     const [selectedProjectId, setSelectedProjectId] = useState(projects[0]?.id || null);
-    const [activeTab, setActiveTab] = useState('tasks'); // overview, tasks, financials
+    const [activeTab, setActiveTab] = useState('financials'); // financials, tasks, overview
 
     const activeProject = projects.find(p => p.id === selectedProjectId);
 
@@ -91,7 +91,11 @@ const ProjectsModule = ({
 
     const updateProjectField = async (field, value) => {
         if (!activeProject || viewMode === 'guest') return;
-        await projectsActions.update(activeProject.id, { [field]: value });
+        if (typeof field === 'object') {
+            await projectsActions.update(activeProject.id, field);
+        } else {
+            await projectsActions.update(activeProject.id, { [field]: value });
+        }
     };
 
     const deleteProject = async () => {
@@ -101,6 +105,45 @@ const ProjectsModule = ({
             setSelectedProjectId(null);
         }
     };
+
+    const projectFinancials = useMemo(() => {
+        const stats = {};
+        let globalExpected = 0;
+        let globalProbably = 0;
+
+        projects.forEach(p => {
+            let received = 0;
+            let expected = 0;
+            let probably = 0;
+
+            if (p.status !== 'Rejected' && p.status !== 'Archived') {
+                p.stages?.forEach(s => {
+                    if (s.status === 'Rejected') return;
+                    const stageIncome = transactions.filter(t => t.projectStageId === s.id && t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+                    received += stageIncome;
+
+                    const totalExpected = Number(s.expectedNetIncome) || 0;
+                    const remainingNet = Math.max(0, totalExpected - stageIncome);
+
+                    if (remainingNet > 0) {
+                        if (s.status === 'Not Started') probably += remainingNet;
+                        else expected += remainingNet;
+                    }
+                });
+            } else {
+                p.stages?.forEach(s => {
+                    const stageIncome = transactions.filter(t => t.projectStageId === s.id && t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+                    received += stageIncome;
+                });
+            }
+
+            stats[p.id] = { received, expected, probably };
+            globalExpected += expected;
+            globalProbably += probably;
+        });
+
+        return { stats, globalExpected, globalProbably };
+    }, [projects, transactions]);
 
     return (
         <div className="flex h-full animate-in fade-in bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden relative shadow-sm">
@@ -125,6 +168,24 @@ const ProjectsModule = ({
                     </div>
 
                     <div className="p-3 border-b border-slate-200 bg-white space-y-2">
+                        {/* Global Expected & Probably Net Cards */}
+                        <div className="flex gap-2">
+                            <div className="flex-1 bg-blue-50/50 border border-blue-100 rounded-lg p-2.5 shadow-sm">
+                                <div className="flex items-center gap-1 mb-0.5">
+                                    <DollarSign className="w-3 h-3 text-blue-500" />
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-600">Expected</span>
+                                </div>
+                                <div className="font-black text-xs text-blue-600">֏{projectFinancials.globalExpected.toLocaleString()}</div>
+                            </div>
+                            <div className="flex-1 bg-purple-50/50 border border-purple-100 rounded-lg p-2.5 shadow-sm">
+                                <div className="flex items-center gap-1 mb-0.5">
+                                    <Target className="w-3 h-3 text-purple-500" />
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-600">Probably</span>
+                                </div>
+                                <div className="font-black text-xs text-purple-600">֏{projectFinancials.globalProbably.toLocaleString()}</div>
+                            </div>
+                        </div>
+
                         <div className="relative">
                             <Search className="w-3 h-3 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                             <input 
@@ -158,7 +219,7 @@ const ProjectsModule = ({
                         </div>
                     </div>
                     
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
                         {filteredProjects.length === 0 ? (
                             <div className="text-center py-8 text-slate-400 text-xs font-bold uppercase tracking-wider">
                                 No projects found
@@ -168,28 +229,40 @@ const ProjectsModule = ({
                                 <button
                                     key={p.id}
                                     onClick={() => setSelectedProjectId(p.id)}
-                                    className={`w-full text-left p-3 rounded-xl border transition-all ${selectedProjectId === p.id ? 'border-blue-500 bg-blue-50/50 shadow-sm' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'}`}
+                                    className={`w-full text-left p-2 rounded-lg border transition-all ${selectedProjectId === p.id ? 'border-blue-500 bg-blue-50/50 shadow-sm' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'}`}
                                 >
-                                    <div className="flex justify-between items-start mb-1">
-                                        <div className={`font-bold text-sm truncate ${p.status === 'Completed' ? 'text-slate-400 line-through' : p.status === 'Rejected' ? 'text-red-400' : 'text-slate-800'}`}>
+                                    <div className="flex justify-between items-start mb-0.5">
+                                        <div className={`font-bold text-[13px] truncate ${p.status === 'Completed' ? 'text-slate-400 line-through' : p.status === 'Rejected' ? 'text-red-400' : 'text-slate-800'}`}>
                                             {p.name || 'Untitled'}
                                         </div>
-                                        {p.isHidden && <EyeOff className="w-3 h-3 text-red-400 shrink-0 ml-2" />}
+                                        {p.isHidden && <EyeOff className="w-3 h-3 text-red-400 shrink-0 ml-1.5" />}
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase font-bold text-slate-500 mt-1">
+                                    <div className="flex flex-wrap items-center gap-1.5 text-[9px] uppercase font-bold text-slate-500 mb-1.5">
                                         <span className={p.status === 'Completed' ? 'text-green-500' : p.status === 'Rejected' ? 'text-red-500' : 'text-amber-500'}>{p.status}</span>
                                         {p.client && (
                                             <>
                                                 <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                <span className="truncate max-w-[80px]">{p.client}</span>
+                                                <span className="truncate max-w-[70px]">{p.client}</span>
                                             </>
                                         )}
                                         {p.category && (
                                             <>
                                                 <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                <span className="text-blue-500 bg-blue-50 px-1 py-0.5 rounded truncate max-w-[80px]">{p.category}</span>
+                                                <span className="text-blue-500 bg-blue-50 px-1 py-0.5 rounded truncate max-w-[70px]">{p.category}</span>
                                             </>
                                         )}
+                                    </div>
+                                    {/* Financial Mini-Stats */}
+                                    <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-widest pt-1 border-t border-slate-100/50">
+                                        <div className="text-emerald-500 flex items-center gap-0.5" title="Received">
+                                            Recv: ֏{(projectFinancials.stats[p.id]?.received || 0).toLocaleString()}
+                                        </div>
+                                        <div className="text-blue-500 flex items-center gap-0.5" title="Expected Net">
+                                            Exp: ֏{(projectFinancials.stats[p.id]?.expected || 0).toLocaleString()}
+                                        </div>
+                                        <div className="text-purple-500 flex items-center gap-0.5" title="Probably Net">
+                                            Prob: ֏{(projectFinancials.stats[p.id]?.probably || 0).toLocaleString()}
+                                        </div>
                                     </div>
                                 </button>
                             ))
@@ -267,7 +340,7 @@ const ProjectsModule = ({
                                         <div className="flex items-center gap-1.5">
                                             <Calendar className="w-3.5 h-3.5" />
                                             <span className="text-[9px] text-slate-400">Received:</span>
-                                            {viewMode === 'admin' ? (
+                                            {viewMode === 'admin' && (!activeProject.stages || activeProject.stages.length === 0) ? (
                                                 <input 
                                                     type="date"
                                                     value={activeProject.receivedAt || ''}
@@ -275,13 +348,15 @@ const ProjectsModule = ({
                                                     className="bg-slate-100 px-2 py-0.5 rounded outline-none focus:ring-1 ring-blue-500"
                                                 />
                                             ) : (
-                                                <span>{activeProject.receivedAt || 'N/A'}</span>
+                                                <span className={activeProject.stages?.length > 0 ? 'text-blue-500' : ''} title={activeProject.stages?.length > 0 ? "Derived from first stage" : ""}>
+                                                    {activeProject.receivedAt || 'N/A'}
+                                                </span>
                                             )}
                                         </div>
                                         <div className="flex items-center gap-1.5">
                                             <Calendar className="w-3.5 h-3.5" />
                                             <span className="text-[9px] text-slate-400">Completed:</span>
-                                            {viewMode === 'admin' ? (
+                                            {viewMode === 'admin' && (!activeProject.stages || activeProject.stages.length === 0) ? (
                                                 <input 
                                                     type="date"
                                                     value={activeProject.completedAt || ''}
@@ -289,7 +364,9 @@ const ProjectsModule = ({
                                                     className="bg-slate-100 px-2 py-0.5 rounded outline-none focus:ring-1 ring-blue-500"
                                                 />
                                             ) : (
-                                                <span>{activeProject.completedAt || 'N/A'}</span>
+                                                <span className={activeProject.stages?.length > 0 ? 'text-blue-500' : ''} title={activeProject.stages?.length > 0 ? "Derived from last stage" : ""}>
+                                                    {activeProject.completedAt || 'N/A'}
+                                                </span>
                                             )}
                                         </div>
                                     </div>
@@ -300,7 +377,9 @@ const ProjectsModule = ({
                                         <select 
                                             value={activeProject.status}
                                             onChange={e => updateProjectField('status', e.target.value)}
-                                            className="bg-white border border-slate-200 text-xs font-bold text-slate-700 uppercase tracking-wider rounded-lg px-3 py-1.5 outline-none focus:border-blue-500"
+                                            disabled={activeProject.stages && activeProject.stages.length > 0}
+                                            className="bg-white border border-slate-200 text-xs font-bold text-slate-700 uppercase tracking-wider rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 disabled:opacity-50 disabled:bg-slate-50"
+                                            title={activeProject.stages && activeProject.stages.length > 0 ? "Status is automatically derived from stages" : ""}
                                         >
                                             <option value="Active">Active</option>
                                             <option value="In Development">In Development</option>
@@ -325,9 +404,9 @@ const ProjectsModule = ({
                             {/* Inner Tabs */}
                             <div className="flex gap-1 border-b border-slate-200 ml-8 xl:ml-10">
                                 {[
+                                    { id: 'financials', label: 'Financials' },
                                     { id: 'tasks', label: 'Tasks' },
-                                    { id: 'overview', label: 'Overview' },
-                                    { id: 'financials', label: 'Financials' }
+                                    { id: 'overview', label: 'Overview' }
                                 ].map(tab => (
                                     <button 
                                         key={tab.id}
@@ -772,31 +851,79 @@ const ProjectFinancials = ({ project, updateProjectField, transactionsActions, t
     };
 
     const totalExpected = project.stages?.reduce((sum, s) => sum + (Number(s.expectedIncome) || 0), 0) || 0;
+    
+    let expectedProjectNet = 0;
+    let probablyProjectNet = 0;
+    
+    project.stages?.forEach(s => {
+        if (s.status === 'Rejected') return;
+        const stageIncome = getStageActual(s.id);
+        const totalExpectedNet = Number(s.expectedNetIncome) || 0;
+        const remainingNet = Math.max(0, totalExpectedNet - stageIncome);
+
+        if (remainingNet > 0) {
+            if (s.status === 'Not Started') probablyProjectNet += remainingNet;
+            else expectedProjectNet += remainingNet;
+        }
+    });
     const totalActual = projectIncomes.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     const totalExpense = projectExpenses.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     const netProfit = totalActual - totalExpense;
 
     const progressPercent = totalExpected > 0 ? Math.min(100, (totalActual / totalExpected) * 100) : 0;
 
+    const updateProjectFromStages = (stages) => {
+        const updates = { stages };
+        
+        if (stages.length > 0) {
+            const allCompleted = stages.every(s => s.status === 'Completed');
+            if (allCompleted && project.status !== 'Completed') updates.status = 'Completed';
+            if (!allCompleted && project.status === 'Completed') updates.status = 'Active';
+
+            const recvDates = stages.map(s => s.receivedAt).filter(Boolean).sort();
+            if (recvDates.length > 0) updates.receivedAt = recvDates[0];
+
+            const compDates = stages.map(s => s.completedAt).filter(Boolean).sort().reverse();
+            if (compDates.length > 0) updates.completedAt = compDates[0];
+        }
+        
+        updateProjectField(updates);
+    };
+
     const handleAddStage = () => {
         const stages = [...(project.stages || []), { 
             id: Date.now().toString(), 
-            name: 'New Phase', 
+            name: 'Release', 
             expectedIncome: 0, 
             expectedNetIncome: 0,
+            receivedAt: new Date().toISOString().slice(0, 10),
+            completedAt: '',
+            expectedPaymentDate: '',
             status: 'Active' 
         }];
-        updateProjectField('stages', stages);
+        updateProjectFromStages(stages);
     };
 
     const handleUpdateStage = (id, field, value) => {
-        const stages = project.stages.map(s => s.id === id ? { ...s, [field]: value } : s);
-        updateProjectField('stages', stages);
+        const stages = project.stages.map(s => {
+            if (s.id !== id) return s;
+            let updated = { ...s, [field]: value };
+            if (field === 'completedAt' && value) {
+                const completedDate = new Date(value);
+                const today = new Date();
+                today.setHours(23, 59, 59, 999);
+                if (completedDate <= today) {
+                    updated.status = 'Completed';
+                }
+            }
+            return updated;
+        });
+        updateProjectFromStages(stages);
     };
 
     const handleRemoveStage = (id) => {
         const stages = project.stages.filter(s => s.id !== id);
-        updateProjectField('stages', stages);
+        updateProjectFromStages(stages);
     };
 
     const submitPayment = async (e) => {
@@ -886,7 +1013,25 @@ const ProjectFinancials = ({ project, updateProjectField, transactionsActions, t
             )}
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="bg-white p-4 rounded-2xl border border-blue-500/20 shadow-sm relative overflow-hidden bg-blue-50/10">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-blue-500 mb-1 line-clamp-1">Expected Net</div>
+                    <div className="text-lg font-black text-blue-700 flex items-center gap-1">
+                        <span className="text-sm font-bold text-blue-400">֏</span>
+                        {expectedProjectNet.toLocaleString()}
+                    </div>
+                    <Target className="w-12 h-12 absolute -right-3 -bottom-3 text-blue-100 opacity-50" />
+                </div>
+                
+                <div className="bg-white p-4 rounded-2xl border border-purple-500/20 shadow-sm relative overflow-hidden bg-purple-50/10">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-purple-500 mb-1 line-clamp-1">Probably Net</div>
+                    <div className="text-lg font-black text-purple-700 flex items-center gap-1">
+                        <span className="text-sm font-bold text-purple-400">֏</span>
+                        {probablyProjectNet.toLocaleString()}
+                    </div>
+                    <Target className="w-12 h-12 absolute -right-3 -bottom-3 text-purple-100 opacity-50" />
+                </div>
+
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
                     <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 line-clamp-1">Expected Gross</div>
                     <div className="text-lg font-black text-slate-800 flex items-center gap-1">
@@ -946,91 +1091,136 @@ const ProjectFinancials = ({ project, updateProjectField, transactionsActions, t
                             const expected = Number(stage.expectedIncome) || 0;
                             const isPaid = expected > 0 && actual >= expected;
 
+                            const stageIncomes = projectIncomes.filter(t => t.projectStageId === stage.id);
+                            const latestPayment = stageIncomes.length > 0 ? new Date(Math.max(...stageIncomes.map(t => new Date(t.date || t.createdAt)))) : null;
+                            const paymentDayStr = latestPayment ? latestPayment.toLocaleDateString() : 'Pending';
+
                             return (
-                                <div key={stage.id} className="p-4 hover:bg-slate-50 transition-colors flex flex-col md:flex-row md:items-center gap-4">
-                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-xs shrink-0">
-                                        {index + 1}
-                                    </div>
+                                <div key={stage.id} className="p-4 md:p-5 hover:bg-slate-50 transition-colors flex flex-col gap-4 border-b border-slate-100 last:border-0 relative">
                                     
-                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="space-y-1">
-                                            <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Stage Name</div>
-                                            {viewMode === 'admin' ? (
-                                                <DebouncedInput 
-                                                    value={stage.name} onChange={val => handleUpdateStage(stage.id, 'name', val)}
-                                                    className="w-full bg-white border border-slate-200 px-2 py-1 rounded text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
-                                                />
-                                            ) : (
-                                                <div className="font-bold text-sm text-slate-800">{stage.name}</div>
-                                            )}
+                                    {/* Top Row: Index, Name, Status, Actions */}
+                                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                        <div className="flex flex-wrap items-center gap-4 flex-1">
+                                            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0">
+                                                {index + 1}
+                                            </div>
+                                            <div className="flex-1 min-w-[200px]">
+                                                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Stage Name</div>
+                                                {viewMode === 'admin' ? (
+                                                    <DebouncedInput 
+                                                        value={stage.name} onChange={val => handleUpdateStage(stage.id, 'name', val)}
+                                                        className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-sm font-bold text-slate-800 outline-none focus:border-blue-500 shadow-sm"
+                                                    />
+                                                ) : (
+                                                    <div className="font-bold text-sm text-slate-800 px-1">{stage.name}</div>
+                                                )}
+                                            </div>
+                                            <div className="min-w-[140px]">
+                                                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Status</div>
+                                                {viewMode === 'admin' ? (
+                                                    <select 
+                                                        value={stage.status} onChange={e => handleUpdateStage(stage.id, 'status', e.target.value)}
+                                                        className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 outline-none focus:border-blue-500 shadow-sm"
+                                                    >
+                                                        <option>Not Started</option>
+                                                        <option>Active</option>
+                                                        <option>Completed</option>
+                                                        <option>Rejected</option>
+                                                    </select>
+                                                ) : (
+                                                    <div className="font-bold text-xs text-slate-600 px-3 py-1.5 bg-slate-100 rounded-lg inline-block border border-slate-200">{stage.status}</div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {viewMode === 'admin' && (
+                                            <div className="flex items-center gap-3 shrink-0 pt-2 md:pt-0">
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Received</span>
+                                                    <span className={`text-sm font-black flex items-center gap-1 ${isPaid ? 'text-emerald-500' : 'text-slate-600'}`}>
+                                                        <span className="text-[10px]">֏</span>{actual.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <button 
+                                                    onClick={() => setPaymentModal({ stageId: stage.id, stageName: stage.name, amount: '', date: new Date().toISOString().slice(0, 10), accountId: accounts.length > 0 ? accounts[0].id : '' })}
+                                                    className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${isPaid ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-100' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-md shadow-blue-500/20'}`}
+                                                    title="Log Payment"
+                                                >
+                                                    <DollarSign className="w-4 h-4" />
+                                                </button>
+                                                <button onClick={() => handleRemoveStage(stage.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Bottom Row: Financials and Timeline */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 ml-0 md:ml-12 mt-2">
+                                        
+                                        {/* Financials Card */}
+                                        <div className="col-span-1 flex flex-col gap-3 bg-white border border-slate-100 p-4 rounded-xl shadow-sm">
+                                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">Financials</div>
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-slate-500 font-bold uppercase">Expected Gross</span>
+                                                {viewMode === 'admin' ? (
+                                                    <DebouncedInput 
+                                                        type="number" value={stage.expectedIncome} onChange={val => handleUpdateStage(stage.id, 'expectedIncome', val)}
+                                                        className="w-24 bg-slate-50 border border-slate-200 px-2 py-1 rounded text-xs font-bold text-slate-800 outline-none focus:border-blue-500 text-right"
+                                                    />
+                                                ) : (
+                                                    <span className="font-bold text-slate-800">֏{expected.toLocaleString()}</span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-slate-500 font-bold uppercase">Expected Net</span>
+                                                {viewMode === 'admin' ? (
+                                                    <DebouncedInput 
+                                                        type="number" value={stage.expectedNetIncome || 0} onChange={val => handleUpdateStage(stage.id, 'expectedNetIncome', val)}
+                                                        className="w-24 bg-slate-50 border border-slate-200 px-2 py-1 rounded text-xs font-bold text-slate-800 outline-none focus:border-blue-500 text-right"
+                                                    />
+                                                ) : (
+                                                    <span className="font-bold text-slate-800">֏{(Number(stage.expectedNetIncome)||0).toLocaleString()}</span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Timeline Card */}
+                                        <div className="col-span-1 lg:col-span-2 flex flex-col gap-3 bg-slate-50/50 border border-slate-100 p-4 rounded-xl shadow-sm">
+                                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">Timeline</div>
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <div className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1"><Calendar className="w-3 h-3"/> Received</div>
+                                                    {viewMode === 'admin' ? (
+                                                        <input type="date" value={stage.receivedAt || ''} onChange={e => handleUpdateStage(stage.id, 'receivedAt', e.target.value)} className="w-full bg-white border border-slate-200 px-2 py-1 rounded text-xs outline-none focus:border-blue-500" />
+                                                    ) : (
+                                                        <div className="font-bold text-xs">{stage.receivedAt || 'N/A'}</div>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <div className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1"><Calendar className="w-3 h-3"/> Completed</div>
+                                                    {viewMode === 'admin' ? (
+                                                        <input type="date" value={stage.completedAt || ''} onChange={e => handleUpdateStage(stage.id, 'completedAt', e.target.value)} className="w-full bg-white border border-slate-200 px-2 py-1 rounded text-xs outline-none focus:border-blue-500" />
+                                                    ) : (
+                                                        <div className="font-bold text-xs">{stage.completedAt || 'N/A'}</div>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <div className="text-[9px] font-bold text-amber-500 uppercase flex items-center gap-1"><Calendar className="w-3 h-3"/> Exp. Payment</div>
+                                                    {viewMode === 'admin' ? (
+                                                        <input type="date" value={stage.expectedPaymentDate || ''} onChange={e => handleUpdateStage(stage.id, 'expectedPaymentDate', e.target.value)} className="w-full bg-white border border-slate-200 px-2 py-1 rounded text-xs outline-none focus:border-amber-500 text-amber-600" />
+                                                    ) : (
+                                                        <div className="font-bold text-xs text-amber-600">{stage.expectedPaymentDate || 'N/A'}</div>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <div className="text-[9px] font-bold text-emerald-500 uppercase flex items-center gap-1"><DollarSign className="w-3 h-3"/> Payment Day</div>
+                                                    <div className="font-bold text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded inline-block">{paymentDayStr}</div>
+                                                </div>
+                                            </div>
                                         </div>
                                         
-                                        <div className="space-y-1">
-                                            <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Expected Value</div>
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-1 text-[10px]">
-                                                    <span className="text-slate-400 font-bold">Gross: ֏</span>
-                                                    {viewMode === 'admin' ? (
-                                                        <DebouncedInput 
-                                                            type="number" value={stage.expectedIncome} onChange={val => handleUpdateStage(stage.id, 'expectedIncome', val)}
-                                                            className="w-20 bg-white border border-slate-200 px-1 py-0.5 rounded text-[10px] font-bold text-slate-800 outline-none focus:border-blue-500"
-                                                        />
-                                                    ) : (
-                                                        <span className="font-bold text-slate-800">{expected.toLocaleString()}</span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-1 text-[10px]">
-                                                    <span className="text-slate-400 font-bold">Net: ֏</span>
-                                                    {viewMode === 'admin' ? (
-                                                        <DebouncedInput 
-                                                            type="number" value={stage.expectedNetIncome || 0} onChange={val => handleUpdateStage(stage.id, 'expectedNetIncome', val)}
-                                                            className="w-20 bg-white border border-slate-200 px-1 py-0.5 rounded text-[10px] font-bold text-slate-800 outline-none focus:border-blue-500"
-                                                        />
-                                                    ) : (
-                                                        <span className="font-bold text-slate-800">{(Number(stage.expectedNetIncome)||0).toLocaleString()}</span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Status</div>
-                                            {viewMode === 'admin' ? (
-                                                <select 
-                                                    value={stage.status} onChange={e => handleUpdateStage(stage.id, 'status', e.target.value)}
-                                                    className="w-full bg-white border border-slate-200 px-2 py-1 rounded text-xs font-bold text-slate-600 outline-none focus:border-blue-500"
-                                                >
-                                                    <option>Not Started</option>
-                                                    <option>Active</option>
-                                                    <option>Completed</option>
-                                                    <option>Rejected</option>
-                                                </select>
-                                            ) : (
-                                                <div className="font-bold text-xs text-slate-600 px-2 py-1 bg-slate-100 rounded inline-block">{stage.status}</div>
-                                            )}
-                                        </div>
                                     </div>
-
-                                    {viewMode === 'admin' && (
-                                        <div className="flex items-center gap-3 shrink-0 border-t md:border-t-0 md:border-l border-slate-200 pt-3 md:pt-0 md:pl-4">
-                                            <div className="flex flex-col items-end">
-                                                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Received</span>
-                                                <span className={`text-sm font-black flex items-center gap-1 ${isPaid ? 'text-emerald-500' : 'text-slate-600'}`}>
-                                                    <span className="text-[10px]">֏</span>{actual.toLocaleString()}
-                                                </span>
-                                            </div>
-                                            <button 
-                                                onClick={() => setPaymentModal({ stageId: stage.id, stageName: stage.name, amount: '', date: new Date().toISOString().slice(0, 10), accountId: accounts.length > 0 ? accounts[0].id : '' })}
-                                                className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${isPaid ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-100' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-md shadow-blue-500/20'}`}
-                                                title="Log Payment"
-                                            >
-                                                <DollarSign className="w-4 h-4" />
-                                            </button>
-                                            <button onClick={() => handleRemoveStage(stage.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    )}
                                 </div>
                             );
                         })
