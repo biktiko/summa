@@ -378,6 +378,7 @@ const FinanceModule = ({
 
     // Planning/Coming Analytics State
     const [planningMode, setPlanningMode] = useState('project'); // 'history' | 'project'
+    const [projectionMethod, setProjectionMethod] = useState('average'); // 'average' | 'smart'
     
     // Default prediction target: 30 days from now
     const defaultTarget = new Date();
@@ -1473,6 +1474,43 @@ const FinanceModule = ({
                         const totalLookbackSpend = filteredLookbackExpenses.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
                         const dailyAverageSpend = totalLookbackSpend / lookbackDays;
                         
+                        // Smart Projection Logic: Group by day of month (1-31)
+                        const dayOccurrences = Array(32).fill(0);
+                        let currDate = new Date(effectiveLookbackStart);
+                        currDate.setHours(0,0,0,0);
+                        let maxEndD = new Date(lookbackEnd);
+                        if (lookbackTx.length > 0) {
+                            const lastTxDate = new Date(Math.max(...lookbackTx.map(t => new Date(t.date || t.createdAt))));
+                            if (lastTxDate < maxEndD) {
+                                maxEndD = lastTxDate;
+                            }
+                        } else {
+                            if (new Date() < maxEndD) maxEndD = new Date();
+                        }
+                        maxEndD.setHours(23,59,59,999);
+                        while (currDate <= maxEndD) {
+                            dayOccurrences[currDate.getDate()]++;
+                            currDate.setDate(currDate.getDate() + 1);
+                        }
+                        
+                        const smartDailySpend = Array(32).fill(0);
+                        filteredLookbackExpenses.forEach(t => {
+                            const d = new Date(t.date || t.createdAt);
+                            smartDailySpend[d.getDate()] += (Number(t.amount) || 0);
+                        });
+                        for (let i = 1; i <= 31; i++) {
+                            smartDailySpend[i] = dayOccurrences[i] > 0 ? (smartDailySpend[i] / dayOccurrences[i]) : 0;
+                        }
+                        
+                        const smartDailyIncome = Array(32).fill(0);
+                        lookbackIncomes.forEach(t => {
+                            const d = new Date(t.date || t.createdAt);
+                            smartDailyIncome[d.getDate()] += (Number(t.amount) || 0);
+                        });
+                        for (let i = 1; i <= 31; i++) {
+                            smartDailyIncome[i] = dayOccurrences[i] > 0 ? (smartDailyIncome[i] / dayOccurrences[i]) : 0;
+                        }
+
                         const expectedIncomeEvents = [];
                         const expectedExpenseEvents = [];
                         
@@ -1624,30 +1662,54 @@ const FinanceModule = ({
                             // 2. Prediction baselines (strictly future)
                             if (d > today) {
                                 let dayRecurringInc = 0;
+                                let dayAvgSpend = dailyAverageSpend;
+                                
                                 const accountObj = accounts.find(a => a.id === planningAccountId);
                                 const isMain = planningAccountId === 'all' || (accountObj && accountObj.label.toLowerCase().includes('main'));
                                 
-                                if (planningMode === 'history') {
-                                    if (isMain) dayRecurringInc = dailyRecurringIncome;
-                                } else {
-                                    if (isMain) {
-                                        const activeIncomeCategories = categories.filter(c => c.type === 'income');
-                                        activeIncomeCategories.forEach(c => {
-                                            const transferDay = Number(c.dayOfTransfer) || 1;
-                                            const maxDaysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-                                            const actualTransferDay = Math.min(transferDay, maxDaysInMonth);
-                                            
-                                            if (d.getDate() === actualTransferDay) {
-                                                dayRecurringInc += (Number(c.amount) || 0);
+                                if (projectionMethod === 'smart') {
+                                    const dDay = d.getDate();
+                                    const maxDaysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                                    
+                                    dayAvgSpend = smartDailySpend[dDay] || 0;
+                                    if (dDay === maxDaysInMonth) {
+                                        for (let extra = maxDaysInMonth + 1; extra <= 31; extra++) {
+                                            dayAvgSpend += (smartDailySpend[extra] || 0);
+                                        }
+                                    }
+                                    
+                                    if (planningMode === 'history' && isMain) {
+                                        dayRecurringInc = smartDailyIncome[dDay] || 0;
+                                        if (dDay === maxDaysInMonth) {
+                                            for (let extra = maxDaysInMonth + 1; extra <= 31; extra++) {
+                                                dayRecurringInc += (smartDailyIncome[extra] || 0);
                                             }
-                                        });
+                                        }
+                                    }
+                                } else {
+                                    if (planningMode === 'history' && isMain) {
+                                        dayRecurringInc = dailyRecurringIncome;
                                     }
                                 }
                                 
+                                // In Expected mode, we always use categories for income
+                                if (planningMode === 'project' && isMain) {
+                                    const activeIncomeCategories = categories.filter(c => c.type === 'income');
+                                    activeIncomeCategories.forEach(c => {
+                                        const transferDay = Number(c.dayOfTransfer) || 1;
+                                        const maxDaysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                                        const actualTransferDay = Math.min(transferDay, maxDaysInMonth);
+                                        
+                                        if (d.getDate() === actualTransferDay) {
+                                            dayRecurringInc += (Number(c.amount) || 0);
+                                        }
+                                    });
+                                }
+                                
                                 runningBalance += dayRecurringInc;
-                                runningBalance -= dailyAverageSpend;
+                                runningBalance -= dayAvgSpend;
                                 windowExpectedIncome += dayRecurringInc;
-                                windowPredictedExpenses += dailyAverageSpend;
+                                windowPredictedExpenses += dayAvgSpend;
                             }
                             
                             // 3. Expected Specific Events (today and future)
@@ -1704,6 +1766,23 @@ const FinanceModule = ({
                                                 onClick={() => setPlanningMode('project')}
                                             >
                                                 Expected
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 space-y-1 w-full">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Method</label>
+                                        <div className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1 flex font-bold text-xs h-[38px]">
+                                            <button 
+                                                className={`flex-1 rounded-md transition-colors ${projectionMethod === 'average' ? 'bg-white shadow-sm text-blue-600 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
+                                                onClick={() => setProjectionMethod('average')}
+                                            >
+                                                Average
+                                            </button>
+                                            <button 
+                                                className={`flex-1 rounded-md transition-colors ${projectionMethod === 'smart' ? 'bg-white shadow-sm text-blue-600 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
+                                                onClick={() => setProjectionMethod('smart')}
+                                            >
+                                                Smart
                                             </button>
                                         </div>
                                     </div>
@@ -1817,7 +1896,12 @@ const FinanceModule = ({
                                         <div className={`text-2xl font-black ${balanceColorClass}`}>
                                             {formatMoney(projectedEndBalance)}
                                         </div>
-                                        <div className="text-[9px] text-slate-500 font-bold mt-1">On {new Date(predictionDateRange.end).toLocaleDateString()}</div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <div className="text-[9px] text-slate-500 font-bold">On {new Date(predictionDateRange.end).toLocaleDateString()}</div>
+                                            <div className={`text-[9px] font-bold ${projectedEndBalance - windowStartingBalance > 0 ? 'text-green-500' : (projectedEndBalance - windowStartingBalance < 0 ? 'text-red-500' : 'text-slate-400')}`}>
+                                                ({projectedEndBalance - windowStartingBalance > 0 ? '+' : ''}{formatMoney(projectedEndBalance - windowStartingBalance)})
+                                            </div>
+                                        </div>
                                         <Wallet className={`w-12 h-12 absolute -right-3 -bottom-3 opacity-50 ${isSafe ? 'text-indigo-100' : 'text-red-100'}`} />
                                     </div>
                                 </div>
