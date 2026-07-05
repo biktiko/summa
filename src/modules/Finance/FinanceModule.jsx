@@ -266,6 +266,57 @@ const CURRENCIES = {
     RUB: { symbol: '₽', label: 'RUB', rate: 0.24 }
 };
 
+const getLocalYYYYMMDD = (dateOrStr) => {
+    const d = dateOrStr ? new Date(dateOrStr) : new Date();
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
+
+
+
+const CustomBalanceTooltip = ({ active, payload, label, formatMoney, balanceChartMode }) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        const displayLabel = data.fullDate ? formatDateToDDMMYYYY(data.fullDate) : label;
+        return (
+            <div className="bg-slate-900 border-none rounded-xl p-4 shadow-xl">
+                <div className="text-[10px] font-bold text-slate-400 uppercase mb-2">{displayLabel}</div>
+                <div className="space-y-1">
+                    <div className="flex justify-between items-center gap-4 text-xs font-mono text-white">
+                        <span className="text-slate-300 font-sans">Balance</span>
+                        <span className="font-bold">{formatMoney(data.balance)}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-4 text-xs font-mono text-emerald-400">
+                        <span className="text-emerald-500/80 font-sans">Income</span>
+                        <span>+{formatMoney(data.income)}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-4 text-xs font-mono text-rose-400">
+                        <span className="text-rose-500/80 font-sans">Expense</span>
+                        <span>-{formatMoney(data.expense)}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-4 text-xs font-mono text-blue-400 pt-1 border-t border-slate-700/50">
+                        <span className="text-blue-500/80 font-sans">Net Flow</span>
+                        <span>{data.netFlow > 0 ? '+' : ''}{formatMoney(data.netFlow)}</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
+
+const formatDateToDDMMYYYY = (dateString) => {
+    if (!dateString) return '';
+    const parts = dateString.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}.${parts[1]}.${parts[0]}`;
+    } else if (parts.length === 2) {
+        return `01.${parts[1]}.${parts[0]}`;
+    }
+    return dateString;
+};
+
 const FinanceModule = ({
     userData,
     updateUser,
@@ -373,6 +424,21 @@ const FinanceModule = ({
     });
 
     // Projects Analytics State
+    
+    const exportBalanceHistoryToExcel = () => {
+        const data = balanceHistoryData.map(d => ({
+            'Date': formatDateToDDMMYYYY(d.fullDate),
+            'Income': d.income,
+            'Expense': d.expense,
+            'Net Flow': d.netFlow,
+            'Balance': d.balance
+        }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Balance_History");
+        XLSX.writeFile(wb, `Balance_History.xlsx`);
+    };
+
     const [projectClientFilter, setProjectClientFilter] = useState('all');
     const [projectStatusFilter, setProjectStatusFilter] = useState('all');
 
@@ -383,18 +449,18 @@ const FinanceModule = ({
     // Default prediction target: 30 days from now
     const defaultTarget = new Date();
     defaultTarget.setDate(defaultTarget.getDate() + 30);
-    const [predictionDateRange, setPredictionDateRange] = useState({ start: new Date().toISOString().slice(0, 10), end: defaultTarget.toISOString().slice(0, 10) });
+    const [predictionDateRange, setPredictionDateRange] = useState({ start: getLocalYYYYMMDD(), end: getLocalYYYYMMDD(defaultTarget) });
     
     // Default lookback start: 15 days ago
     const defaultLookback = new Date();
     defaultLookback.setDate(defaultLookback.getDate() - 15);
-    const [lookbackDateRange, setLookbackDateRange] = useState({ start: defaultLookback.toISOString().slice(0, 10), end: new Date().toISOString().slice(0, 10) });
+    const [lookbackDateRange, setLookbackDateRange] = useState({ start: defaultLookback.toISOString().slice(0, 10), end: getLocalYYYYMMDD() });
     
     const [selectedPredictionCategories, setSelectedPredictionCategories] = useState([]); // array of category IDs, empty means all
     const [planningAccountId, setPlanningAccountId] = useState('all');
     const [isAddingExpected, setIsAddingExpected] = useState(false);
     const [isEditingExpectedId, setIsEditingExpectedId] = useState(null);
-    const [expectedForm, setExpectedForm] = useState({ date: defaultTarget.toISOString().slice(0, 10), description: '', amount: '', type: 'expense', categoryId: '' });
+    const [expectedForm, setExpectedForm] = useState({ date: getLocalYYYYMMDD(defaultTarget), description: '', amount: '', type: 'expense', categoryId: '' });
 
     // --- Data Processing (Month-Aware) ---
     const transactions = useMemo(() => userData.transactions || [], [userData.transactions]);
@@ -726,18 +792,20 @@ const FinanceModule = ({
             let curr = new Date(start);
             while (curr <= end) {
                 if (curr > today) break;
-                const dayStr = curr.toISOString().slice(0, 10);
-                const dayTransactions = rangeTx.filter(t => t.createdAt.startsWith(dayStr));
+                const dayStr = getLocalYYYYMMDD(curr);
+                const dayTransactions = rangeTx.filter(t => getLocalYYYYMMDD(t.createdAt) === dayStr);
                 
                 let prevBal = currentBal;
-                dayTransactions.forEach(t => {
+                  let dayIncome = 0;
+                  let dayExpense = 0;
+                  dayTransactions.forEach(t => {
                     const amount = Number(t.amount) || 0;
                     if (t.type === 'income') {
                         const accId = t.accountId || 'legacy';
-                        if (activeAnalyticAccountIds.includes(accId)) currentBal += amount;
+                        if (activeAnalyticAccountIds.includes(accId)) { currentBal += amount; dayIncome += amount; }
                     } else if (t.type === 'expense') {
                         const accId = t.accountId || 'legacy';
-                        if (activeAnalyticAccountIds.includes(accId)) currentBal -= amount;
+                        if (activeAnalyticAccountIds.includes(accId)) { currentBal -= amount; dayExpense += amount; }
                     } else if (t.type === 'transfer') {
                         if (activeAnalyticAccountIds.includes(t.accountId)) currentBal -= amount;
                         if (activeAnalyticAccountIds.includes(t.toAccountId)) currentBal += amount;
@@ -745,11 +813,13 @@ const FinanceModule = ({
                 });
 
                 points.push({
-                    label: curr.getDate().toString(),
-                    fullDate: dayStr,
-                    balance: currentBal,
-                    netFlow: currentBal - prevBal
-                });
+                      label: String(curr.getDate()).padStart(2, '0') + '.' + String(curr.getMonth() + 1).padStart(2, '0'),
+                      fullDate: dayStr,
+                      balance: currentBal,
+                      netFlow: currentBal - prevBal,
+                      income: dayIncome,
+                      expense: dayExpense
+                  });
                 
                 curr.setDate(curr.getDate() + 1);
             }
@@ -772,14 +842,16 @@ const FinanceModule = ({
                 });
 
                 let prevBal = currentBal;
-                weekTransactions.forEach(t => {
+                  let dayIncome = 0;
+                  let dayExpense = 0;
+                  weekTransactions.forEach(t => {
                     const amount = Number(t.amount) || 0;
                     if (t.type === 'income') {
                         const accId = t.accountId || 'legacy';
-                        if (activeAnalyticAccountIds.includes(accId)) currentBal += amount;
+                        if (activeAnalyticAccountIds.includes(accId)) { currentBal += amount; dayIncome += amount; }
                     } else if (t.type === 'expense') {
                         const accId = t.accountId || 'legacy';
-                        if (activeAnalyticAccountIds.includes(accId)) currentBal -= amount;
+                        if (activeAnalyticAccountIds.includes(accId)) { currentBal -= amount; dayExpense += amount; }
                     } else if (t.type === 'transfer') {
                         if (activeAnalyticAccountIds.includes(t.accountId)) currentBal -= amount;
                         if (activeAnalyticAccountIds.includes(t.toAccountId)) currentBal += amount;
@@ -788,11 +860,13 @@ const FinanceModule = ({
 
                 const labelStr = `${weekStart.getDate()} ${weekStart.toLocaleDateString(undefined, {month:'short'})}`;
                 points.push({
-                    label: labelStr,
-                    fullDate: weekStart.toISOString().slice(0, 10),
-                    balance: currentBal,
-                    netFlow: currentBal - prevBal
-                });
+                      label: labelStr,
+                      fullDate: getLocalYYYYMMDD(weekStart),
+                      balance: currentBal,
+                      netFlow: currentBal - prevBal,
+                      income: dayIncome,
+                      expense: dayExpense
+                  });
                 curr.setDate(curr.getDate() + 7);
             }
         } else {
@@ -801,19 +875,21 @@ const FinanceModule = ({
             
             while (curr <= end) {
                 if (curr > today) break;
-                const monthStr = curr.toISOString().slice(0, 7);
+                const monthStr = getLocalYYYYMMDD(curr).slice(0, 7);
                 const nextMonth = new Date(curr.getFullYear(), curr.getMonth() + 1, 1);
-                const monthTransactionsList = rangeTx.filter(t => t.createdAt.startsWith(monthStr));
+                const monthTransactionsList = rangeTx.filter(t => getLocalYYYYMMDD(t.createdAt).startsWith(monthStr));
 
                 let prevBal = currentBal;
-                monthTransactionsList.forEach(t => {
+                  let dayIncome = 0;
+                  let dayExpense = 0;
+                  monthTransactionsList.forEach(t => {
                     const amount = Number(t.amount) || 0;
                     if (t.type === 'income') {
                         const accId = t.accountId || 'legacy';
-                        if (activeAnalyticAccountIds.includes(accId)) currentBal += amount;
+                        if (activeAnalyticAccountIds.includes(accId)) { currentBal += amount; dayIncome += amount; }
                     } else if (t.type === 'expense') {
                         const accId = t.accountId || 'legacy';
-                        if (activeAnalyticAccountIds.includes(accId)) currentBal -= amount;
+                        if (activeAnalyticAccountIds.includes(accId)) { currentBal -= amount; dayExpense += amount; }
                     } else if (t.type === 'transfer') {
                         if (activeAnalyticAccountIds.includes(t.accountId)) currentBal -= amount;
                         if (activeAnalyticAccountIds.includes(t.toAccountId)) currentBal += amount;
@@ -822,11 +898,13 @@ const FinanceModule = ({
 
                 const labelStr = curr.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
                 points.push({
-                    label: labelStr,
-                    fullDate: monthStr,
-                    balance: currentBal,
-                    netFlow: currentBal - prevBal
-                });
+                      label: labelStr,
+                      fullDate: monthStr,
+                      balance: currentBal,
+                      netFlow: currentBal - prevBal,
+                      income: dayIncome,
+                      expense: dayExpense
+                  });
 
                 curr = nextMonth;
             }
@@ -897,13 +975,13 @@ const FinanceModule = ({
         if (spendingGrouping === 'day') {
             let current = new Date(resolvedDateRange.start);
             while (current <= resolvedDateRange.end) {
-                const dayStr = current.toISOString().slice(0, 10); // "YYYY-MM-DD"
+                const dayStr = getLocalYYYYMMDD(current); // "YYYY-MM-DD"
                 const dayLabel = current.getDate().toString();
                 const dayData = { day: dayLabel, income: 0, expense: 0, fullDate: dayStr };
                 
                 // Filter transactions for this day
                 const dayTransactions = filteredMonthTransactions.filter(t => 
-                    t.createdAt.startsWith(dayStr) && 
+                    getLocalYYYYMMDD(t.createdAt) === dayStr && 
                     (dailyChartCategoryFilter === 'all' || t.categoryId === dailyChartCategoryFilter)
                 );
                 
@@ -940,7 +1018,7 @@ const FinanceModule = ({
                 weekEnd.setHours(23, 59, 59, 999);
 
                 const weekLabel = `${weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
-                const weekData = { day: weekLabel, income: 0, expense: 0, fullDate: weekStart.toISOString().slice(0, 10) };
+                const weekData = { day: weekLabel, income: 0, expense: 0, fullDate: getLocalYYYYMMDD(weekStart) };
 
                 const weekTransactions = filteredMonthTransactions.filter(t => {
                     const tDate = new Date(t.createdAt);
@@ -979,7 +1057,7 @@ const FinanceModule = ({
                 const monthEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
                 monthEnd.setHours(23, 59, 59, 999);
 
-                const monthStr = monthStart.toISOString().slice(0, 7); // "YYYY-MM"
+                const monthStr = getLocalYYYYMMDD(monthStart).slice(0, 7); // "YYYY-MM"
                 const monthLabel = monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
                 const monthData = { day: monthLabel, income: 0, expense: 0, fullDate: monthStr };
 
@@ -1926,12 +2004,7 @@ const FinanceModule = ({
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                                 <XAxis dataKey="shortDate" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} dy={10} />
                                                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} tickFormatter={(val) => `֏${(val/1000)}k`} />
-                                                <RechartsTooltip 
-                                                    contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', padding: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
-                                                    itemStyle={{ color: '#fff', fontSize: '14px', fontWeight: 'bold' }} 
-                                                    labelStyle={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', fontWeight: 'bold' }}
-                                                    formatter={(val) => formatMoney(val)} 
-                                                />
+                                                <RechartsTooltip content={<CustomBalanceTooltip formatMoney={formatMoney} balanceChartMode={balanceChartMode} />} />
                                                 <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" />
                                                 <Area 
                                                     type="monotone" 
@@ -2656,12 +2729,7 @@ const FinanceModule = ({
                                                      tickFormatter={val => formatMoney(val)}
                                                      dx={-10}
                                                  />
-                                                 <RechartsTooltip 
-                                                     contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
-                                                     itemStyle={{ color: '#fff', fontSize: '12px', fontFamily: 'monospace' }} 
-                                                     labelStyle={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }} 
-                                                     formatter={(val) => [formatMoney(val), balanceChartMode === 'net_worth' ? "Net Worth" : "Net Flow"]} 
-                                                 />
+                                                 <RechartsTooltip content={<CustomBalanceTooltip formatMoney={formatMoney} balanceChartMode={balanceChartMode} />} />
                                                  <Area 
                                                      type="monotone" 
                                                      dataKey={balanceChartMode === 'net_worth' ? "balance" : "netFlow"} 
@@ -2677,7 +2745,45 @@ const FinanceModule = ({
                                              <span className="text-xs">No balance history data available</span>
                                          </div>
                                      )}
+                                                              {/* Balance History Table */}
+                             <div className="bg-white shadow-sm border border-slate-200 p-6 rounded-2xl flex flex-col relative mt-6">
+                                 <div className="flex justify-between items-center mb-6">
+                                     <h3 className="text-sm font-bold text-slate-800 tracking-wider">Detailed History</h3>
+                                     <button onClick={exportBalanceHistoryToExcel} className="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2">
+                                         <Download className="w-4 h-4" /> Export (.xlsx)
+                                     </button>
                                  </div>
+                                 <div className="overflow-x-auto w-full">
+                                     <table className="w-full text-left border-collapse min-w-[600px]">
+                                         <thead>
+                                             <tr className="border-b-2 border-slate-200 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                                                 <th className="pb-3 px-4 font-bold w-32">Date</th>
+                                                 <th className="pb-3 px-4 text-right w-32">Income</th>
+                                                 <th className="pb-3 px-4 text-right w-32">Expense</th>
+                                                 <th className="pb-3 px-4 text-right w-32">Net Flow</th>
+                                                 <th className="pb-3 px-4 text-right w-32">Balance</th>
+                                             </tr>
+                                         </thead>
+                                         <tbody>
+                                             {balanceHistoryData.map((d, i) => (
+                                                 <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                                     <td className="py-3 px-4 text-xs font-bold text-slate-700">{formatDateToDDMMYYYY(d.fullDate)}</td>
+                                                     <td className="py-3 px-4 text-xs font-mono text-emerald-600 text-right">+{formatMoney(d.income || 0)}</td>
+                                                     <td className="py-3 px-4 text-xs font-mono text-rose-600 text-right">-{formatMoney(d.expense || 0)}</td>
+                                                     <td className="py-3 px-4 text-xs font-mono text-slate-700 text-right">{d.netFlow >= 0 ? '+' : ''}{formatMoney(d.netFlow)}</td>
+                                                     <td className="py-3 px-4 text-xs font-mono font-bold text-slate-800 text-right">{formatMoney(d.balance)}</td>
+                                                 </tr>
+                                             ))}
+                                             {balanceHistoryData.length === 0 && (
+                                                 <tr>
+                                                     <td colSpan="5" className="py-8 text-center text-xs text-slate-400">No data available</td>
+                                                 </tr>
+                                             )}
+                                         </tbody>
+                                     </table>
+                                 </div>
+                             </div>
+</div>
                              </div>
                          </div>
                      )}
@@ -3214,12 +3320,7 @@ const FinanceModule = ({
                                                  tickFormatter={val => formatMoney(val)}
                                                  tickMargin={12}
                                              />
-                                             <RechartsTooltip 
-                                                 contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
-                                                 itemStyle={{ color: '#fff', fontSize: '14px', fontFamily: 'monospace' }} 
-                                                 labelStyle={{ color: '#94a3b8', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }} 
-                                                 formatter={(val) => [formatMoney(val), balanceChartMode === 'net_worth' ? "Net Worth" : "Net Flow"]} 
-                                             />
+                                             <RechartsTooltip content={<CustomBalanceTooltip formatMoney={formatMoney} balanceChartMode={balanceChartMode} />} />
                                              <Area 
                                                  type="monotone" 
                                                  dataKey={balanceChartMode === 'net_worth' ? "balance" : "netFlow"} 
