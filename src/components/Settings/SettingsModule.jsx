@@ -53,6 +53,9 @@ const SettingsModule = ({ userData, updateUser }) => {
         // Gameplay
         gameplaySettings: userData.gameplaySettings || { xp: true, coins: true, publicXP: false, publicCoins: false },
         hiddenModules: userData.hiddenModules || [],
+        defaultModule: userData.defaultModule || '',
+        moduleOrder: userData.moduleOrder || ['projects', 'finance', 'wishlist', 'tasks', 'blog', 'career', 'health', 'network'],
+        wishlist: userData.wishlist || [],
 
         // Appearance / Pagination
         appearance: userData.appearance || {
@@ -947,7 +950,7 @@ const SettingsModule = ({ userData, updateUser }) => {
                         <p className="text-[10px] text-slate-500 mb-2">Toggle modules to hide them. Use arrows to reorder navigation.</p>
                         <div className="grid grid-cols-1 gap-3">
                             {(() => {
-                                const defaults = ['projects', 'finance', 'tasks', 'blog', 'career', 'health', 'network'];
+                                const defaults = ['projects', 'finance', 'wishlist', 'tasks', 'blog', 'career', 'health', 'network'];
                                 let current = localData.moduleOrder || defaults;
                                 defaults.forEach(m => { if (!current.includes(m)) current.push(m); });
                                 return current.map((modId, index, arr) => {
@@ -968,6 +971,20 @@ const SettingsModule = ({ userData, updateUser }) => {
                                         </div>
                                         
                                         <div className="flex items-center gap-2">
+                                            {/* Set Default Button */}
+                                            <button
+                                                onClick={() => setLocalData({ ...localData, defaultModule: modId })}
+                                                disabled={isHidden}
+                                                className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${
+                                                    localData.defaultModule === modId 
+                                                    ? 'bg-amber-100 text-amber-500 border border-amber-200' 
+                                                    : 'bg-slate-50 text-slate-400 hover:text-amber-400 hover:bg-slate-100 disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-slate-50 border border-slate-200 hover:border-slate-300'
+                                                }`}
+                                                title={localData.defaultModule === modId ? "Default Module" : "Set as Default"}
+                                            >
+                                                <Target className="w-3.5 h-3.5" />
+                                            </button>
+
                                             {/* Reorder Buttons */}
                                             <div className="flex flex-col gap-0.5 mr-2">
                                                 <button 

@@ -43,17 +43,23 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
         return true;
     });
 
-    return filtered.sort((a, b) => {
-        const indexA = order.indexOf(a.id);
-        const indexB = order.indexOf(b.id);
-        // If not in order array, put at end
-        const valA = indexA === -1 ? 999 : indexA;
-        const valB = indexB === -1 ? 999 : indexB;
-        return valA - valB;
+    // Create a robust sorted array based strictly on 'order'
+    const sorted = [];
+    order.forEach(id => {
+        const found = filtered.find(m => m.id === id);
+        if (found) sorted.push(found);
     });
+    
+    // Add any remaining modules not in 'order'
+    filtered.forEach(m => {
+        if (!sorted.find(s => s.id === m.id)) sorted.push(m);
+    });
+
+    return sorted;
   }, [userData, viewMode]);
-  
-  const [activeTabId, setActiveTabId] = useState(null);
+
+  const [activeTabId, setActiveTabId] = useState(MODULES[0].id);
+  const [hasInitializedTab, setHasInitializedTab] = useState(false);
   const [lastActiveTabId, setLastActiveTabId] = useState(MODULES[0].id);
   const [currentModuleView, setCurrentModuleView] = useState('dashboard'); 
   const [activeTaskTab, setActiveTaskTab] = useState('missions');
@@ -67,22 +73,33 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
   }, [userData?.appearance?.sidebarOpenByDefault]);
   const [activeMobileMenu, setActiveMobileMenu] = useState(false);
 
-  // Initialize Active Tab - synced safely
+  // Initialize Tab Once Data Loads
   useEffect(() => {
-    if (visibleModules.length > 0) {
-        // If we are currently in settings, don't force redirect
-        if (activeTabId === 'settings') return;
+      if (!loading && !hasInitializedTab && userData) {
+          setHasInitializedTab(true);
+          if (userData.defaultModule) {
+              const defaultValid = visibleModules.find(m => m.id === userData.defaultModule);
+              if (defaultValid) {
+                  setActiveTabId(userData.defaultModule);
+                  return;
+              }
+          }
+          if (visibleModules.length > 0) {
+              setActiveTabId(visibleModules[0].id);
+          }
+      }
+  }, [loading, userData, hasInitializedTab, visibleModules]);
 
-        // If current activeTabId is not in visible modules, switch to first visible
+  // Sync Active Tab if visibility changes (e.g. module hidden)
+  useEffect(() => {
+    if (hasInitializedTab && visibleModules.length > 0) {
+        if (activeTabId === 'settings') return;
         const isValid = visibleModules.find(m => m.id === activeTabId);
-        if (!activeTabId || !isValid) {
-             const timeoutId = setTimeout(() => {
-                 setActiveTabId(visibleModules[0].id);
-             }, 0);
-             return () => clearTimeout(timeoutId);
+        if (!isValid) {
+            setActiveTabId(visibleModules[0].id);
         }
     }
-  }, [visibleModules, activeTabId]);
+  }, [visibleModules, activeTabId, hasInitializedTab]);
 
   // Swipe State
   const [touchStart, setTouchStart] = useState(null);

@@ -392,7 +392,7 @@ export class MockDatabase {
         const db = this._getDb();
         const user = db.users.find(u => u.id === userId);
         if (user) {
-            user.xp = (user.xp || 0) + amount;
+            user.xp = Math.max(0, (user.xp || 0) + amount);
             this._saveDb(db);
             return user.xp;
         }
@@ -717,7 +717,7 @@ export class FirestoreDatabase {
         if (!snapshot.empty) {
             const docRef = snapshot.docs[0].ref;
             const currentXp = snapshot.docs[0].data().xp || 0;
-            const newXp = currentXp + amount;
+            const newXp = Math.max(0, currentXp + amount);
             await updateDoc(docRef, { xp: newXp });
             return newXp;
         }

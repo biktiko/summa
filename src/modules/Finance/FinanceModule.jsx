@@ -55,7 +55,7 @@ const FinanceModule = ({
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [analyticsSource, setAnalyticsSource] = useState('actual'); // 'actual' | 'budget'
     const [pieChartMode, setPieChartMode] = useState('expense'); // 'expense' | 'income'
-    const [dateFilterType, setDateFilterType] = useState('month'); // 'month' | 'all' | 'custom'
+    const [dateFilterType, setDateFilterType] = useState('all'); // 'month' | 'all' | 'custom'
     const [customStartDate, setCustomStartDate] = useState('');
     const [customEndDate, setCustomEndDate] = useState('');
     const [recurringExpensesSort, setRecurringExpensesSort] = useState('actual');
@@ -123,7 +123,7 @@ const FinanceModule = ({
     const [expandedChart, setExpandedChart] = useState(null);
 
     // History Filters
-    const [historyFilter, setHistoryFilter] = useState({ categoryId: 'all', type: 'all', accountId: 'all', minAmount: '', maxAmount: '' });
+    const [historyFilter, setHistoryFilter] = useState({ categoryId: 'all', type: 'all', accountId: 'all', minAmount: '', maxAmount: '', date: '' });
 
     // Daily Spending Chart Filters
     const [dailyChartCategoryFilter, setDailyChartCategoryFilter] = useState('all');
@@ -175,13 +175,17 @@ const FinanceModule = ({
     defaultTarget.setDate(defaultTarget.getDate() + 30);
     const [predictionDateRange, setPredictionDateRange] = useState({ start: getLocalYYYYMMDD(), end: getLocalYYYYMMDD(defaultTarget) });
     
-    // Default lookback start: 15 days ago
+    // Default lookback start: All Time (Past) - 10 years
     const defaultLookback = new Date();
-    defaultLookback.setDate(defaultLookback.getDate() - 15);
+    defaultLookback.setFullYear(defaultLookback.getFullYear() - 10);
     const [lookbackDateRange, setLookbackDateRange] = useState({ start: defaultLookback.toISOString().slice(0, 10), end: getLocalYYYYMMDD() });
     
-    const [selectedPredictionCategories, setSelectedPredictionCategories] = useState([]); // array of category IDs, empty means all
-    const [planningAccountId, setPlanningAccountId] = useState('all');
+    const [excludedPredictionCategories, setExcludedPredictionCategories] = useState([]); // array of category IDs, empty means all are selected
+    const [disabledExpectedTx, setDisabledExpectedTx] = useState([]); // array of temporarily disabled transaction IDs
+    const [isAdvancedMode, setIsAdvancedMode] = useState(false);
+    const [advancedMaxTxAmount, setAdvancedMaxTxAmount] = useState(''); // max transaction amount for calculations
+    const [categoryOverrides, setCategoryOverrides] = useState({}); // { categoryId: amount }
+    const [planningAccountIds, setPlanningAccountIds] = useState([]); // empty means all
     const [isAddingExpected, setIsAddingExpected] = useState(false);
     const [isEditingExpectedId, setIsEditingExpectedId] = useState(null);
     const [expectedForm, setExpectedForm] = useState({ date: getLocalYYYYMMDD(defaultTarget), description: '', amount: '', type: 'expense', categoryId: '' });
@@ -1230,21 +1234,11 @@ const FinanceModule = ({
                         const predictionEnd = new Date(predictionDateRange.end + 'T23:59:59');
                         const daysInWindow = Math.max(1, Math.floor((predictionEnd - predictionStart) / (1000 * 60 * 60 * 24)));
                         
-                        // 1. Calculate Daily Average Spend & Income (Lookback)
-                        const lookbackTx = transactions.filter(t => {
+                        const txListOrdered = [...transactions].sort((a,b) => new Date(a.date || a.createdAt) - new Date(b.date || b.createdAt));
+                        
+                        const lookbackTx = txListOrdered.filter(t => {
                             const d = new Date(t.date || t.createdAt);
-                            if (d < lookbackStart || d > lookbackEnd) return false;
-                            
-                            if (planningAccountId !== 'all') {
-                                if (t.type === 'transfer') {
-                                    if (t.accountId !== planningAccountId && t.toAccountId !== planningAccountId) return false;
-                                } else {
-                                    const accId = t.accountId || 'legacy';
-                                    if (accId !== planningAccountId) return false;
-                                }
-                            }
-                            
-                            return true;
+                            return d >= lookbackStart && d <= lookbackEnd;
                         });
                         
                         let effectiveLookbackStart = lookbackStart;
@@ -1258,25 +1252,36 @@ const FinanceModule = ({
                         
                         const lookbackDays = Math.max(1, Math.floor((lookbackEnd - effectiveLookbackStart) / (1000 * 60 * 60 * 24)) + 1);
                         
-                        const lookbackExpenses = lookbackTx.filter(t => {
-                            if (t.type === 'expense') return true;
-                            if (planningAccountId !== 'all' && t.type === 'transfer' && t.accountId === planningAccountId) return true;
+                        const isAccountActive = (id) => planningAccountIds.length === 0 || planningAccountIds.includes(id);
+
+                        const lookbackIncomes = txListOrdered.filter(t => {
+                            if (new Date(t.date || t.createdAt) >= today) return false;
+                            if (t.type === 'income') return isAccountActive(t.accountId || 'legacy');
+                            if (t.type === 'transfer' && isAccountActive(t.toAccountId) && !isAccountActive(t.accountId)) return true;
                             return false;
                         });
-                        const lookbackIncomes = lookbackTx.filter(t => {
-                            if (t.type === 'income') return true;
-                            if (planningAccountId !== 'all' && t.type === 'transfer' && t.toAccountId === planningAccountId) return true;
+                        
+                        const lookbackExpenses = txListOrdered.filter(t => {
+                            if (new Date(t.date || t.createdAt) >= today) return false;
+                            if (t.type === 'expense') return isAccountActive(t.accountId || 'legacy');
+                            if (t.type === 'transfer' && isAccountActive(t.accountId) && !isAccountActive(t.toAccountId)) return true;
                             return false;
                         });
 
-                        const filteredLookbackExpenses = selectedPredictionCategories.length > 0 
-                            ? lookbackExpenses.filter(t => selectedPredictionCategories.includes(t.categoryId))
+                        let filteredLookbackExpenses = excludedPredictionCategories.length > 0 
+                            ? lookbackExpenses.filter(t => !excludedPredictionCategories.includes(t.categoryId))
                             : lookbackExpenses;
+                            
+                        if (isAdvancedMode && advancedMaxTxAmount !== '') {
+                            const maxAmt = Number(advancedMaxTxAmount);
+                            if (!isNaN(maxAmt) && maxAmt > 0) {
+                                filteredLookbackExpenses = filteredLookbackExpenses.filter(t => Number(t.amount) <= maxAmt);
+                            }
+                        }
                             
                         const totalLookbackSpend = filteredLookbackExpenses.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
                         const dailyAverageSpend = totalLookbackSpend / lookbackDays;
                         
-                        // Smart Projection Logic: Group by day of month (1-31)
                         const dayOccurrences = Array(32).fill(0);
                         let currDate = new Date(effectiveLookbackStart);
                         currDate.setHours(0,0,0,0);
@@ -1294,6 +1299,62 @@ const FinanceModule = ({
                             dayOccurrences[currDate.getDate()]++;
                             currDate.setDate(currDate.getDate() + 1);
                         }
+                        
+                        const categoryLookbackSpend = {};
+                        const smartDailySpendByCategory = {};
+                        
+                        filteredLookbackExpenses.forEach(t => {
+                            const catId = t.categoryId || 'unassigned';
+                            if (!categoryLookbackSpend[catId]) {
+                                categoryLookbackSpend[catId] = 0;
+                                smartDailySpendByCategory[catId] = Array(32).fill(0);
+                            }
+                            categoryLookbackSpend[catId] += (Number(t.amount) || 0);
+                            
+                            const d = new Date(t.date || t.createdAt);
+                            smartDailySpendByCategory[catId][d.getDate()] += (Number(t.amount) || 0);
+                        });
+                        
+                        Object.keys(smartDailySpendByCategory).forEach(catId => {
+                            for (let i = 1; i <= 31; i++) {
+                                smartDailySpendByCategory[catId][i] = dayOccurrences[i] > 0 ? (smartDailySpendByCategory[catId][i] / dayOccurrences[i]) : 0;
+                            }
+                        });
+                        
+                        const allRelevantCategories = new Set([...Object.keys(categoryLookbackSpend), ...Object.keys(categoryOverrides)]);
+                        allRelevantCategories.forEach(catId => {
+                            if (!categoryLookbackSpend[catId]) {
+                                categoryLookbackSpend[catId] = 0;
+                                smartDailySpendByCategory[catId] = Array(32).fill(0);
+                            }
+                        });
+
+                        const predictionDaysCount = Math.max(1, Math.ceil((predictionEnd - predictionStart) / (1000 * 60 * 60 * 24)));
+                        const categoryExpectedSpend = {};
+                        
+                        allRelevantCategories.forEach(catId => {
+                            if (projectionMethod === 'smart') {
+                                let smartTotal = 0;
+                                for (let i = 0; i <= predictionDaysCount; i++) {
+                                    const d = new Date(predictionStart);
+                                    d.setDate(d.getDate() + i);
+                                    if (d > today) {
+                                        const dDay = d.getDate();
+                                        const maxDaysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                                        let daySpend = smartDailySpendByCategory[catId][dDay] || 0;
+                                        if (dDay === maxDaysInMonth) {
+                                            for (let extra = maxDaysInMonth + 1; extra <= 31; extra++) {
+                                                daySpend += (smartDailySpendByCategory[catId][extra] || 0);
+                                            }
+                                        }
+                                        smartTotal += daySpend;
+                                    }
+                                }
+                                categoryExpectedSpend[catId] = smartTotal;
+                            } else {
+                                categoryExpectedSpend[catId] = (categoryLookbackSpend[catId] / lookbackDays) * predictionDaysCount;
+                            }
+                        });
                         
                         const smartDailySpend = Array(32).fill(0);
                         filteredLookbackExpenses.forEach(t => {
@@ -1319,23 +1380,17 @@ const FinanceModule = ({
                         let dailyRecurringIncome = 0;
                         if (planningMode === 'history') {
                             const totalLookbackIncome = lookbackIncomes.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-                            const dailyAverageIncome = totalLookbackIncome / lookbackDays;
-                            dailyRecurringIncome = dailyAverageIncome;
+                            dailyRecurringIncome = totalLookbackIncome / lookbackDays;
                         } else {
-                            // Project / Expected Mode
-                            // Income:
                             projects.filter(p => p.status !== 'Rejected' && p.status !== 'Archived').forEach(p => {
                                 p.stages?.forEach(s => {
                                     if (s.status === 'Rejected' || s.status === 'Not Started') return;
-                                    
                                     const expDate = s.expectedPaymentDate ? new Date(s.expectedPaymentDate) : today;
-                                    let effectiveDate = expDate < today ? today : expDate; // Overdue is expected today
-                                    
+                                    let effectiveDate = expDate < today ? today : expDate;
                                     if (effectiveDate >= today && effectiveDate <= predictionEnd) {
                                         const stageIncome = transactions.filter(t => t.projectStageId === s.id && t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
                                         const totalExpected = Number(s.expectedNetIncome) || 0;
                                         const remainingNet = Math.max(0, totalExpected - stageIncome);
-                                        
                                         if (remainingNet > 0) {
                                             expectedIncomeEvents.push({
                                                 date: formatDateStr(effectiveDate),
@@ -1346,63 +1401,52 @@ const FinanceModule = ({
                                     }
                                 });
                             });
-                            
-                            // Expenses: Expected History
-                            expectedTransactions.forEach(et => {
-                                const etDate = new Date(et.date + 'T00:00:00');
-                                let effectiveDate = etDate < today ? today : etDate;
-                                if (effectiveDate >= today && effectiveDate <= predictionEnd) {
-                                    if (et.type === 'expense') {
-                                        expectedExpenseEvents.push({
-                                            date: formatDateStr(effectiveDate),
-                                            amount: Number(et.amount),
-                                            label: et.description || 'Expected Expense'
-                                        });
-                                    } else {
-                                        expectedIncomeEvents.push({
-                                            date: formatDateStr(effectiveDate),
-                                            amount: Number(et.amount),
-                                            label: et.description || 'Expected Income'
-                                        });
-                                    }
-                                }
-                            });
                         }
+
+                        expectedTransactions.forEach(et => {
+                            if (disabledExpectedTx.includes(et.id)) return;
+                            const etDate = new Date(et.date + 'T00:00:00');
+                            let effectiveDate = etDate < today ? today : etDate;
+                            if (effectiveDate >= today && effectiveDate <= predictionEnd) {
+                                if (et.type === 'expense') {
+                                    expectedExpenseEvents.push({
+                                        date: formatDateStr(effectiveDate),
+                                        amount: Number(et.amount),
+                                        label: et.description || 'Expected Expense'
+                                    });
+                                } else {
+                                    expectedIncomeEvents.push({
+                                        date: formatDateStr(effectiveDate),
+                                        amount: Number(et.amount),
+                                        label: et.description || 'Expected Income'
+                                    });
+                                }
+                            }
+                        });
                         
-                        // 2. Generate Chart Data & Summary Stats in the target window
-                        const chartData = [];
-                        
-                        // We need to calculate running balance correctly. 
-                        // If predictionStart < today, we need historical balance. 
-                        // The easiest way is to calculate from initial accounts balance up to predictionStart, then run loop.
                         let runningBalance = 0;
                         accounts.forEach(a => {
-                            if (planningAccountId === 'all' || a.id === planningAccountId) {
+                            if (planningAccountIds.length === 0 || planningAccountIds.includes(a.id)) {
                                 runningBalance += (Number(a.initialBalance) || 0);
                             }
                         });
-                        const txList = [...transactions].sort((a,b) => new Date(a.date || a.createdAt) - new Date(b.date || b.createdAt));
                         
-                        // Fast forward balance up to predictionStart
                         predictionStart.setHours(0,0,0,0);
-                        txList.forEach(t => {
+                        txListOrdered.forEach(t => {
                             const d = new Date(t.date || t.createdAt);
                             d.setHours(0,0,0,0);
                             if (d < predictionStart) {
-                                if (planningAccountId !== 'all') {
-                                    if (t.type === 'transfer') {
-                                        if (t.accountId === planningAccountId) runningBalance -= Number(t.amount);
-                                        if (t.toAccountId === planningAccountId) runningBalance += Number(t.amount);
-                                    } else {
-                                        const accId = t.accountId || 'legacy';
-                                        if (accId === planningAccountId) {
-                                            if (t.type === 'income') runningBalance += Number(t.amount);
-                                            if (t.type === 'expense') runningBalance -= Number(t.amount);
-                                        }
-                                    }
+                                if (t.type === 'transfer') {
+                                    const fromActive = planningAccountIds.length === 0 || planningAccountIds.includes(t.accountId);
+                                    const toActive = planningAccountIds.length === 0 || planningAccountIds.includes(t.toAccountId);
+                                    if (fromActive && !toActive) runningBalance -= Number(t.amount);
+                                    else if (!fromActive && toActive) runningBalance += Number(t.amount);
                                 } else {
-                                    if (t.type === 'income') runningBalance += Number(t.amount);
-                                    if (t.type === 'expense') runningBalance -= Number(t.amount);
+                                    const accId = t.accountId || 'legacy';
+                                    if (planningAccountIds.length === 0 || planningAccountIds.includes(accId)) {
+                                        if (t.type === 'income') runningBalance += Number(t.amount);
+                                        if (t.type === 'expense') runningBalance -= Number(t.amount);
+                                    }
                                 }
                             }
                         });
@@ -1411,12 +1455,15 @@ const FinanceModule = ({
                         let windowExpectedIncome = 0;
                         let windowPredictedExpenses = 0;
                         
-                        // Add the starting point to the graph (1 day before the window starts)
+                        const chartData = [];
                         const startPointDate = new Date(predictionStart);
                         startPointDate.setDate(startPointDate.getDate() - 1);
                         chartData.push({
                             date: formatDateStr(startPointDate),
                             balance: windowStartingBalance,
+                            income: 0,
+                            expense: 0,
+                            netFlow: 0,
                             shortDate: dateFilterType === 'month' ? startPointDate.getDate().toString() : String(startPointDate.getDate()).padStart(2, '0') + '.' + String(startPointDate.getMonth() + 1).padStart(2, '0')
                         });
                         
@@ -1425,58 +1472,80 @@ const FinanceModule = ({
                             d.setDate(d.getDate() + i);
                             d.setHours(0,0,0,0);
                             const dateStr = formatDateStr(d);
+                            let dayIncome = 0;
+                            let dayExpense = 0;
                             
-                            // 1. Real history (past and today)
                             if (d <= today) {
-                                const todaysTx = txList.filter(t => {
+                                const todaysTx = txListOrdered.filter(t => {
                                     const td = new Date(t.date || t.createdAt);
                                     return formatDateStr(td) === dateStr;
                                 });
-                                let dayInc = 0;
-                                let dayExp = 0;
                                 todaysTx.forEach(t => {
-                                    if (planningAccountId !== 'all') {
-                                        if (t.type === 'transfer') {
-                                            if (t.accountId === planningAccountId) {
-                                                runningBalance -= Number(t.amount);
-                                                dayExp += Number(t.amount);
-                                            }
-                                            if (t.toAccountId === planningAccountId) {
-                                                runningBalance += Number(t.amount);
-                                                dayInc += Number(t.amount);
-                                            }
-                                        } else {
-                                            const accId = t.accountId || 'legacy';
-                                            if (accId === planningAccountId) {
-                                                if (t.type === 'income') { dayInc += Number(t.amount); runningBalance += Number(t.amount); }
-                                                if (t.type === 'expense') { dayExp += Number(t.amount); runningBalance -= Number(t.amount); }
-                                            }
+                                    if (t.type === 'transfer') {
+                                        const fromActive = planningAccountIds.length === 0 || planningAccountIds.includes(t.accountId);
+                                        const toActive = planningAccountIds.length === 0 || planningAccountIds.includes(t.toAccountId);
+                                        if (fromActive && !toActive) {
+                                            runningBalance -= Number(t.amount);
+                                            dayExpense += Number(t.amount);
+                                        } else if (!fromActive && toActive) {
+                                            runningBalance += Number(t.amount);
+                                            dayIncome += Number(t.amount);
                                         }
                                     } else {
-                                        if (t.type === 'income') { dayInc += Number(t.amount); runningBalance += Number(t.amount); }
-                                        if (t.type === 'expense') { dayExp += Number(t.amount); runningBalance -= Number(t.amount); }
+                                        const accId = t.accountId || 'legacy';
+                                        if (planningAccountIds.length === 0 || planningAccountIds.includes(accId)) {
+                                            if (t.type === 'income') { dayIncome += Number(t.amount); runningBalance += Number(t.amount); }
+                                            if (t.type === 'expense') { dayExpense += Number(t.amount); runningBalance -= Number(t.amount); }
+                                        }
                                     }
                                 });
-                                windowExpectedIncome += dayInc;
-                                windowPredictedExpenses += dayExp;
+                                windowExpectedIncome += dayIncome;
+                                windowPredictedExpenses += dayExpense;
                             }
                             
-                            // 2. Prediction baselines (strictly future)
                             if (d > today) {
                                 let dayRecurringInc = 0;
                                 let dayAvgSpend = dailyAverageSpend;
                                 
-                                const accountObj = accounts.find(a => a.id === planningAccountId);
-                                const isMain = planningAccountId === 'all' || (accountObj && accountObj.label.toLowerCase().includes('main'));
+                                const isMain = planningAccountIds.length === 0 || planningAccountIds.some(id => {
+                                    const accountObj = accounts.find(a => a.id === id);
+                                    return accountObj && accountObj.label.toLowerCase().includes('main');
+                                });
                                 
                                 if (projectionMethod === 'smart') {
                                     const dDay = d.getDate();
                                     const maxDaysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
                                     
-                                    dayAvgSpend = smartDailySpend[dDay] || 0;
-                                    if (dDay === maxDaysInMonth) {
-                                        for (let extra = maxDaysInMonth + 1; extra <= 31; extra++) {
-                                            dayAvgSpend += (smartDailySpend[extra] || 0);
+                                    if (isAdvancedMode) {
+                                        dayAvgSpend = 0;
+                                        allRelevantCategories.forEach(catId => {
+                                            if (excludedPredictionCategories.includes(catId)) return;
+                                            
+                                            let baseDaySpend = smartDailySpendByCategory[catId][dDay] || 0;
+                                            if (dDay === maxDaysInMonth) {
+                                                for (let extra = maxDaysInMonth + 1; extra <= 31; extra++) {
+                                                    baseDaySpend += (smartDailySpendByCategory[catId][extra] || 0);
+                                                }
+                                            }
+                                            
+                                            if (categoryOverrides[catId] !== undefined && categoryOverrides[catId] !== '') {
+                                                const overrideVal = Number(categoryOverrides[catId]);
+                                                const expectedBase = categoryExpectedSpend[catId];
+                                                if (expectedBase > 0) {
+                                                    dayAvgSpend += baseDaySpend * (overrideVal / expectedBase);
+                                                } else {
+                                                    dayAvgSpend += overrideVal / predictionDaysCount;
+                                                }
+                                            } else {
+                                                dayAvgSpend += baseDaySpend;
+                                            }
+                                        });
+                                    } else {
+                                        dayAvgSpend = smartDailySpend[dDay] || 0;
+                                        if (dDay === maxDaysInMonth) {
+                                            for (let extra = maxDaysInMonth + 1; extra <= 31; extra++) {
+                                                dayAvgSpend += (smartDailySpend[extra] || 0);
+                                            }
                                         }
                                     }
                                     
@@ -1489,6 +1558,25 @@ const FinanceModule = ({
                                         }
                                     }
                                 } else {
+                                    if (isAdvancedMode) {
+                                        dayAvgSpend = 0;
+                                        allRelevantCategories.forEach(catId => {
+                                            if (excludedPredictionCategories.includes(catId)) return;
+                                            
+                                            let baseDaySpend = categoryLookbackSpend[catId] / lookbackDays;
+                                            if (categoryOverrides[catId] !== undefined && categoryOverrides[catId] !== '') {
+                                                const overrideVal = Number(categoryOverrides[catId]);
+                                                const expectedBase = categoryExpectedSpend[catId];
+                                                if (expectedBase > 0) {
+                                                    dayAvgSpend += baseDaySpend * (overrideVal / expectedBase);
+                                                } else {
+                                                    dayAvgSpend += overrideVal / predictionDaysCount;
+                                                }
+                                            } else {
+                                                dayAvgSpend += baseDaySpend;
+                                            }
+                                        });
+                                    }
                                     if (planningMode === 'history' && isMain) {
                                         dayRecurringInc = dailyRecurringIncome;
                                     }
@@ -1512,18 +1600,23 @@ const FinanceModule = ({
                                 runningBalance -= dayAvgSpend;
                                 windowExpectedIncome += dayRecurringInc;
                                 windowPredictedExpenses += dayAvgSpend;
+                                dayIncome += dayRecurringInc;
+                                dayExpense += dayAvgSpend;
                             }
                             
                             // 3. Expected Specific Events (today and future)
-                            if (d >= today && planningMode === 'project') {
-                                const accountObj = accounts.find(a => a.id === planningAccountId);
-                                const isMain = planningAccountId === 'all' || (accountObj && accountObj.label.toLowerCase().includes('main'));
+                            if (d >= today) {
+                                const isMain = planningAccountIds.length === 0 || planningAccountIds.some(id => {
+                                    const accountObj = accounts.find(a => a.id === id);
+                                    return accountObj && accountObj.label.toLowerCase().includes('main');
+                                });
                                 
                                 const todaysIncEvents = expectedIncomeEvents.filter(e => e.date === dateStr);
                                 todaysIncEvents.forEach(e => {
                                     if (isMain) {
                                         runningBalance += e.amount;
                                         windowExpectedIncome += e.amount;
+                                        dayIncome += e.amount;
                                     }
                                 });
                                 
@@ -1532,6 +1625,7 @@ const FinanceModule = ({
                                     if (isMain) {
                                         runningBalance -= e.amount;
                                         windowPredictedExpenses += e.amount;
+                                        dayExpense += e.amount;
                                     }
                                 });
                             }
@@ -1539,6 +1633,9 @@ const FinanceModule = ({
                             chartData.push({
                                 date: dateStr,
                                 balance: runningBalance,
+                                income: dayIncome,
+                                expense: dayExpense,
+                                netFlow: dayIncome - dayExpense,
                                 shortDate: dateFilterType === 'month' ? d.getDate().toString() : String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0')
                             });
                         }
@@ -1588,6 +1685,23 @@ const FinanceModule = ({
                                             </button>
                                         </div>
                                     </div>
+                                    <div className="flex-1 space-y-1 w-full">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Mode</label>
+                                        <div className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1 flex font-bold text-xs h-[38px]">
+                                            <button 
+                                                className={`flex-1 rounded-md transition-colors ${!isAdvancedMode ? 'bg-white shadow-sm text-blue-600 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
+                                                onClick={() => setIsAdvancedMode(false)}
+                                            >
+                                                Simple
+                                            </button>
+                                            <button 
+                                                className={`flex-1 rounded-md transition-colors ${isAdvancedMode ? 'bg-white shadow-sm text-blue-600 border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
+                                                onClick={() => setIsAdvancedMode(true)}
+                                            >
+                                                Advanced
+                                            </button>
+                                        </div>
+                                    </div>
                                     <DateRangePicker 
                                         label="Lookback Window" 
                                         range={lookbackDateRange} 
@@ -1597,7 +1711,7 @@ const FinanceModule = ({
                                             { label: 'Last Month', getRange: () => { const d = new Date(); return { start: formatDateStr(new Date(d.getFullYear(), d.getMonth() - 1, 1)), end: formatDateStr(new Date(d.getFullYear(), d.getMonth(), 0)) }}},
                                             { label: 'Last 30 Days', getRange: () => { const d = new Date(); const prev = new Date(d); prev.setDate(prev.getDate() - 30); return { start: formatDateStr(prev), end: formatDateStr(d) }}},
                                             { label: 'Last 90 Days', getRange: () => { const d = new Date(); const prev = new Date(d); prev.setDate(prev.getDate() - 90); return { start: formatDateStr(prev), end: formatDateStr(d) }}},
-                                            { label: 'All Time (Past)', getRange: () => { const d = new Date(); const prev = new Date(d); prev.setFullYear(prev.getFullYear() - 1); return { start: formatDateStr(prev), end: formatDateStr(d) }}},
+                                            { label: 'All Time (Past)', getRange: () => { const d = new Date(); const prev = new Date(d); prev.setFullYear(prev.getFullYear() - 10); return { start: formatDateStr(prev), end: formatDateStr(d) }}},
                                             { label: 'Custom', isCustom: true }
                                         ]} 
                                     />
@@ -1615,58 +1729,187 @@ const FinanceModule = ({
                                         ]} 
                                     />
                                     <div className="flex-[2] space-y-1 w-full md:w-auto">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Planning Account</label>
-                                        <select 
-                                            value={planningAccountId}
-                                            onChange={e => setPlanningAccountId(e.target.value)}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 h-[38px] outline-none focus:border-blue-500"
-                                        >
-                                            <option value="all">All Accounts</option>
-                                            {accounts.map(acc => (
-                                                <option key={acc.id} value={acc.id}>{acc.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="flex-[2] space-y-1 w-full relative group">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Expense Categories</label>
-                                        <div className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 font-bold cursor-pointer flex justify-between items-center h-[38px]">
-                                            <span className="truncate">
-                                                {selectedPredictionCategories.length === 0 
-                                                    ? 'All Expense Categories' 
-                                                    : `${selectedPredictionCategories.length} Categories Selected`}
-                                            </span>
-                                            <ChevronRight className="w-4 h-4 text-slate-400 rotate-90" />
-                                        </div>
-                                        <div className="absolute top-[60px] left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl z-50 hidden group-hover:block max-h-64 overflow-y-auto p-2">
-                                            <div className="text-[10px] text-slate-400 font-bold mb-2 uppercase px-2">Filter Predicted Expenses</div>
-                                            <div 
-                                                className={`p-2 rounded-lg cursor-pointer text-xs font-bold mb-1 ${selectedPredictionCategories.length === 0 ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-700'}`}
-                                                onClick={() => setSelectedPredictionCategories([])}
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Planning Accounts</label>
+                                        <div className="flex flex-wrap gap-1 mt-1 border bg-slate-50 border-slate-200 rounded-lg p-1.5 min-h-[38px] items-center">
+                                            <button
+                                                onClick={() => setPlanningAccountIds([])}
+                                                className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${
+                                                    planningAccountIds.length === 0 
+                                                    ? 'bg-slate-800 text-white border-slate-800 shadow-sm' 
+                                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                                }`}
                                             >
-                                                All Categories
-                                            </div>
-                                            {categories.filter(c => c.type === 'expense').map(c => (
-                                                <div 
-                                                    key={c.id} 
-                                                    className={`p-2 rounded-lg cursor-pointer text-xs font-bold flex items-center justify-between mb-1 ${selectedPredictionCategories.includes(c.id) ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-700'}`}
-                                                    onClick={() => {
-                                                        if (selectedPredictionCategories.includes(c.id)) {
-                                                            setSelectedPredictionCategories(selectedPredictionCategories.filter(id => id !== c.id));
-                                                        } else {
-                                                            setSelectedPredictionCategories([...selectedPredictionCategories, c.id]);
-                                                        }
-                                                    }}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: c.color}}></div>
-                                                        {c.label}
-                                                    </div>
-                                                    {selectedPredictionCategories.includes(c.id) && <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />}
-                                                </div>
-                                            ))}
+                                                All Accounts
+                                            </button>
+                                            {accounts.map(acc => {
+                                                const isSelected = planningAccountIds.includes(acc.id);
+                                                return (
+                                                    <button
+                                                        key={acc.id}
+                                                        onClick={() => {
+                                                            if (isSelected) setPlanningAccountIds(planningAccountIds.filter(id => id !== acc.id));
+                                                            else setPlanningAccountIds([...planningAccountIds, acc.id]);
+                                                        }}
+                                                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border flex items-center gap-1 ${
+                                                            isSelected 
+                                                            ? 'bg-slate-800 text-white border-slate-800 shadow-sm' 
+                                                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: acc.color }} />
+                                                        {acc.label}
+                                                    </button>
+                                                )
+                                            })}
                                         </div>
                                     </div>
+                             
+                                        <div className="flex-[2] space-y-1 w-full relative group">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Expense Categories</label>
+                                            <div className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 font-bold cursor-pointer flex justify-between items-center h-[38px]">
+                                                <span className="truncate">
+                                                    {excludedPredictionCategories.length === 0 
+                                                        ? 'All Expense Categories' 
+                                                        : `${categories.filter(c => c.type === 'expense').length - excludedPredictionCategories.length} Categories Selected`}
+                                                </span>
+                                                <ChevronRight className="w-4 h-4 text-slate-400 rotate-90" />
+                                            </div>
+                                            <div className="absolute top-[60px] left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-xl z-50 hidden group-hover:block max-h-64 overflow-y-auto p-2">
+                                                <div className="text-[10px] text-slate-400 font-bold mb-2 uppercase px-2">Filter Predicted Expenses</div>
+                                                <div 
+                                                    className={`p-2 rounded-lg cursor-pointer text-xs font-bold mb-1 ${excludedPredictionCategories.length === 0 ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-700'}`}
+                                                    onClick={() => setExcludedPredictionCategories([])}
+                                                >
+                                                    All Categories
+                                                </div>
+                                                {categories.filter(c => c.type === 'expense').map(c => (
+                                                    <div 
+                                                        key={c.id} 
+                                                        className={`p-2 rounded-lg cursor-pointer text-xs font-bold flex items-center justify-between mb-1 ${!excludedPredictionCategories.includes(c.id) ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-700'}`}
+                                                        onClick={() => {
+                                                            if (excludedPredictionCategories.includes(c.id)) {
+                                                                setExcludedPredictionCategories(excludedPredictionCategories.filter(id => id !== c.id));
+                                                            } else {
+                                                                setExcludedPredictionCategories([...excludedPredictionCategories, c.id]);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: c.color}}></div>
+                                                            <span className={excludedPredictionCategories.includes(c.id) ? 'line-through text-slate-400' : ''}>{c.label}</span>
+                                                        </div>
+                                                        {!excludedPredictionCategories.includes(c.id) && <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                 </div>
+
+                                {/* Advanced Mode Categories Table */}
+                                {isAdvancedMode && (
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden relative z-20 mb-4 mt-4">
+                                        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Advanced Category Adjustments</h3>
+                                        <div className="flex flex-wrap items-center gap-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[9px] font-bold text-slate-500 uppercase">Exclude Tx &gt;</span>
+                                                    <input
+                                                        type="number"
+                                                        placeholder="∞"
+                                                        value={advancedMaxTxAmount}
+                                                        onChange={e => setAdvancedMaxTxAmount(e.target.value)}
+                                                        className="w-16 px-2 py-1 text-xs border border-slate-200 rounded outline-none focus:border-blue-500"
+                                                    />
+                                                </div>
+                                                <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                                    Prediction Period: {predictionDaysCount} Days
+                                                </div>
+                                                {Object.keys(categoryOverrides).length > 0 && (
+                                                    <button 
+                                                        onClick={() => setCategoryOverrides({})}
+                                                        className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded text-[9px] font-bold uppercase transition-colors"
+                                                    >
+                                                        Reset All
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="max-h-[300px] overflow-y-auto no-scrollbar">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr className="border-b border-slate-100 text-[9px] uppercase tracking-wider font-bold text-slate-400 bg-white sticky top-0 z-10 shadow-sm">
+                                                        <th className="p-3">Category</th>
+                                                        <th className="p-3 text-right">Historical Spend (Lookback)</th>
+                                                        <th className="p-3 text-right">Expected Spend (Prediction)</th>
+                                                        <th className="p-3 text-right">Target Override</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-50">
+                                                    {categories.filter(c => c.type === 'expense').map(c => {
+                                                        const lookbackVal = categoryLookbackSpend ? categoryLookbackSpend[c.id] || 0 : 0;
+                                                        const expectedBase = categoryExpectedSpend ? categoryExpectedSpend[c.id] || 0 : 0;
+                                                        const overrideVal = categoryOverrides[c.id];
+                                                        const isOverridden = overrideVal !== undefined && overrideVal !== '';
+                                                        
+                                                        return (
+                                                            <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                                <td className="p-3">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: c.color}}></div>
+                                                                        <span className="text-xs font-bold text-slate-700">{c.label}</span>
+                                                                        {isOverridden && <span className="ml-2 px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-600 text-[8px] font-black uppercase tracking-wider">Modified</span>}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-3 text-right text-xs font-bold text-slate-500">
+                                                                    {formatMoney(lookbackVal)}
+                                                                </td>
+                                                                <td className="p-3 text-right text-xs font-bold text-slate-500">
+                                                                    <span className={isOverridden ? 'line-through opacity-50' : ''}>
+                                                                        {formatMoney(expectedBase)}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3 text-right">
+                                                                    <div className="flex justify-end items-center gap-2">
+                                                                        <div className="relative">
+                                                                            <input 
+                                                                                type="number"
+                                                                                className={`w-28 bg-white border rounded-lg px-2 py-1.5 text-xs font-bold text-right outline-none transition-colors ${isOverridden ? 'border-blue-500 text-blue-600 shadow-sm' : 'border-slate-200 text-slate-700 focus:border-slate-400'}`}
+                                                                                placeholder={expectedBase > 0 ? Math.round(expectedBase).toString() : '0'}
+                                                                                value={overrideVal !== undefined ? overrideVal : ''}
+                                                                                onChange={e => {
+                                                                                    setCategoryOverrides(prev => ({
+                                                                                        ...prev,
+                                                                                        [c.id]: e.target.value
+                                                                                    }));
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        {isOverridden && (
+                                                                            <button 
+                                                                                onClick={() => {
+                                                                                    setCategoryOverrides(prev => {
+                                                                                        const next = { ...prev };
+                                                                                        delete next[c.id];
+                                                                                        return next;
+                                                                                    });
+                                                                                }}
+                                                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                                                title="Reset Override"
+                                                                            >
+                                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                        )}
+                                                                        {!isOverridden && <div className="w-[26px]"></div>}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Summary Cards */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 relative z-20">
@@ -1746,10 +1989,9 @@ const FinanceModule = ({
                                 </div>
 
                                 {/* Expected History Section */}
-                                {planningMode === 'project' && (
-                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden relative z-10 mt-6">
-                                        <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Expected History</h3>
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden relative z-10 mt-6">
+                                    <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Expected History</h3>
                                             <button 
                                                 onClick={() => {
                                                     if (isAddingExpected) {
@@ -1810,7 +2052,7 @@ const FinanceModule = ({
                                                 [...expectedTransactions].sort((a,b) => new Date(a.date) - new Date(b.date)).map((et) => {
                                                     const cat = categories.find(c => c.id === et.categoryId);
                                                     return (
-                                                    <div key={et.id} className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center gap-4">
+                                                    <div key={et.id} className={`p-4 hover:bg-slate-50 transition-colors flex justify-between items-center gap-4 ${disabledExpectedTx.includes(et.id) ? 'opacity-50 grayscale' : ''}`}>
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat?.color || '#94a3b8' }} />
                                                             <div>
@@ -1825,6 +2067,15 @@ const FinanceModule = ({
                                                                 {et.type === 'expense' ? '-' : '+'}{formatMoney(et.amount)}
                                                             </div>
                                                             <div className="flex gap-1">
+                                                                <button onClick={() => {
+                                                                    if (disabledExpectedTx.includes(et.id)) {
+                                                                        setDisabledExpectedTx(disabledExpectedTx.filter(id => id !== et.id));
+                                                                    } else {
+                                                                        setDisabledExpectedTx([...disabledExpectedTx, et.id]);
+                                                                    }
+                                                                }} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors" title="Toggle active">
+                                                                    {disabledExpectedTx.includes(et.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                                </button>
                                                                 <button onClick={() => {
                                                                     setExpectedForm({
                                                                         date: et.date,
@@ -1851,8 +2102,6 @@ const FinanceModule = ({
                                             )}
                                         </div>
                                     </div>
-                                )}
-
 
                             </div>
                         );
@@ -2062,7 +2311,7 @@ const FinanceModule = ({
                                                     key={idx} 
                                                     onClick={() => {
                                                         if (item.id) {
-                                                            setHistoryFilter({ type: analyticsSource === 'budget' ? 'expense' : 'all', categoryId: item.id, accountId: 'all', minAmount: '', maxAmount: '' });
+                                                            setHistoryFilter({ type: analyticsSource === 'budget' ? 'expense' : 'all', categoryId: item.id, accountId: 'all', minAmount: '', maxAmount: '', date: '' });
                                                             setDashboardTab('history');
                                                             setExpandedChart(null);
                                                         }

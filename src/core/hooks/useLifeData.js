@@ -12,7 +12,52 @@ export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
     const refreshData = useCallback(async () => {
         if (!userId) return;
         const data = await db.getUserData(userId);
-        setUserData(data);
+        
+        // Month End Gamification Reconciliation
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        let needsUpdate = false;
+        let updateData = {};
+        
+        if (data.financeLastProcessedMonth && data.financeLastProcessedMonth !== currentMonth) {
+            const monthToProcess = data.financeLastProcessedMonth;
+            let xpReward = 0;
+            let coinsReward = 0;
+            
+            const categories = data.categories || [];
+            const transactions = data.transactions || [];
+            
+            categories.forEach(cat => {
+                if (cat.budget && cat.budget > 0) {
+                    const spent = transactions
+                        .filter(t => t.type === 'expense' && t.categoryId === cat.id && t.date.startsWith(monthToProcess))
+                        .reduce((sum, t) => sum + Number(t.amount), 0);
+                        
+                    if (spent <= cat.budget) {
+                        xpReward += 50;
+                        coinsReward += 1;
+                    }
+                }
+            });
+            
+            if (xpReward > 0 || coinsReward > 0) {
+                await db.addXP(userId, xpReward);
+                updateData.balance = (data.balance || 0) + coinsReward;
+            }
+            
+            updateData.financeLastProcessedMonth = currentMonth;
+            needsUpdate = true;
+        } else if (!data.financeLastProcessedMonth) {
+            updateData.financeLastProcessedMonth = currentMonth;
+            needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+            await db.updateUser(userId, updateData);
+            const freshData = await db.getUserData(userId);
+            setUserData(freshData);
+        } else {
+            setUserData(data);
+        }
     }, [userId]);
 
     useEffect(() => {
@@ -271,8 +316,68 @@ export const useLifeData = (activeUserId, initialViewMode = 'admin') => {
         protocolsActions,
         biometricsActions: createCRUD('biometrics', (u, d) => db.addBiometric(u, d), (id, d) => db.updateBiometric(id, d), (id) => db.deleteBiometric(id)),
         supplementsActions: createCRUD('supplements', (u, d) => db.addSupplement(u, d), (id, d) => db.updateSupplement(id, d), (id) => db.deleteSupplement(id)),
-        transactionsActions: createCRUD('transactions', (u, d) => db.addTransaction(u, d), (id, d) => db.updateTransaction(id, d), (id) => db.deleteTransaction(id)),
-        categoriesActions: createCRUD('categories', (u, d) => db.addCategory(u, d), (id, d) => db.updateCategory(id, d), (id) => db.deleteCategory(id)),
+        categoriesActions: {
+            add: async (data) => {
+                if (viewMode === 'guest') return;
+                await db.addCategory(userId, data);
+                await db.addXP(userId, 10);
+                refreshData();
+            },
+            update: async (id, data) => {
+                if (viewMode === 'guest') return;
+                await db.updateCategory(id, data);
+                refreshData();
+            },
+            delete: async (id) => {
+                if (viewMode === 'guest') return;
+                await db.deleteCategory(id);
+                await db.addXP(userId, -10);
+                refreshData();
+            }
+        },
+        transactionsActions: {
+            add: async (data) => {
+                if (viewMode === 'guest') return;
+                
+                if (data.type === 'expense' && data.categoryId) {
+                    const category = userData.categories?.find(c => c.id === data.categoryId);
+                    if (category && category.budget && category.budget > 0) {
+                        const currentMonth = new Date().toISOString().slice(0, 7);
+                        const penaltyKey = `${data.categoryId}-${currentMonth}`;
+                        const penalties = userData.overbudgetPenalties || {};
+                        
+                        if (!penalties[penaltyKey]) {
+                            const spentSoFar = (userData.transactions || [])
+                                .filter(t => t.type === 'expense' && t.categoryId === data.categoryId && t.date.startsWith(currentMonth))
+                                .reduce((sum, t) => sum + Number(t.amount), 0);
+                                
+                            const newTotal = spentSoFar + Number(data.amount);
+                            
+                            if (newTotal >= category.budget * 1.1) {
+                                await db.addXP(userId, -100);
+                                penalties[penaltyKey] = true;
+                                await db.updateUser(userId, { overbudgetPenalties: penalties });
+                            }
+                        }
+                    }
+                }
+                
+                await db.addTransaction(userId, data);
+                await db.addXP(userId, 5);
+                refreshData();
+            },
+            update: async (id, data) => {
+                if (viewMode === 'guest') return;
+                await db.updateTransaction(id, data);
+                refreshData();
+            },
+            delete: async (id) => {
+                if (viewMode === 'guest') return;
+                await db.deleteTransaction(id);
+                await db.addXP(userId, -5);
+                refreshData();
+            }
+        },
         accountsActions: createCRUD('accounts', (u, d) => db.addAccount(u, d), (id, d) => db.updateAccount(id, d), (id) => db.deleteAccount(id)),
         wishlistActions: createCRUD('wishlists', (u, d) => db.addWishlist(u, d), (id, d) => db.updateWishlist(id, d), (id) => db.deleteWishlist(id)),
 
