@@ -675,7 +675,7 @@ const FinanceModule = ({
     const categoryBreakdown = useMemo(() => {
         if (analyticsSource === 'actual') {
             const map = {};
-            filteredMonthTransactions.filter(t => t.type === 'expense').forEach(t => {
+            filteredMonthTransactions.filter(t => t.type === pieChartMode).forEach(t => {
                 const catId = t.categoryId || 'uncategorized';
                 map[catId] = (map[catId] || 0) + Number(t.amount);
             });
@@ -685,14 +685,15 @@ const FinanceModule = ({
             }).filter(i => i.value > 0);
         } else {
             // Budget Source
-            return expenseCategories.map(c => ({
+            const targetCategories = pieChartMode === 'expense' ? expenseCategories : incomeCategories;
+            return targetCategories.map(c => ({
                 id: c.id,
                 name: c.label,
                 value: (Number(c.amount) * 30) / (Number(c.period) || 30),
                 color: c.color
             })).filter(i => i.value > 0);
         }
-    }, [analyticsSource, monthTransactions, categories, expenseCategories]);
+    }, [analyticsSource, filteredMonthTransactions, categories, expenseCategories, incomeCategories, pieChartMode]);
 
     // 5. Daily Bar Chart (Range View)
     const dailyActivity = useMemo(() => {

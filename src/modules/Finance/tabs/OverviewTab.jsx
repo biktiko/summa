@@ -84,12 +84,18 @@ const OverviewTab = ({
                                          </button>
                                      );
                                  })}
-                                 <button 
-                                     onClick={() => setSelectedAnalyticAccounts(null)}
-                                     className="text-[10px] font-bold text-blue-600 hover:underline ml-auto px-2"
-                                 >
-                                     Reset
-                                 </button>
+                                 <div className="flex items-center gap-3 ml-auto">
+                                     <span className="text-[10px] font-bold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200 flex items-center gap-1.5">
+                                         <Calendar className="w-3 h-3 text-amber-500" />
+                                         Period: {activeDays} Days
+                                     </span>
+                                     <button 
+                                         onClick={() => setSelectedAnalyticAccounts(null)}
+                                         className="text-[10px] font-bold text-blue-600 hover:underline px-2"
+                                     >
+                                         Reset
+                                     </button>
+                                 </div>
                              </div>
 
                             {/* Stats based on Toggle */}
@@ -97,14 +103,15 @@ const OverviewTab = ({
                                 const difference = activeIncome - activeExpense;
                                 const dailyProfit = analyticsSource === 'actual' ? (difference / (activeDays || 1)) : (difference / 30);
                                 const dailySpend = analyticsSource === 'actual' ? (monthActualExpense / (activeDays || 1)) : (projectedMonthlyExpense / 30);
+                                const dailyIncome = analyticsSource === 'actual' ? (activeIncome / (activeDays || 1)) : (activeIncome / 30);
                                 
                                 const stats = [
                                     { title: analyticsSource === 'actual' ? "Actual Income" : "Planned Income", amount: activeIncome, color: "text-blue-500", bg: "bg-blue-100", icon: TrendingUp },
                                     { title: analyticsSource === 'actual' ? "Actual Expense" : "Planned Expense", amount: activeExpense, color: "text-red-500", bg: "bg-red-100", icon: TrendingDown },
                                     { title: "Net Difference", amount: difference, color: difference >= 0 ? "text-emerald-500" : "text-red-500", bg: difference >= 0 ? "bg-emerald-100" : "bg-red-100", icon: Wallet },
                                     { title: "Daily Avg Spend", amount: dailySpend, color: "text-amber-500", bg: "bg-amber-100", icon: Calendar, onClick: () => setShowDailyAvgBreakdown(!showDailyAvgBreakdown) },
-                                    { title: "Daily Profit", amount: dailyProfit, color: dailyProfit >= 0 ? "text-emerald-500" : "text-red-500", bg: dailyProfit >= 0 ? "bg-emerald-100" : "bg-red-100", icon: TrendingUp },
-                                    { title: "Current Balance", amount: totalCurrentLiquidity, color: "text-purple-500", bg: "bg-purple-100", icon: PieChartIcon }
+                                    { title: "Daily Avg Income", amount: dailyIncome, color: "text-blue-500", bg: "bg-blue-100", icon: TrendingUp },
+                                    { title: "Daily Profit", amount: dailyProfit, color: dailyProfit >= 0 ? "text-emerald-500" : "text-red-500", bg: dailyProfit >= 0 ? "bg-emerald-100" : "bg-red-100", icon: TrendingUp }
                                 ];
 
                                 return (
