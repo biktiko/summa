@@ -25,7 +25,7 @@ export const exportTransactionsToExcel = (transactions, categories, accounts, da
     XLSX.writeFile(wb, `Summa_Transactions_${dateLabel.replace(/\s+/g, '_')}.xlsx`);
 };
 
-export const exportAnalyticsToExcel = (dailyActivity, categoryBreakdown, balanceHistoryData, activeDaysInMonth, dateLabel) => {
+export const exportAnalyticsToExcel = (dailyActivity, categoryBreakdown, balanceHistoryData, activeDays, dateLabel) => {
     const wb = XLSX.utils.book_new();
 
     // 1. Cash Flow Dynamics
@@ -50,7 +50,7 @@ export const exportAnalyticsToExcel = (dailyActivity, categoryBreakdown, balance
     const total = categoryBreakdown.reduce((sum, i) => sum + i.value, 0);
     const catData = categoryBreakdown.slice().sort((a,b) => b.value - a.value).map(c => {
         const percent = total > 0 ? ((c.value / total) * 100).toFixed(1) : 0;
-        const dailyAvg = c.value / activeDaysInMonth;
+        const dailyAvg = c.value / activeDays;
         return {
             Category: c.name,
             Amount: c.value,

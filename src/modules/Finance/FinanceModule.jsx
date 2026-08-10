@@ -842,7 +842,7 @@ const FinanceModule = ({
             }).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
             exportTransactionsToExcel(filteredList, categories, accounts, dateLabel);
         } else if (dashboardTab === 'overview') {
-            exportAnalyticsToExcel(dailyActivity, categoryBreakdown, balanceHistoryData, activeDaysInMonth, dateLabel);
+            exportAnalyticsToExcel(dailyActivity, categoryBreakdown, balanceHistoryData, activeDays, dateLabel);
         } else if (dashboardTab === 'budget') {
             exportBudgetToExcel(categories, planningMonthTransactions, dateLabel, selectedDate.getMonth());
         } else if (dashboardTab === 'projects') {
@@ -2304,7 +2304,7 @@ const FinanceModule = ({
                                             const total = categoryBreakdown.reduce((sum, i) => sum + i.value, 0);
                                             const percent = total > 0 ? ((item.value / total) * 100).toFixed(1) : 0;
                                             const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
-                                            const daysForAvg = analyticsSource === 'actual' ? activeDaysInMonth : daysInMonth;
+                                            const daysForAvg = analyticsSource === 'actual' ? activeDays : daysInMonth;
                                             const dailyAvg = item.value / daysForAvg;
 
                                             return (
