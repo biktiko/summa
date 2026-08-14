@@ -58,7 +58,9 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
     return sorted;
   }, [userData, viewMode]);
 
-  const [activeTabId, setActiveTabId] = useState(MODULES[0].id);
+  const [activeTabId, setActiveTabId] = useState(() => {
+    return localStorage.getItem('summa_default_module') || MODULES[0].id;
+  });
   const [hasInitializedTab, setHasInitializedTab] = useState(false);
   const [lastActiveTabId, setLastActiveTabId] = useState(MODULES[0].id);
   const [currentModuleView, setCurrentModuleView] = useState('dashboard'); 
@@ -75,16 +77,21 @@ const SystemInterface = ({ system, authUser, logout, isGuest = false }) => {
 
   // Initialize Tab Once Data Loads
   useEffect(() => {
-      if (!loading && !hasInitializedTab && userData) {
-          setHasInitializedTab(true);
-          if (userData.defaultModule) {
-              const defaultValid = visibleModules.find(m => m.id === userData.defaultModule);
+      if (!loading && userData) {
+          const targetModule = userData.defaultModule || localStorage.getItem('summa_default_module');
+          if (targetModule) {
+              const defaultValid = visibleModules.find(m => m.id === targetModule);
               if (defaultValid) {
-                  setActiveTabId(userData.defaultModule);
+                  localStorage.setItem('summa_default_module', targetModule);
+                  if (!hasInitializedTab) {
+                      setHasInitializedTab(true);
+                      setActiveTabId(targetModule);
+                  }
                   return;
               }
           }
-          if (visibleModules.length > 0) {
+          if (!hasInitializedTab && visibleModules.length > 0) {
+              setHasInitializedTab(true);
               setActiveTabId(visibleModules[0].id);
           }
       }

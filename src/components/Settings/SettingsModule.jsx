@@ -68,6 +68,20 @@ const SettingsModule = ({ userData, updateUser }) => {
     });
 
     useEffect(() => {
+        if (userData?.defaultModule) {
+            localStorage.setItem('summa_default_module', userData.defaultModule);
+        }
+        if (userData) {
+            setLocalData(prev => ({
+                ...prev,
+                defaultModule: userData.defaultModule !== undefined ? userData.defaultModule : prev.defaultModule,
+                moduleOrder: userData.moduleOrder || prev.moduleOrder,
+                hiddenModules: userData.hiddenModules || prev.hiddenModules
+            }));
+        }
+    }, [userData?.defaultModule, userData?.moduleOrder, userData?.hiddenModules]);
+
+    useEffect(() => {
         const checkGoogle = async () => {
             if (isSignedIn()) {
                 const profile = await getUserProfile();
@@ -973,11 +987,16 @@ const SettingsModule = ({ userData, updateUser }) => {
                                         <div className="flex items-center gap-2">
                                             {/* Set Default Button */}
                                             <button
-                                                onClick={() => setLocalData({ ...localData, defaultModule: modId })}
+                                                onClick={() => {
+                                                    const updated = { ...localData, defaultModule: modId };
+                                                    setLocalData(updated);
+                                                    updateUser(updated);
+                                                    localStorage.setItem('summa_default_module', modId);
+                                                }}
                                                 disabled={isHidden}
                                                 className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${
                                                     localData.defaultModule === modId 
-                                                    ? 'bg-amber-100 text-amber-500 border border-amber-200' 
+                                                    ? 'bg-amber-100 text-amber-500 border border-amber-200 shadow-sm' 
                                                     : 'bg-slate-50 text-slate-400 hover:text-amber-400 hover:bg-slate-100 disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-slate-50 border border-slate-200 hover:border-slate-300'
                                                 }`}
                                                 title={localData.defaultModule === modId ? "Default Module" : "Set as Default"}
@@ -992,7 +1011,9 @@ const SettingsModule = ({ userData, updateUser }) => {
                                                         if (index === 0) return;
                                                         const newOrder = [...arr];
                                                         [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-                                                        setLocalData({ ...localData, moduleOrder: newOrder });
+                                                        const updated = { ...localData, moduleOrder: newOrder };
+                                                        setLocalData(updated);
+                                                        updateUser(updated);
                                                     }}
                                                     disabled={index === 0}
                                                     className="w-5 h-4 flex items-center justify-center rounded hover:bg-slate-200 text-slate-500 disabled:opacity-20"
@@ -1004,7 +1025,9 @@ const SettingsModule = ({ userData, updateUser }) => {
                                                         if (index === arr.length - 1) return;
                                                         const newOrder = [...arr];
                                                         [newOrder[index + 1], newOrder[index]] = [newOrder[index], newOrder[index + 1]];
-                                                        setLocalData({ ...localData, moduleOrder: newOrder });
+                                                        const updated = { ...localData, moduleOrder: newOrder };
+                                                        setLocalData(updated);
+                                                        updateUser(updated);
                                                     }}
                                                     disabled={index === arr.length - 1}
                                                     className="w-5 h-4 flex items-center justify-center rounded hover:bg-slate-200 text-slate-500 disabled:opacity-20"
@@ -1016,9 +1039,10 @@ const SettingsModule = ({ userData, updateUser }) => {
                                             <button
                                                 onClick={() => {
                                                     const currentHidden = localData.hiddenModules || [];
+                                                    let newHidden;
                                                     if (isHidden) {
                                                         // Unhide
-                                                        setLocalData({ ...localData, hiddenModules: currentHidden.filter(id => id !== modId) });
+                                                        newHidden = currentHidden.filter(id => id !== modId);
                                                     } else {
                                                         // Hide (check if at least one remains)
                                                         const enabledCount = arr.filter(m => !(localData.hiddenModules || []).includes(m)).length;
@@ -1026,8 +1050,11 @@ const SettingsModule = ({ userData, updateUser }) => {
                                                             alert("You must have at least one active module.");
                                                             return;
                                                         }
-                                                        setLocalData({ ...localData, hiddenModules: [...currentHidden, modId] });
+                                                        newHidden = [...currentHidden, modId];
                                                     }
+                                                    const updated = { ...localData, hiddenModules: newHidden };
+                                                    setLocalData(updated);
+                                                    updateUser(updated);
                                                 }}
                                                 className={`text-[9px] font-bold uppercase px-3 py-1.5 rounded-lg transition-all ${!isHidden ? 'bg-green-500/20 text-green-400 border border-green-500/20 hover:bg-green-500/30' : 'bg-slate-200 text-slate-500 border border-transparent hover:border-slate-300 hover:text-slate-500'}`}
                                             >

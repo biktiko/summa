@@ -13,8 +13,9 @@ import CustomBalanceTooltip from '../components/CustomBalanceTooltip';
 const OverviewTab = ({
     filterAccountsList,
     activeAnalyticAccountIds,
-    setSelectedAnalyticAccounts,
+
     analyticsSource,
+    setAnalyticsSource,
     activeIncome,
     activeExpense,
     activeDays,
@@ -58,43 +59,20 @@ const OverviewTab = ({
                      
                          <div className="space-y-6 animate-in slide-in-from-bottom-2 fade-in">
                              
-                             {/* Account Filter */}
-                             <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-2">Filter Accounts:</span>
-                                 {filterAccountsList.map(acc => {
-                                     const isSelected = activeAnalyticAccountIds.includes(acc.id);
-                                     return (
-                                         <button
-                                             key={acc.id}
-                                             onClick={() => {
-                                                 if (isSelected) {
-                                                     setSelectedAnalyticAccounts(activeAnalyticAccountIds.filter(id => id !== acc.id));
-                                                 } else {
-                                                     setSelectedAnalyticAccounts([...activeAnalyticAccountIds, acc.id]);
-                                                 }
-                                             }}
-                                             className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
-                                                 isSelected 
-                                                 ? 'bg-slate-800 text-white border-slate-800 shadow-sm' 
-                                                 : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                                             }`}
-                                         >
-                                             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: acc.color }} />
-                                             {acc.label}
-                                         </button>
-                                     );
-                                 })}
-                                 <div className="flex items-center gap-3 ml-auto">
-                                     <span className="text-[10px] font-bold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200 flex items-center gap-1.5">
-                                         <Calendar className="w-3 h-3 text-amber-500" />
+                             {/* Header Controls */}
+                             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                                 {/* Source Toggle for Analytics */}
+                                 <div className="flex bg-white shadow-sm rounded-lg p-1 border border-slate-200 w-full sm:w-auto">
+                                     <button onClick={() => setAnalyticsSource('actual')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${analyticsSource === 'actual' ? 'bg-green-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Actuals</button>
+                                     <button onClick={() => setAnalyticsSource('budget')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${analyticsSource === 'budget' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Budget Plan</button>
+                                 </div>
+
+                                 {/* Period Indicator */}
+                                 <div className="flex justify-end w-full sm:w-auto">
+                                     <span className="text-[10px] font-bold text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200 flex items-center gap-1.5 shadow-sm">
+                                         <Calendar className="w-3.5 h-3.5 text-amber-500" />
                                          Period: {activeDays} Days
                                      </span>
-                                     <button 
-                                         onClick={() => setSelectedAnalyticAccounts(null)}
-                                         className="text-[10px] font-bold text-blue-600 hover:underline px-2"
-                                     >
-                                         Reset
-                                     </button>
                                  </div>
                              </div>
 
@@ -323,11 +301,13 @@ const OverviewTab = ({
                                                     {incomeCategories.map(c => (
                                                         <Bar key={c.id} dataKey={`IN_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#10b981'} radius={[4, 4, 0, 0]} />
                                                     ))}
+                                                    <Bar dataKey="IN_Transfer" name="Перевод (In)" stackId="spending" fill="#a855f7" radius={[4, 4, 0, 0]} />
                                                     <Bar dataKey="IN_Other" name="Other Income" stackId="spending" fill="#64748b" radius={[4, 4, 0, 0]} />
                                                     
                                                     {expenseCategories.map(c => (
                                                         <Bar key={c.id} dataKey={`OUT_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#ef4444'} radius={[0, 0, 4, 4]} />
                                                     ))}
+                                                    <Bar dataKey="OUT_Transfer" name="Перевод (Out)" stackId="spending" fill="#a855f7" radius={[0, 0, 4, 4]} />
                                                     <Bar dataKey="OUT_Other" name="Other Expense" stackId="spending" fill="#475569" radius={[0, 0, 4, 4]} />
                                                 </BarChart>
                                             </ResponsiveContainer>

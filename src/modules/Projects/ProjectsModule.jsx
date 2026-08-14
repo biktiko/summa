@@ -1142,7 +1142,7 @@ const ProjectFinancials = ({ project, updateProjectField, transactionsActions, t
                                                     </span>
                                                 </div>
                                                 <button 
-                                                    onClick={() => setPaymentModal({ stageId: stage.id, stageName: stage.name, amount: '', date: new Date().toISOString().slice(0, 10), accountId: accounts.length > 0 ? accounts[0].id : '' })}
+                                                    onClick={() => setPaymentModal({ stageId: stage.id, stageName: stage.name, amount: '', date: new Date().toISOString().slice(0, 10), accountId: userData?.settings?.mainAccountId || (accounts.length > 0 ? accounts[0].id : '') })}
                                                     className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${isPaid ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-100' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-md shadow-blue-500/20'}`}
                                                     title="Log Payment"
                                                 >

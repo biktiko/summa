@@ -17,60 +17,47 @@ const HistoryTab = ({
     getAccountBalance,
     getDateRangeLabel,
     viewMode,
-    monthTransactions
+    monthTransactions,
+    activeAnalyticAccountIds,
+    mainAccountId,
+    setMainAccount
 }) => {
     const [page, setPage] = useState(1);
     const [collapsedDays, setCollapsedDays] = useState({});
+    const [isCategoryOpen, setIsCategoryOpen] = useState(false);
     const pageSize = 10;
 
     React.useEffect(() => {
         setPage(1);
     }, [historyFilter]);
 
+    React.useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Enter') {
+                const activeTag = document.activeElement?.tagName?.toLowerCase();
+                if (activeTag !== 'input' && activeTag !== 'textarea') {
+                    e.preventDefault();
+                    setIsAddingTransaction(true);
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [setIsAddingTransaction]);
+
     return (
                 
-                    <div className="space-y-4 animate-in slide-in-from-bottom-2 fade-in">
-                        {/* Accounts Section */}
-                        <div className="grid grid-cols-2 md:flex md:flex-row gap-4 pb-2 no-scrollbar">
-                            {accounts.map(acc => (
-                                <div key={acc.id} onClick={() => { setEditingAccountData(acc); setIsEditingAccount(true); }} className="w-full md:min-w-[150px] bg-white shadow-sm border border-slate-200 p-4 rounded-xl cursor-pointer hover:border-slate-300 transition-all flex flex-col gap-2 relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 p-12 rounded-full blur-2xl opacity-10" style={{ backgroundColor: acc.color || '#555' }} />
-                                    <div className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: acc.color || '#555' }}></div>
-                                        {acc.label}
-                                    </div>
-                                    <div className="text-xl font-black text-slate-800 relative z-10">
-                                        {formatMoney(getAccountBalance(acc.id))}
-                                    </div>
-                                </div>
-                            ))}
-                            <button onClick={() => { setEditingAccountData({ label: '', initialBalance: 0, color: '#3b82f6' }); setIsEditingAccount(true); }} className="w-full md:min-w-[150px] bg-slate-50 border border-dashed border-slate-300 text-slate-500 hover:text-blue-600 hover:border-blue-300 p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all min-h-[80px]">
-                                <Plus className="w-5 h-5" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest">New Account</span>
-                            </button>
-                        </div>
+                    <div className="space-y-3 animate-in slide-in-from-bottom-2 fade-in">
 
-                         <div className="bg-white shadow-sm border border-slate-200 p-4 rounded-xl flex flex-col gap-4">
-                            {/* Top Row: Title & Action */}
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Transactions • {getDateRangeLabel()}</h3>
-                                {viewMode === 'admin' && (
-                                    <button 
-                                        onClick={() => setIsAddingTransaction(true)}
-                                        className="flex px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold uppercase transition-all items-center gap-2 shrink-0"
-                                    >
-                                        <Plus className="w-4 h-4" /> Log
-                                    </button>
-                                )}
-                            </div>
-                            
-                            {/* Bottom Row: Filters */}
-                            <div className="flex flex-wrap gap-2 items-center">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1 shrink-0"><Filter className="w-3 h-3"/></span>
+
+                        {/* Filters Row */}
+                        <div className="bg-white shadow-sm border border-slate-200 p-2 md:px-3 md:py-2 rounded-xl flex flex-col md:flex-row gap-2 md:items-center justify-between relative z-20">
+                            <div className="flex flex-wrap gap-2 items-center flex-1 min-w-0 w-full">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 hidden sm:flex items-center gap-1 shrink-0"><Filter className="w-3 h-3"/></span>
                                 <select 
                                     value={historyFilter.type}
-                                    onChange={e => setHistoryFilter({...historyFilter, type: e.target.value, categoryId: 'all'})}
-                                    className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 shrink-0"
+                                    onChange={e => setHistoryFilter({...historyFilter, type: e.target.value, categoryIds: []})}
+                                    className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 shrink-0"
                                 >
                                     <option value="all">All Types</option>
                                     <option value="income">Income</option>
@@ -78,27 +65,81 @@ const HistoryTab = ({
                                     <option value="transfer">Transfers</option>
                                 </select>
                                 {historyFilter.type !== 'transfer' && (
-                                    <select 
-                                        value={historyFilter.categoryId}
-                                        onChange={e => setHistoryFilter({...historyFilter, categoryId: e.target.value})}
-                                        className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 max-w-[150px] md:max-w-[200px] truncate shrink-0"
-                                    >
-                                        <option value="all">All Categories</option>
-                                        {categories.filter(c => historyFilter.type === 'all' || c.type === historyFilter.type).map(c => (
-                                            <option key={c.id} value={c.id}>{c.label}</option>
-                                        ))}
-                                    </select>
+                                    <div className="relative shrink-0">
+                                        <button 
+                                            onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+                                            className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-2.5 py-1.5 outline-none hover:border-blue-500 flex items-center justify-between min-w-[130px] md:min-w-[150px]"
+                                        >
+                                            <span className="truncate max-w-[110px]">
+                                                {(!historyFilter.categoryIds || historyFilter.categoryIds.length === 0) ? "All Categories" : `${historyFilter.categoryIds.length} selected`}
+                                            </span>
+                                            <ChevronDown className="w-3 h-3 ml-1 text-slate-400" />
+                                        </button>
+                                        {isCategoryOpen && (
+                                            <div className="absolute top-full mt-1 left-0 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto p-1.5 flex flex-col gap-0.5">
+                                                <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs font-bold text-slate-700 transition-colors">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={!historyFilter.categoryIds || historyFilter.categoryIds.length === 0}
+                                                        onChange={() => setHistoryFilter(prev => ({...prev, categoryIds: []}))}
+                                                        className="rounded text-blue-600 focus:ring-0 border-slate-300"
+                                                    />
+                                                    All Categories
+                                                </label>
+                                                <div className="h-px bg-slate-100 my-0.5"></div>
+                                                {historyFilter.type !== 'income' && (
+                                                    <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs font-bold text-slate-700 transition-colors">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={(historyFilter.categoryIds || []).includes('transfer')}
+                                                            onChange={() => {
+                                                                setHistoryFilter(prev => {
+                                                                    const ids = prev.categoryIds || [];
+                                                                    const nextIds = ids.includes('transfer') ? ids.filter(id => id !== 'transfer') : [...ids, 'transfer'];
+                                                                    return { ...prev, categoryIds: nextIds };
+                                                                });
+                                                            }}
+                                                            className="rounded text-purple-500 focus:ring-0 border-slate-300"
+                                                        />
+                                                        🔄 Transfers
+                                                    </label>
+                                                )}
+                                                {categories.filter(c => historyFilter.type === 'all' || c.type === historyFilter.type).map(c => (
+                                                    <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs font-bold text-slate-700 transition-colors">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={(historyFilter.categoryIds || []).includes(c.id)}
+                                                            onChange={() => {
+                                                                setHistoryFilter(prev => {
+                                                                    const ids = prev.categoryIds || [];
+                                                                    const nextIds = ids.includes(c.id) ? ids.filter(id => id !== c.id) : [...ids, c.id];
+                                                                    return { ...prev, categoryIds: nextIds };
+                                                                });
+                                                            }}
+                                                            className="rounded text-blue-600 focus:ring-0 border-slate-300"
+                                                        />
+                                                        <div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor: c.color}}></div>
+                                                        <span className="truncate">{c.label}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
-                                <select 
-                                    value={historyFilter.accountId}
-                                    onChange={e => setHistoryFilter({...historyFilter, accountId: e.target.value})}
-                                    className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 max-w-[150px] truncate shrink-0"
+                                <button
+                                    type="button"
+                                    onClick={() => setHistoryFilter(prev => ({ ...prev, showTransfers: prev.showTransfers === false ? true : false }))}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border shrink-0 ${
+                                        (historyFilter.showTransfers ?? true)
+                                            ? 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 shadow-sm'
+                                            : 'bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-500 line-through opacity-70'
+                                    }`}
+                                    title={(historyFilter.showTransfers ?? true) ? "Переводы включены (нажмите, чтобы скрыть)" : "Переводы скрыты (нажмите, чтобы показать)"}
                                 >
-                                    <option value="all">All Accounts</option>
-                                    {accounts.map(acc => (
-                                        <option key={acc.id} value={acc.id}>{acc.label}</option>
-                                    ))}
-                                </select>
+                                    <RefreshCw className={`w-3 h-3 ${(historyFilter.showTransfers ?? true) ? 'text-purple-600' : 'text-slate-400'}`} />
+                                    <span>Переводы</span>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${(historyFilter.showTransfers ?? true) ? 'bg-purple-500' : 'bg-slate-300'}`} />
+                                </button>
                                 <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 shrink-0">
                                     <span className="text-[9px] font-bold uppercase text-slate-400">Min:</span>
                                     <input 
@@ -118,56 +159,140 @@ const HistoryTab = ({
                                         className="w-12 bg-transparent text-xs font-mono font-bold text-slate-700 outline-none"
                                     />
                                 </div>
-                                <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 shrink-0">
+                                <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 shrink-0 flex-1 min-w-[120px] md:flex-none">
                                     <input 
                                         type="date" 
                                         value={historyFilter.date || ''}
                                         onChange={e => setHistoryFilter({...historyFilter, date: e.target.value})}
-                                        className="bg-transparent text-xs font-bold text-slate-700 outline-none"
+                                        className="bg-transparent text-xs font-bold text-slate-700 outline-none w-full"
                                     />
                                 </div>
-                                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 w-full md:w-auto shrink-0 flex-1 md:flex-none">
+                                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 w-full md:w-auto shrink-0 flex-1 md:flex-none">
                                     <Search className="w-3.5 h-3.5 text-slate-400" />
                                     <input 
                                         type="text" 
                                         placeholder="Search..." 
                                         value={historyFilter.search || ''}
                                         onChange={e => setHistoryFilter({...historyFilter, search: e.target.value})}
-                                        className="bg-transparent text-xs font-bold text-slate-700 outline-none w-full md:w-32"
+                                        className="bg-transparent text-xs font-bold text-slate-700 outline-none w-full md:w-28"
                                     />
                                 </div>
-                                {(historyFilter.type !== 'all' || historyFilter.categoryId !== 'all' || historyFilter.accountId !== 'all' || historyFilter.minAmount !== '' || historyFilter.maxAmount !== '' || historyFilter.date || historyFilter.search) && (
-                                    <button onClick={() => setHistoryFilter({type:'all', categoryId:'all', accountId:'all', minAmount:'', maxAmount:'', date:'', search:''})} className="text-[10px] text-blue-500 hover:underline font-bold px-2 shrink-0">Clear</button>
+                                {(historyFilter.type !== 'all' || (historyFilter.categoryIds && historyFilter.categoryIds.length > 0) || historyFilter.minAmount !== '' || historyFilter.maxAmount !== '' || historyFilter.date || historyFilter.search || historyFilter.showTransfers === false) && (
+                                    <button onClick={() => setHistoryFilter({type:'all', categoryIds:[], minAmount:'', maxAmount:'', date:'', search:'', showTransfers: true})} className="text-[10px] text-blue-500 hover:underline font-bold px-1.5 shrink-0 ml-auto md:ml-0">Clear</button>
                                 )}
                             </div>
+                            {viewMode === 'admin' && (
+                                <>
+                                    {/* Desktop Log Button */}
+                                    <button 
+                                        onClick={() => setIsAddingTransaction(true)}
+                                        className="hidden md:flex px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold uppercase transition-all items-center gap-1.5 shrink-0 shadow-sm ml-auto"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" /> Log
+                                    </button>
+                                    {/* Mobile FAB Log Button */}
+                                    <button 
+                                        onClick={() => setIsAddingTransaction(true)}
+                                        className="md:hidden fixed bottom-[90px] right-4 w-12 h-12 bg-blue-600 hover:bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-blue-500/40 z-50 transition-transform active:scale-95"
+                                        title="Log Transaction"
+                                    >
+                                        <Plus className="w-6 h-6" />
+                                    </button>
+                                </>
+                            )}
                         </div>
                         {(() => {
-                            const filteredList = monthTransactions.filter(t => {
-                                if (historyFilter.type !== 'all' && t.type !== historyFilter.type) return false;
-                                if (historyFilter.categoryId !== 'all' && t.categoryId !== historyFilter.categoryId) return false;
+                            const getTransferFlow = (t) => {
+                                if (t.type !== 'transfer') return null;
                                 
-                                // Account filter
-                                if (historyFilter.accountId !== 'all') {
+                                // 1. If filtered by active analytic accounts (from Overview / Breakdown)
+                                if (activeAnalyticAccountIds && activeAnalyticAccountIds.length > 0) {
+                                    const isSourceSelected = activeAnalyticAccountIds.includes(t.accountId);
+                                    const isDestSelected = activeAnalyticAccountIds.includes(t.toAccountId);
+                                    if (isSourceSelected && !isDestSelected) return 'out';
+                                    if (!isSourceSelected && isDestSelected) return 'in';
+                                    if (isSourceSelected && isDestSelected) return 'internal';
+                                    return null;
+                                }
+                                
+                                // 2. If all accounts are selected
+                                return 'internal';
+                            };
+
+                            const filteredList = monthTransactions.filter(t => {
+                                const fAccounts = activeAnalyticAccountIds || [];
+                                const fCategories = historyFilter.categoryIds || [];
+                                
+                                // 1. Account filter
+                                if (fAccounts.length > 0) {
                                     if (t.type === 'transfer') {
-                                        if (t.accountId !== historyFilter.accountId && t.toAccountId !== historyFilter.accountId) return false;
+                                        if (!fAccounts.includes(t.accountId) && !fAccounts.includes(t.toAccountId)) {
+                                            return false;
+                                        }
                                     } else {
                                         const accId = t.accountId || '';
-                                        if (accId !== historyFilter.accountId) return false;
+                                        if (!fAccounts.includes(accId)) {
+                                            return false;
+                                        }
                                     }
                                 }
 
-                                // Amount range filter
+                                // 2. Transfers toggle (showTransfers)
+                                const showTransfers = historyFilter.showTransfers !== false;
+                                if (t.type === 'transfer') {
+                                    if (!showTransfers && historyFilter.type !== 'transfer' && !fCategories.includes('transfer')) {
+                                        return false;
+                                    }
+                                }
+
+                                // 3. Category filter
+                                if (fCategories.length > 0) {
+                                    if (t.type === 'transfer') {
+                                        if (!fCategories.includes('transfer')) return false;
+                                    } else {
+                                        if (!fCategories.includes(t.categoryId)) return false;
+                                    }
+                                }
+
+                                // 4. Type filter (Income / Expense / Transfers / All)
+                                if (historyFilter.type !== 'all') {
+                                    if (historyFilter.type === 'transfer') {
+                                        if (t.type !== 'transfer') return false;
+                                    } else if (historyFilter.type === 'income') {
+                                        if (t.type === 'income') {
+                                            // regular income matches
+                                        } else if (t.type === 'transfer' && showTransfers) {
+                                            const flow = getTransferFlow(t);
+                                            // Must be an incoming transfer to the filtered account(s)
+                                            if (flow !== 'in' && flow !== 'internal') return false;
+                                        } else {
+                                            return false;
+                                        }
+                                    } else if (historyFilter.type === 'expense') {
+                                        if (t.type === 'expense') {
+                                            // regular expense matches
+                                        } else if (t.type === 'transfer' && showTransfers) {
+                                            const flow = getTransferFlow(t);
+                                            // Must be an outgoing transfer from the filtered account(s)
+                                            if (flow !== 'out' && flow !== 'internal') return false;
+                                        } else {
+                                            return false;
+                                        }
+                                    }
+                                }
+
+                                // 5. Amount range filter
                                 const amount = Number(t.amount);
                                 if (historyFilter.minAmount !== '' && amount < Number(historyFilter.minAmount)) return false;
                                 if (historyFilter.maxAmount !== '' && amount > Number(historyFilter.maxAmount)) return false;
 
-                                // Date filter
+                                // 6. Date filter
                                 if (historyFilter.date) {
                                     const tDate = getLocalYYYYMMDD(t.createdAt);
                                     if (tDate !== historyFilter.date) return false;
                                 }
 
-                                // Search filter
+                                // 7. Search filter
                                 if (historyFilter.search && historyFilter.search.trim() !== '') {
                                     const searchLower = historyFilter.search.toLowerCase();
                                     if (!t.description || !t.description.toLowerCase().includes(searchLower)) {
@@ -178,31 +303,53 @@ const HistoryTab = ({
                                 return true;
                             }).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-                            const filteredIncome = filteredList.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
-                            const filteredExpense = filteredList.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
+                            const filteredIncome = filteredList.reduce((sum, t) => {
+                                if (t.type === 'income') return sum + Number(t.amount);
+                                if (t.type === 'transfer') {
+                                    const flow = getTransferFlow(t);
+                                    if (flow === 'in') return sum + Number(t.amount);
+                                    if (flow === 'internal' && (historyFilter.type === 'all' || historyFilter.type === 'income')) {
+                                        return sum + Number(t.amount);
+                                    }
+                                }
+                                return sum;
+                            }, 0);
+
+                            const filteredExpense = filteredList.reduce((sum, t) => {
+                                if (t.type === 'expense') return sum + Number(t.amount);
+                                if (t.type === 'transfer') {
+                                    const flow = getTransferFlow(t);
+                                    if (flow === 'out') return sum + Number(t.amount);
+                                    if (flow === 'internal' && (historyFilter.type === 'all' || historyFilter.type === 'expense')) {
+                                        return sum + Number(t.amount);
+                                    }
+                                }
+                                return sum;
+                            }, 0);
+
                             const filteredNet = filteredIncome - filteredExpense;
 
                             return (
                                 <>
-                                    {/* Summary Stats for Current Filter/Slice */}
-                                    <div className="grid grid-cols-3 gap-3 bg-white border border-slate-200 p-4 rounded-xl shadow-sm text-center">
-                                        <div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Income</div>
-                                            <div className="text-base font-black text-green-600 mt-1">+{formatMoney(filteredIncome)}</div>
+                                    {/* Summary Stats: Compact Row with Mobile Support */}
+                                    <div className="bg-white border border-slate-200 p-2 md:px-4 md:py-2 rounded-xl shadow-sm flex flex-row items-center justify-between md:justify-around gap-1 md:gap-3 text-xs font-bold text-center">
+                                        <div className="flex flex-col md:flex-row items-center gap-0.5 md:gap-2 flex-1 min-w-0">
+                                            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider">Income</span>
+                                            <span className="font-mono font-black text-green-600 text-[11px] md:text-sm truncate w-full">+{formatMoney(filteredIncome)}</span>
                                         </div>
-                                        <div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Expenses</div>
-                                            <div className="text-base font-black text-red-600 mt-1">-{formatMoney(filteredExpense)}</div>
+                                        <div className="flex flex-col md:flex-row items-center gap-0.5 md:gap-2 flex-1 min-w-0 border-l border-r border-slate-100 md:border-none px-1">
+                                            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider">Expenses</span>
+                                            <span className="font-mono font-black text-red-600 text-[11px] md:text-sm truncate w-full">-{formatMoney(filteredExpense)}</span>
                                         </div>
-                                        <div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SUM</div>
-                                            <div className={`text-base font-black mt-1 ${filteredNet >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                        <div className="flex flex-col md:flex-row items-center gap-0.5 md:gap-2 flex-1 min-w-0">
+                                            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider">SUM</span>
+                                            <span className={`font-mono font-black text-[11px] md:text-sm truncate w-full ${filteredNet >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                                                 {filteredNet >= 0 ? '+' : ''}{formatMoney(filteredNet)}
-                                            </div>
+                                            </span>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-4 mt-4">
+                                    <div className="space-y-3 mt-3">
                                         {filteredList.length === 0 ? (
                                             <div className="text-center py-20 text-slate-500 italic border border-dashed border-slate-300 rounded-xl">
                                                 No transactions found matching filters
@@ -226,6 +373,16 @@ const HistoryTab = ({
                                                         groups[dateStr].income += Number(t.amount);
                                                     } else if (t.type === 'expense') {
                                                         groups[dateStr].expense += Number(t.amount);
+                                                    } else if (t.type === 'transfer') {
+                                                        const flow = getTransferFlow(t);
+                                                        if (flow === 'in') {
+                                                            groups[dateStr].income += Number(t.amount);
+                                                        } else if (flow === 'out') {
+                                                            groups[dateStr].expense += Number(t.amount);
+                                                        } else if (flow === 'internal' && ((historyFilter.categoryIds || []).includes('transfer') || historyFilter.type === 'transfer')) {
+                                                            groups[dateStr].income += Number(t.amount);
+                                                            groups[dateStr].expense += Number(t.amount);
+                                                        }
                                                     }
                                                     groups[dateStr].transactions.push(t);
                                                 });
@@ -270,26 +427,45 @@ const HistoryTab = ({
                                                                     const cat = categories.find(c => c.id === t.categoryId);
                                                                     const fromAcc = accounts.find(a => a.id === t.accountId);
                                                                     const toAcc = accounts.find(a => a.id === t.toAccountId);
+                                                                    const flow = getTransferFlow(t);
+
+                                                                    let amountDisplay = null;
+                                                                    let dotColor = cat?.color || '#555';
+                                                                    let subtitle = '';
+
+                                                                    if (t.type === 'transfer') {
+                                                                        dotColor = '#a855f7';
+                                                                        if (flow === 'out') {
+                                                                            amountDisplay = <div className="font-mono font-bold text-red-500">-{formatMoney(Math.abs(t.amount))}</div>;
+                                                                            subtitle = ` • Transfer Out ➔ ${toAcc?.label || 'External'}`;
+                                                                        } else if (flow === 'in') {
+                                                                            amountDisplay = <div className="font-mono font-bold text-green-500">+{formatMoney(Math.abs(t.amount))}</div>;
+                                                                            subtitle = ` • Transfer In ➔ ${toAcc?.label || 'Account'} (from ${fromAcc?.label || 'External'})`;
+                                                                        } else {
+                                                                            amountDisplay = <div className="font-mono font-bold text-purple-600">⇄ {formatMoney(Math.abs(t.amount))}</div>;
+                                                                            subtitle = ` • Transfer ${fromAcc?.label || 'Unknown'} ➔ ${toAcc?.label || 'Unknown'}`;
+                                                                        }
+                                                                    } else if (t.type === 'income') {
+                                                                        amountDisplay = <div className="font-mono font-bold text-green-500">+{formatMoney(Math.abs(t.amount))}</div>;
+                                                                        subtitle = ` • ${cat?.label || 'Uncategorized'} • ${fromAcc?.label || 'Cash'}`;
+                                                                    } else {
+                                                                        amountDisplay = <div className="font-mono font-bold text-red-500">-{formatMoney(Math.abs(t.amount))}</div>;
+                                                                        subtitle = ` • ${cat?.label || 'Uncategorized'} • ${fromAcc?.label || 'Cash'}`;
+                                                                    }
 
                                                                     return (
                                                                         <div key={t.id} className="group relative flex justify-between items-center p-4 bg-white/20 border border-slate-200 rounded-xl text-sm hover:bg-slate-100 transition-all">
                                                                             <div className="flex items-center gap-4">
-                                                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: t.type === 'transfer' ? '#3b82f6' : (cat?.color || '#555') }} />
+                                                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: dotColor }} />
                                                                                 <div>
-                                                                                    <div className="font-bold text-slate-800">{t.description || (t.type === 'transfer' ? 'Transfer' : 'Unknown')}</div>
+                                                                                    <div className="font-bold text-slate-800">{t.description || (t.type === 'transfer' ? (flow === 'out' ? `Transfer to ${toAcc?.label || ''}` : flow === 'in' ? `Transfer from ${fromAcc?.label || ''}` : 'Transfer') : 'Unknown')}</div>
                                                                                     <div className="text-[10px] text-slate-500 uppercase">
                                                                                         {new Date(t.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                                                                                        {t.type === 'transfer' ? (
-                                                                                            ` • Transfer ${fromAcc?.label || 'Unknown'} ➔ ${toAcc?.label || 'Unknown'}`
-                                                                                        ) : (
-                                                                                            ` • ${cat?.label || 'Uncategorized'} • ${fromAcc?.label || 'Cash'}`
-                                                                                        )}
+                                                                                        {subtitle}
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
-                                                                            <div className={`font-mono font-bold ${t.type === 'income' ? 'text-green-500' : t.type === 'expense' ? 'text-red-500' : 'text-blue-500'}`}>
-                                                                                {t.type === 'income' ? '+' : t.type === 'expense' ? '-' : '⇄ '}{formatMoney(Math.abs(t.amount))}
-                                                                            </div>
+                                                                            {amountDisplay}
                                                                             
                                                                             {/* Edit/Delete Overlay */}
                                                                             <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white p-1 rounded-lg border border-slate-300 shadow-xl">

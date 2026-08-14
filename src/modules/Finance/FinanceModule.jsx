@@ -113,7 +113,7 @@ const FinanceModule = ({
     // Account Management State
     const [isEditingAccount, setIsEditingAccount] = useState(false);
     const [editingAccountData, setEditingAccountData] = useState(null);
-    const [selectedAnalyticAccounts, setSelectedAnalyticAccounts] = useState(null);
+    const [globalAccountFilterIds, setGlobalAccountFilterIds] = useState([]);
 
     // Category dropdown search state
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -123,7 +123,7 @@ const FinanceModule = ({
     const [expandedChart, setExpandedChart] = useState(null);
 
     // History Filters
-    const [historyFilter, setHistoryFilter] = useState({ categoryId: 'all', type: 'all', accountId: 'all', minAmount: '', maxAmount: '', date: '' });
+    const [historyFilter, setHistoryFilter] = useState({ categoryIds: [], type: 'all', accountIds: [], minAmount: '', maxAmount: '', date: '', search: '', showTransfers: true });
 
     // Daily Spending Chart Filters
     const [dailyChartCategoryFilter, setDailyChartCategoryFilter] = useState('all');
@@ -185,7 +185,7 @@ const FinanceModule = ({
     const [isAdvancedMode, setIsAdvancedMode] = useState(false);
     const [advancedMaxTxAmount, setAdvancedMaxTxAmount] = useState(''); // max transaction amount for calculations
     const [categoryOverrides, setCategoryOverrides] = useState({}); // { categoryId: amount }
-    const [planningAccountIds, setPlanningAccountIds] = useState([]); // empty means all
+
     const [isAddingExpected, setIsAddingExpected] = useState(false);
     const [isEditingExpectedId, setIsEditingExpectedId] = useState(null);
     const [expectedForm, setExpectedForm] = useState({ date: getLocalYYYYMMDD(defaultTarget), description: '', amount: '', type: 'expense', categoryId: '' });
@@ -197,6 +197,18 @@ const FinanceModule = ({
     const accounts = useMemo(() => userData.accounts || [], [userData.accounts]);
     const expectedTransactions = useMemo(() => userData.expectedTransactions || [], [userData.expectedTransactions]);
 
+    const mainAccountId = userData?.settings?.mainAccountId || (accounts.length > 0 ? accounts[0].id : '');
+    const setMainAccount = (id) => updateUser({ settings: { ...(userData.settings || {}), mainAccountId: id } });
+
+    React.useEffect(() => {
+        if (isAddingTransaction && !newTransaction.id && !newTransaction.accountId) {
+            setNewTransaction(prev => ({
+                ...prev,
+                accountId: mainAccountId
+            }));
+        }
+    }, [isAddingTransaction, newTransaction.id, newTransaction.accountId, mainAccountId]);
+
     const filterAccountsList = useMemo(() => {
         const list = [...accounts];
         const hasLegacy = transactions.some(t => !t.accountId);
@@ -207,11 +219,11 @@ const FinanceModule = ({
     }, [accounts, transactions]);
 
     const activeAnalyticAccountIds = useMemo(() => {
-        if (selectedAnalyticAccounts === null) {
+        if (!globalAccountFilterIds || globalAccountFilterIds.length === 0) {
             return filterAccountsList.map(a => a.id);
         }
-        return selectedAnalyticAccounts;
-    }, [filterAccountsList, selectedAnalyticAccounts]);
+        return globalAccountFilterIds;
+    }, [filterAccountsList, globalAccountFilterIds]);
     
     const resolvedDateRange = useMemo(() => {
         let start = new Date();
@@ -257,9 +269,9 @@ const FinanceModule = ({
                 const isSourceSelected = activeAnalyticAccountIds.includes(t.accountId);
                 const isDestSelected = activeAnalyticAccountIds.includes(t.toAccountId);
                 if (isSourceSelected && !isDestSelected) {
-                    list.push({ ...t, type: 'expense', description: `${t.description || 'Transfer'} (Out)` });
+                    list.push({ ...t, type: 'expense', categoryId: 'transfer', description: `${t.description || 'Transfer'} (Out)` });
                 } else if (!isSourceSelected && isDestSelected) {
-                    list.push({ ...t, type: 'income', description: `${t.description || 'Transfer'} (In)` });
+                    list.push({ ...t, type: 'income', categoryId: 'transfer', description: `${t.description || 'Transfer'} (In)` });
                 }
             } else {
                 const accId = t.accountId || 'legacy';
@@ -286,9 +298,9 @@ const FinanceModule = ({
                     const isSourceSelected = activeAnalyticAccountIds.includes(t.accountId);
                     const isDestSelected = activeAnalyticAccountIds.includes(t.toAccountId);
                     if (isSourceSelected && !isDestSelected) {
-                        list.push({ ...t, type: 'expense', description: `${t.description || 'Transfer'} (Out)` });
+                        list.push({ ...t, type: 'expense', categoryId: 'transfer', description: `${t.description || 'Transfer'} (Out)` });
                     } else if (!isSourceSelected && isDestSelected) {
-                        list.push({ ...t, type: 'income', description: `${t.description || 'Transfer'} (In)` });
+                        list.push({ ...t, type: 'income', categoryId: 'transfer', description: `${t.description || 'Transfer'} (In)` });
                     }
                 } else {
                     const accId = t.accountId || 'legacy';
@@ -444,7 +456,7 @@ const FinanceModule = ({
         
         // 2. Also calculate for any "Other/Uncategorized" expenses
         const uncategorizedTotal = filteredMonthTransactions
-            .filter(t => t.type === 'expense' && (!t.categoryId || !expenseCategories.some(c => c.id === t.categoryId)))
+            .filter(t => t.type === 'expense' && t.categoryId !== 'transfer' && (!t.categoryId || !expenseCategories.some(c => c.id === t.categoryId)))
             .reduce((sum, t) => sum + Number(t.amount), 0);
             
         if (uncategorizedTotal > 0) {
@@ -456,6 +468,23 @@ const FinanceModule = ({
                 actualDaily,
                 plannedDaily: 0,
                 actualTotal: uncategorizedTotal,
+                percent: 0
+            });
+        }
+        
+        // 3. Calculate for Transfers
+        const transferTotal = filteredMonthTransactions
+            .filter(t => t.type === 'expense' && t.categoryId === 'transfer')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+
+        if (transferTotal > 0) {
+            breakdown.push({
+                id: 'transfer',
+                label: 'Перевод (Out)',
+                color: '#a855f7',
+                actualDaily: transferTotal / activeDaysCount,
+                plannedDaily: 0,
+                actualTotal: transferTotal,
                 percent: 0
             });
         }
@@ -680,6 +709,9 @@ const FinanceModule = ({
                 map[catId] = (map[catId] || 0) + Number(t.amount);
             });
             return Object.keys(map).map(id => {
+                if (id === 'transfer') {
+                    return { id, name: 'Перевод', value: map[id], color: '#a855f7' };
+                }
                 const cat = categories.find(c => c.id === id);
                 return { id, name: cat ? cat.label : 'Other', value: map[id], color: cat ? cat.color : '#555' };
             }).filter(i => i.value > 0);
@@ -716,8 +748,13 @@ const FinanceModule = ({
                 
                 dayTransactions.forEach(t => {
                     const amount = Number(t.amount) || 0;
-                    const cat = categories.find(c => c.id === t.categoryId);
-                    const categoryLabel = cat ? cat.label : 'Other';
+                    let categoryLabel = 'Other';
+                    if (t.categoryId === 'transfer') {
+                        categoryLabel = 'Transfer';
+                    } else {
+                        const cat = categories.find(c => c.id === t.categoryId);
+                        if (cat) categoryLabel = cat.label;
+                    }
                     
                     if (t.type === 'income') {
                         dayData.income += amount;
@@ -757,8 +794,13 @@ const FinanceModule = ({
 
                 weekTransactions.forEach(t => {
                     const amount = Number(t.amount) || 0;
-                    const cat = categories.find(c => c.id === t.categoryId);
-                    const categoryLabel = cat ? cat.label : 'Other';
+                    let categoryLabel = 'Other';
+                    if (t.categoryId === 'transfer') {
+                        categoryLabel = 'Transfer';
+                    } else {
+                        const cat = categories.find(c => c.id === t.categoryId);
+                        if (cat) categoryLabel = cat.label;
+                    }
 
                     if (t.type === 'income') {
                         weekData.income += amount;
@@ -1113,19 +1155,80 @@ const FinanceModule = ({
                     ))}
                 </div>
                 </div>
-            </div>
+                </div>
+                
+                {/* GLOBAL ACCOUNT BADGES */}
+                <div className="flex overflow-x-auto gap-2 no-scrollbar items-center md:flex-wrap pt-3 pb-2">
+                    {/* Selected Accounts Total Balance */}
+                    <div className="bg-white text-slate-800 shadow-sm border border-slate-200 px-3 py-1.5 rounded-xl flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total</span>
+                        <span className="text-xs md:text-sm font-black font-mono tracking-tight">
+                            {formatMoney(
+                                activeAnalyticAccountIds.reduce((sum, id) => sum + getAccountBalance(id), 0)
+                            )}
+                        </span>
+                    </div>
 
+                    <div className="w-px h-6 bg-slate-200 shrink-0 mx-1"></div>
+
+                    {accounts.map(acc => {
+                        const isSelected = activeAnalyticAccountIds.includes(acc.id);
+                        return (
+                            <div 
+                                key={acc.id} 
+                                onClick={() => { setEditingAccountData(acc); setIsEditingAccount(true); }} 
+                                className={`bg-white shadow-sm border px-2.5 py-1.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-2.5 relative group shrink-0 ${
+                                    isSelected ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300'
+                                }`}
+                            >
+                                <div className="absolute top-0 right-0 p-6 rounded-full blur-xl opacity-10 pointer-events-none" style={{ backgroundColor: acc.color || '#555' }} />
+                                <input 
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                        e.stopPropagation();
+                                        setGlobalAccountFilterIds(prev => {
+                                            const current = (!prev || prev.length === 0) ? filterAccountsList.map(a=>a.id) : prev;
+                                            const next = current.includes(acc.id) ? current.filter(id => id !== acc.id) : [...current, acc.id];
+                                            if (next.length === filterAccountsList.length) return [];
+                                            return next;
+                                        });
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 z-20 cursor-pointer"
+                                    title="Filter by this account"
+                                />
+                                <div className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1.5 truncate">
+                                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: acc.color || '#555' }}></div>
+                                    <span className="truncate">{acc.label}</span>
+                                </div>
+                                <div className="text-xs md:text-sm font-black text-slate-800 relative z-10 font-mono tracking-tight shrink-0 mr-4">
+                                    {formatMoney(getAccountBalance(acc.id))}
+                                </div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setMainAccount(acc.id); }}
+                                    className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-md transition-all z-20 ${mainAccountId === acc.id ? 'text-yellow-500 opacity-100 scale-110' : 'text-slate-300 opacity-0 group-hover:opacity-100 hover:text-yellow-500 hover:scale-110'}`}
+                                    title={mainAccountId === acc.id ? "Main Account" : "Set as Main Account"}
+                                >
+                                    <svg className="w-3 h-3" fill={mainAccountId === acc.id ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={mainAccountId === acc.id ? 0 : 2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                    </svg>
+                                </button>
+                            </div>
+                        );
+                    })}
+                    <button 
+                        onClick={() => { setEditingAccountData({ label: '', initialBalance: 0, color: '#3b82f6' }); setIsEditingAccount(true); }} 
+                        className="bg-slate-50 border border-dashed border-slate-300 text-slate-500 hover:text-blue-600 hover:border-blue-300 px-3 py-1.5 rounded-xl flex items-center justify-center gap-1.5 transition-all text-xs font-bold shrink-0"
+                        title="Add New Account"
+                    >
+                        <Plus className="w-3.5 h-3.5 shrink-0" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">New</span>
+                    </button>
+                </div>
             {/* Content Switcher */}
             <div className="flex-1 flex flex-col">
-                    {/* Source Toggle for Analytics */}
-                    {dashboardTab === 'overview' && (
-                        <div className="flex flex-col md:flex-row md:items-center justify-between pb-1 mb-8 gap-4">
-                            <div className="flex bg-white shadow-sm border border-slate-200 rounded-lg p-1 border border-slate-200 mb-1 self-start md:self-auto w-full md:w-auto">
-                                <button onClick={() => setAnalyticsSource('actual')} className={`flex-1 md:flex-none px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'actual' ? 'bg-green-600 text-slate-800' : 'text-slate-500'}`}>Actuals</button>
-                                <button onClick={() => setAnalyticsSource('budget')} className={`flex-1 md:flex-none px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${analyticsSource === 'budget' ? 'bg-amber-600 text-slate-800' : 'text-slate-500'}`}>Budget Plan</button>
-                            </div>
-                        </div>
-                    )}
+
 
                     {/* --- BUDGET VIEW (Planning) --- */}
                     {dashboardTab === 'budget' && (
@@ -1141,13 +1244,17 @@ const FinanceModule = ({
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 {/* Income Section */}
                                 <div className="space-y-4">
-                                    <div className="flex justify-between items-center bg-green-50 p-4 rounded-xl border border-green-500/20">
-                                        <h3 className="text-sm font-black text-green-500 uppercase tracking-widest">Recurring Income Sources</h3>
+                                    <div className="flex justify-between items-end pb-3 border-b border-slate-200">
+                                        <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                            Recurring Income Sources
+                                        </h3>
                                         <button 
                                             onClick={() => { setEditingCategoryData({ type: 'income', label: '', amount: '', period: 30, color: '#10b981' }); setIsEditingCategory(true); }}
-                                            className="p-2 bg-green-500/20 hover:bg-green-500 text-green-500 hover:text-blue-600 rounded-lg transition-all"
+                                            className="px-3 py-1.5 bg-slate-100 hover:bg-green-500 hover:text-white text-slate-500 rounded-lg transition-all text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
                                         >
-                                            <Plus className="w-4 h-4" />
+                                            <Plus className="w-3.5 h-3.5" />
+                                            <span>Add</span>
                                         </button>
                                     </div>
                                     <div className="hidden md:grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-slate-400 px-4">
@@ -1170,27 +1277,31 @@ const FinanceModule = ({
 
                                 {/* Expense Section */}
                                 <div className="space-y-4">
-                                    <div className="flex justify-between items-center bg-red-900/10 p-4 rounded-xl border border-red-500/20">
+                                    <div className="flex justify-between items-end pb-3 border-b border-slate-200">
                                         <div className="flex flex-col">
-                                            <h3 className="text-sm font-black text-red-500 uppercase tracking-widest">Recurring Expenses</h3>
-                                            <span className="text-[10px] text-red-400 font-bold mt-0.5">
-                                                Remaining to spend: {formatMoney(totalRemainingExpense)}
+                                            <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                                                Recurring Expenses
+                                            </h3>
+                                            <span className="text-[10px] text-slate-500 font-bold mt-1">
+                                                Remaining to spend: <span className="text-amber-500">{formatMoney(totalRemainingExpense)}</span>
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <select
                                                 value={recurringExpensesSort}
                                                 onChange={e => setRecurringExpensesSort(e.target.value)}
-                                                className="bg-white/80 border border-red-500/20 text-[10px] font-bold text-red-700 uppercase tracking-wider rounded-lg px-2.5 py-1.5 outline-none focus:border-red-500/50 cursor-pointer animate-in fade-in"
+                                                className="bg-transparent text-[10px] font-bold text-slate-500 uppercase tracking-wider outline-none cursor-pointer"
                                             >
                                                 <option value="actual">By Spent</option>
                                                 <option value="planned">By Budget</option>
                                             </select>
                                             <button 
                                                 onClick={() => { setEditingCategoryData({ type: 'expense', label: '', amount: '', period: 30, color: '#ef4444' }); setIsEditingCategory(true); }}
-                                                className="p-2 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-blue-600 rounded-lg transition-all"
+                                                className="px-3 py-1.5 hover:text-red-600 text-slate-400 rounded-lg transition-all text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
                                             >
-                                                <Plus className="w-4 h-4" />
+                                                <Plus className="w-3.5 h-3.5" />
+                                                <span>Add</span>
                                             </button>
                                         </div>
                                     </div>
@@ -1253,7 +1364,7 @@ const FinanceModule = ({
                         
                         const lookbackDays = Math.max(1, Math.floor((lookbackEnd - effectiveLookbackStart) / (1000 * 60 * 60 * 24)) + 1);
                         
-                        const isAccountActive = (id) => planningAccountIds.length === 0 || planningAccountIds.includes(id);
+                        const isAccountActive = (id) => activeAnalyticAccountIds.includes(id);
 
                         const lookbackIncomes = txListOrdered.filter(t => {
                             if (new Date(t.date || t.createdAt) >= today) return false;
@@ -1427,7 +1538,7 @@ const FinanceModule = ({
                         
                         let runningBalance = 0;
                         accounts.forEach(a => {
-                            if (planningAccountIds.length === 0 || planningAccountIds.includes(a.id)) {
+                            if (activeAnalyticAccountIds.length === 0 || activeAnalyticAccountIds.includes(a.id)) {
                                 runningBalance += (Number(a.initialBalance) || 0);
                             }
                         });
@@ -1438,13 +1549,13 @@ const FinanceModule = ({
                             d.setHours(0,0,0,0);
                             if (d < predictionStart) {
                                 if (t.type === 'transfer') {
-                                    const fromActive = planningAccountIds.length === 0 || planningAccountIds.includes(t.accountId);
-                                    const toActive = planningAccountIds.length === 0 || planningAccountIds.includes(t.toAccountId);
+                                    const fromActive = activeAnalyticAccountIds.length === 0 || activeAnalyticAccountIds.includes(t.accountId);
+                                    const toActive = activeAnalyticAccountIds.length === 0 || activeAnalyticAccountIds.includes(t.toAccountId);
                                     if (fromActive && !toActive) runningBalance -= Number(t.amount);
                                     else if (!fromActive && toActive) runningBalance += Number(t.amount);
                                 } else {
                                     const accId = t.accountId || 'legacy';
-                                    if (planningAccountIds.length === 0 || planningAccountIds.includes(accId)) {
+                                    if (activeAnalyticAccountIds.length === 0 || activeAnalyticAccountIds.includes(accId)) {
                                         if (t.type === 'income') runningBalance += Number(t.amount);
                                         if (t.type === 'expense') runningBalance -= Number(t.amount);
                                     }
@@ -1483,8 +1594,8 @@ const FinanceModule = ({
                                 });
                                 todaysTx.forEach(t => {
                                     if (t.type === 'transfer') {
-                                        const fromActive = planningAccountIds.length === 0 || planningAccountIds.includes(t.accountId);
-                                        const toActive = planningAccountIds.length === 0 || planningAccountIds.includes(t.toAccountId);
+                                        const fromActive = activeAnalyticAccountIds.length === 0 || activeAnalyticAccountIds.includes(t.accountId);
+                                        const toActive = activeAnalyticAccountIds.length === 0 || activeAnalyticAccountIds.includes(t.toAccountId);
                                         if (fromActive && !toActive) {
                                             runningBalance -= Number(t.amount);
                                             dayExpense += Number(t.amount);
@@ -1494,7 +1605,7 @@ const FinanceModule = ({
                                         }
                                     } else {
                                         const accId = t.accountId || 'legacy';
-                                        if (planningAccountIds.length === 0 || planningAccountIds.includes(accId)) {
+                                        if (activeAnalyticAccountIds.length === 0 || activeAnalyticAccountIds.includes(accId)) {
                                             if (t.type === 'income') { dayIncome += Number(t.amount); runningBalance += Number(t.amount); }
                                             if (t.type === 'expense') { dayExpense += Number(t.amount); runningBalance -= Number(t.amount); }
                                         }
@@ -1508,7 +1619,7 @@ const FinanceModule = ({
                                 let dayRecurringInc = 0;
                                 let dayAvgSpend = dailyAverageSpend;
                                 
-                                const isMain = planningAccountIds.length === 0 || planningAccountIds.some(id => {
+                                const isMain = activeAnalyticAccountIds.some(id => {
                                     const accountObj = accounts.find(a => a.id === id);
                                     return accountObj && accountObj.label.toLowerCase().includes('main');
                                 });
@@ -1607,7 +1718,7 @@ const FinanceModule = ({
                             
                             // 3. Expected Specific Events (today and future)
                             if (d >= today) {
-                                const isMain = planningAccountIds.length === 0 || planningAccountIds.some(id => {
+                                const isMain = activeAnalyticAccountIds.length === 0 || activeAnalyticAccountIds.some(id => {
                                     const accountObj = accounts.find(a => a.id === id);
                                     return accountObj && accountObj.label.toLowerCase().includes('main');
                                 });
@@ -1729,41 +1840,6 @@ const FinanceModule = ({
                                             { label: 'Custom', isCustom: true }
                                         ]} 
                                     />
-                                    <div className="flex-[2] space-y-1 w-full md:w-auto">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Planning Accounts</label>
-                                        <div className="flex flex-wrap gap-1 mt-1 border bg-slate-50 border-slate-200 rounded-lg p-1.5 min-h-[38px] items-center">
-                                            <button
-                                                onClick={() => setPlanningAccountIds([])}
-                                                className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${
-                                                    planningAccountIds.length === 0 
-                                                    ? 'bg-slate-800 text-white border-slate-800 shadow-sm' 
-                                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                                                }`}
-                                            >
-                                                All Accounts
-                                            </button>
-                                            {accounts.map(acc => {
-                                                const isSelected = planningAccountIds.includes(acc.id);
-                                                return (
-                                                    <button
-                                                        key={acc.id}
-                                                        onClick={() => {
-                                                            if (isSelected) setPlanningAccountIds(planningAccountIds.filter(id => id !== acc.id));
-                                                            else setPlanningAccountIds([...planningAccountIds, acc.id]);
-                                                        }}
-                                                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border flex items-center gap-1 ${
-                                                            isSelected 
-                                                            ? 'bg-slate-800 text-white border-slate-800 shadow-sm' 
-                                                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                                                        }`}
-                                                    >
-                                                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: acc.color }} />
-                                                        {acc.label}
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
                              
                                         <div className="flex-[2] space-y-1 w-full relative group">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Expense Categories</label>
@@ -2114,6 +2190,7 @@ const FinanceModule = ({
                     categories={categories}
                     historyFilter={historyFilter}
                     setHistoryFilter={setHistoryFilter}
+                    activeAnalyticAccountIds={activeAnalyticAccountIds}
                     setNewTransaction={setNewTransaction}
                     setIsAddingTransaction={setIsAddingTransaction}
                     transactionsActions={transactionsActions}
@@ -2124,6 +2201,8 @@ const FinanceModule = ({
                     getDateRangeLabel={getDateRangeLabel}
                     viewMode={viewMode}
                     monthTransactions={monthTransactions}
+                    mainAccountId={mainAccountId}
+                    setMainAccount={setMainAccount}
                 />
             )}
                      {/* --- ANALYTICS VIEW --- */}
@@ -2131,8 +2210,9 @@ const FinanceModule = ({
                      <OverviewTab 
                          filterAccountsList={filterAccountsList}
                          activeAnalyticAccountIds={activeAnalyticAccountIds}
-                         setSelectedAnalyticAccounts={setSelectedAnalyticAccounts}
+                         
                          analyticsSource={analyticsSource}
+                         setAnalyticsSource={setAnalyticsSource}
                          activeIncome={activeIncome}
                          activeExpense={activeExpense}
                          activeDays={activeDays}
@@ -2312,7 +2392,7 @@ const FinanceModule = ({
                                                     key={idx} 
                                                     onClick={() => {
                                                         if (item.id) {
-                                                            setHistoryFilter({ type: analyticsSource === 'budget' ? 'expense' : 'all', categoryId: item.id, accountId: 'all', minAmount: '', maxAmount: '', date: '' });
+                                                            setHistoryFilter({ type: analyticsSource === 'budget' ? 'expense' : pieChartMode, categoryId: item.id, accountId: 'all', minAmount: '', maxAmount: '', date: '', search: '', showTransfers: true });
                                                             setDashboardTab('history');
                                                             setExpandedChart(null);
                                                         }
