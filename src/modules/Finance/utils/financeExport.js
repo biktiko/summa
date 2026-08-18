@@ -137,3 +137,34 @@ export const exportProjectsToExcel = (projects, transactions, dateLabel) => {
     XLSX.utils.book_append_sheet(wb, ws, "Projects");
     XLSX.writeFile(wb, `Summa_Projects_${dateLabel.replace(/\s+/g, '_')}.xlsx`);
 };
+
+export const exportCategoryAnalysisToExcel = (categoryName, trendData, transactions, accounts, dateLabel) => {
+    const wb = XLSX.utils.book_new();
+
+    // 1. Trend Data
+    const trendSheetData = trendData.map(d => ({
+        Period: d.label,
+        Amount: d.value
+    }));
+    const trendWs = XLSX.utils.json_to_sheet(trendSheetData);
+    XLSX.utils.book_append_sheet(wb, trendWs, "Trend Analysis");
+
+    // 2. Transactions
+    const txData = transactions.map(t => {
+        const fromAcc = accounts.find(a => a.id === t.accountId);
+        
+        return {
+            Date: new Date(t.createdAt).toLocaleDateString(),
+            Time: new Date(t.createdAt).toLocaleTimeString(),
+            Amount: Number(t.amount),
+            Account: fromAcc ? fromAcc.label : 'Unknown',
+            Project: t.projectId || '',
+            Description: t.description || ''
+        };
+    });
+    const txWs = XLSX.utils.json_to_sheet(txData);
+    XLSX.utils.book_append_sheet(wb, txWs, "Transactions");
+
+    XLSX.writeFile(wb, `Summa_Category_${categoryName.replace(/\s+/g, '_')}_${dateLabel.replace(/\s+/g, '_')}.xlsx`);
+};
+

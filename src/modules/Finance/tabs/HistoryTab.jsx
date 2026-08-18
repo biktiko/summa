@@ -24,6 +24,7 @@ const HistoryTab = ({
 }) => {
     const [page, setPage] = useState(1);
     const [collapsedDays, setCollapsedDays] = useState({});
+    const [groupingMode, setGroupingMode] = useState('day'); // 'day' | 'week' | 'month'
     const [isCategoryOpen, setIsCategoryOpen] = useState(false);
     const pageSize = 10;
 
@@ -308,9 +309,6 @@ const HistoryTab = ({
                                 if (t.type === 'transfer') {
                                     const flow = getTransferFlow(t);
                                     if (flow === 'in') return sum + Number(t.amount);
-                                    if (flow === 'internal' && (historyFilter.type === 'all' || historyFilter.type === 'income')) {
-                                        return sum + Number(t.amount);
-                                    }
                                 }
                                 return sum;
                             }, 0);
@@ -320,9 +318,6 @@ const HistoryTab = ({
                                 if (t.type === 'transfer') {
                                     const flow = getTransferFlow(t);
                                     if (flow === 'out') return sum + Number(t.amount);
-                                    if (flow === 'internal' && (historyFilter.type === 'all' || historyFilter.type === 'expense')) {
-                                        return sum + Number(t.amount);
-                                    }
                                 }
                                 return sum;
                             }, 0);
@@ -359,11 +354,30 @@ const HistoryTab = ({
                                                 // Group by date
                                                 const groups = {};
                                                 filteredList.forEach(t => {
-                                                    const dateStr = new Date(t.createdAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                                                    const d = new Date(t.createdAt);
+                                                    let dateStr = '';
+                                                    let rawDate = null;
+                                                    
+                                                    if (groupingMode === 'week') {
+                                                        const firstDay = new Date(d);
+                                                        firstDay.setDate(d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1));
+                                                        const lastDay = new Date(firstDay);
+                                                        lastDay.setDate(lastDay.getDate() + 6);
+                                                        const formatShort = (date) => date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                                                        dateStr = `${formatShort(firstDay)} - ${formatShort(lastDay)}, ${firstDay.getFullYear()}`;
+                                                        rawDate = new Date(firstDay.setHours(0,0,0,0));
+                                                    } else if (groupingMode === 'month') {
+                                                        dateStr = d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+                                                        rawDate = new Date(d.getFullYear(), d.getMonth(), 1);
+                                                    } else {
+                                                        dateStr = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                                                        rawDate = new Date(d.setHours(0,0,0,0));
+                                                    }
+
                                                     if (!groups[dateStr]) {
                                                         groups[dateStr] = {
                                                             dateLabel: dateStr,
-                                                            rawDate: new Date(t.createdAt),
+                                                            rawDate: rawDate,
                                                             income: 0,
                                                             expense: 0,
                                                             transactions: []
@@ -379,9 +393,6 @@ const HistoryTab = ({
                                                             groups[dateStr].income += Number(t.amount);
                                                         } else if (flow === 'out') {
                                                             groups[dateStr].expense += Number(t.amount);
-                                                        } else if (flow === 'internal' && ((historyFilter.categoryIds || []).includes('transfer') || historyFilter.type === 'transfer')) {
-                                                            groups[dateStr].income += Number(t.amount);
-                                                            groups[dateStr].expense += Number(t.amount);
                                                         }
                                                     }
                                                     groups[dateStr].transactions.push(t);
@@ -391,8 +402,49 @@ const HistoryTab = ({
                                                 const totalPages = Math.ceil(sortedGroups.length / pageSize);
                                                 const paginatedGroups = sortedGroups.slice((page - 1) * pageSize, page * pageSize);
 
+                                                const isAnyExpanded = paginatedGroups.some(g => !collapsedDays[g.dateLabel]);
+                                                const toggleCollapseAll = () => {
+                                                    if (isAnyExpanded) {
+                                                        const newCollapsed = { ...collapsedDays };
+                                                        paginatedGroups.forEach(g => newCollapsed[g.dateLabel] = true);
+                                                        setCollapsedDays(newCollapsed);
+                                                    } else {
+                                                        const newCollapsed = { ...collapsedDays };
+                                                        paginatedGroups.forEach(g => delete newCollapsed[g.dateLabel]);
+                                                        setCollapsedDays(newCollapsed);
+                                                    }
+                                                };
+
                                                 return (
                                                     <>
+                                                    <div className="flex flex-col md:flex-row justify-between items-center bg-slate-50 border border-slate-200 shadow-sm rounded-lg p-1 mb-3 gap-2">
+                                                        <div className="flex gap-1 w-full md:w-auto overflow-x-auto no-scrollbar">
+                                                            <button 
+                                                                onClick={() => setGroupingMode('day')}
+                                                                className={`flex-1 md:flex-none px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${groupingMode === 'day' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                                                            >
+                                                                Days
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => setGroupingMode('week')}
+                                                                className={`flex-1 md:flex-none px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${groupingMode === 'week' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                                                            >
+                                                                Weeks
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => setGroupingMode('month')}
+                                                                className={`flex-1 md:flex-none px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${groupingMode === 'month' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                                                            >
+                                                                Months
+                                                            </button>
+                                                        </div>
+                                                        <button 
+                                                            onClick={toggleCollapseAll}
+                                                            className="w-full md:w-auto justify-center text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-wider flex items-center gap-1 transition-colors px-3 py-1.5 rounded hover:bg-slate-200/50"
+                                                        >
+                                                            {isAnyExpanded ? 'Collapse All' : 'Expand All'}
+                                                        </button>
+                                                    </div>
                                                     {paginatedGroups.map((group, groupIdx) => {
                                                     const dailyNet = group.income - group.expense;
                                                     const isCollapsed = collapsedDays[group.dateLabel] || false;

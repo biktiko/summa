@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
-    TrendingUp, TrendingDown, Wallet, Calendar, PieChart as PieChartIcon, Calculator, Download, Maximize2, X
+    TrendingUp, TrendingDown, Wallet, Calendar, PieChart as PieChartIcon, Calculator, Download, Maximize2, X, Plus, Minus, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -9,6 +9,196 @@ import {
 import StatCard from '../components/StatCard';
 import CustomTooltip from '../components/CustomTooltip';
 import CustomBalanceTooltip from '../components/CustomBalanceTooltip';
+
+const CategoryDynamicsSection = ({ transactions, categories, formatMoney, currencySymbol }) => {
+    const [dynType, setDynType] = useState('expense'); // 'expense' | 'income'
+    
+    // Default P1: Last 30 days. P2: 60 to 30 days ago.
+    const [p1Start, setP1Start] = useState(() => {
+        const d = new Date(); d.setDate(d.getDate() - 30);
+        return d.toISOString().split('T')[0];
+    });
+    const [p1End, setP1End] = useState(() => new Date().toISOString().split('T')[0]);
+    const [p2Start, setP2Start] = useState('');
+    const [p2End, setP2End] = useState(() => {
+        const d = new Date(); d.setDate(d.getDate() - 30);
+        return d.toISOString().split('T')[0];
+    });
+
+    // Set p2Start to the earliest transaction date when transactions load
+    useEffect(() => {
+        if (!p2Start && transactions && transactions.length > 0) {
+            const earliest = transactions.reduce((min, t) => {
+                const d = new Date(t.createdAt);
+                return d < min ? d : min;
+            }, new Date());
+            setP2Start(earliest.toISOString().split('T')[0]);
+        }
+    }, [transactions, p2Start]);
+
+    const getLocalYYYYMMDD = (dStr) => {
+        const d = new Date(dStr);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    const dynamicsData = useMemo(() => {
+        if (!transactions || transactions.length === 0) return [];
+
+        const p1Sums = {};
+        const p2Sums = {};
+        
+        transactions.forEach(t => {
+            if (t.type !== dynType) return;
+            if (t.categoryId === 'transfer') return;
+
+            const tDate = getLocalYYYYMMDD(t.createdAt);
+            const amount = Number(t.amount) || 0;
+
+            if (tDate >= p1Start && tDate <= p1End) {
+                p1Sums[t.categoryId] = (p1Sums[t.categoryId] || 0) + amount;
+            }
+            if (tDate >= p2Start && tDate <= p2End) {
+                p2Sums[t.categoryId] = (p2Sums[t.categoryId] || 0) + amount;
+            }
+        });
+
+        const combinedCats = new Set([...Object.keys(p1Sums), ...Object.keys(p2Sums)]);
+        const results = [];
+
+        combinedCats.forEach(catId => {
+            const p1 = p1Sums[catId] || 0;
+            const p2 = p2Sums[catId] || 0;
+            const diff = p1 - p2;
+            let pct = 0;
+            
+            if (p2 === 0 && p1 > 0) pct = 100;
+            else if (p2 === 0 && p1 === 0) pct = 0;
+            else pct = (diff / p2) * 100;
+
+            const catDef = categories.find(c => c.id === catId);
+            
+            results.push({
+                categoryId: catId,
+                label: catDef ? catDef.label : 'Other',
+                color: catDef ? catDef.color : '#ccc',
+                p1, p2, diff, pct
+            });
+        });
+
+        const increased = results.filter(d => d.diff > 0).sort((a, b) => b.diff - a.diff);
+        const decreased = results.filter(d => d.diff < 0).sort((a, b) => a.diff - b.diff);
+
+        return { increased, decreased };
+    }, [transactions, dynType, p1Start, p1End, p2Start, p2End, categories]);
+
+    const renderRow = (d, i) => {
+        let isGood = false;
+        if (dynType === 'expense') isGood = d.diff <= 0;
+        else isGood = d.diff >= 0;
+
+        const diffColor = isGood ? 'text-emerald-500' : 'text-rose-500';
+        const diffBg = isGood ? 'bg-emerald-50' : 'bg-rose-50';
+        const diffSign = d.diff > 0 ? '+' : '';
+
+        return (
+            <tr key={`${d.categoryId}-${i}`} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors group">
+                <td className="py-4 px-4 flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }}></div>
+                    <span className="text-sm font-bold text-slate-700">{d.label}</span>
+                </td>
+                <td className="py-4 px-4 text-sm font-mono text-slate-500 text-right">{currencySymbol}{formatMoney(d.p2)}</td>
+                <td className="py-4 px-4 text-sm font-mono font-bold text-slate-800 text-right">{currencySymbol}{formatMoney(d.p1)}</td>
+                <td className="py-4 px-4 text-right">
+                    <div className="flex flex-col items-end">
+                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${diffBg}`}>
+                            {isGood ? <TrendingDown className={`w-3.5 h-3.5 ${diffColor}`} /> : <TrendingUp className={`w-3.5 h-3.5 ${diffColor}`} />}
+                            <span className={`text-xs font-black ${diffColor}`}>
+                                {diffSign}{formatMoney(d.diff)} ({diffSign}{d.pct.toFixed(1)}%)
+                            </span>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        );
+    };
+
+    return (
+        <div className="bg-white shadow-sm border border-slate-200 p-6 rounded-2xl flex flex-col relative mt-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                <div>
+                    <h3 className="text-sm font-bold text-slate-800 tracking-wider">Movers & Shakers</h3>
+                    <p className="text-xs text-slate-500 mt-1">Growth and decline by category over custom periods</p>
+                </div>
+                
+                <div className="flex items-center gap-2 flex-wrap">
+                    {/* Type Filter */}
+                    <div className="flex bg-slate-200/50 p-1 rounded-xl border border-slate-300 shadow-inner mr-2">
+                        <button onClick={() => setDynType('income')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${dynType === 'income' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Income</button>
+                        <button onClick={() => setDynType('expense')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${dynType === 'expense' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Expense</button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1.5 rounded-xl border border-slate-200">
+                        <span className="text-[10px] font-bold text-slate-400">P2:</span>
+                        <input type="date" value={p2Start} onChange={(e) => setP2Start(e.target.value)} className="bg-transparent text-xs font-bold text-slate-600 outline-none" />
+                        <span className="text-[10px] font-bold text-slate-400">-</span>
+                        <input type="date" value={p2End} onChange={(e) => setP2End(e.target.value)} className="bg-transparent text-xs font-bold text-slate-600 outline-none" />
+                    </div>
+                    
+                    <span className="text-xs font-bold text-slate-300">vs</span>
+
+                    <div className="flex items-center gap-1.5 bg-white px-2 py-1.5 rounded-xl border border-blue-200 shadow-sm">
+                        <span className="text-[10px] font-bold text-blue-400">P1:</span>
+                        <input type="date" value={p1Start} onChange={(e) => setP1Start(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none" />
+                        <span className="text-[10px] font-bold text-blue-400">-</span>
+                        <input type="date" value={p1End} onChange={(e) => setP1End(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none" />
+                    </div>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto w-full">
+                <table className="w-full text-left border-collapse min-w-[600px]">
+                    <thead>
+                        <tr className="border-b-2 border-slate-100 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                            <th className="pb-3 px-4 w-1/3">Category</th>
+                            <th className="pb-3 px-4 text-right">Period 2 (P2)</th>
+                            <th className="pb-3 px-4 text-right">Period 1 (P1)</th>
+                            <th className="pb-3 px-4 text-right">Difference</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {dynamicsData.increased.length > 0 && (
+                            <>
+                                <tr className="bg-slate-50/80">
+                                    <td colSpan="4" className="py-2.5 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-y border-slate-200 shadow-inner">
+                                        Increased {dynType === 'expense' ? 'Expenses' : 'Income'}
+                                    </td>
+                                </tr>
+                                {dynamicsData.increased.map(renderRow)}
+                            </>
+                        )}
+                        
+                        {dynamicsData.decreased.length > 0 && (
+                            <>
+                                <tr className="bg-slate-50/80">
+                                    <td colSpan="4" className="py-2.5 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-y border-slate-200 shadow-inner">
+                                        Decreased {dynType === 'expense' ? 'Expenses' : 'Income'}
+                                    </td>
+                                </tr>
+                                {dynamicsData.decreased.map(renderRow)}
+                            </>
+                        )}
+                        
+                        {dynamicsData.increased.length === 0 && dynamicsData.decreased.length === 0 && (
+                            <tr>
+                                <td colSpan="4" className="py-8 text-center text-xs text-slate-400">No data available for the selected periods.</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
 
 const OverviewTab = ({
     filterAccountsList,
@@ -36,8 +226,9 @@ const OverviewTab = ({
     exportBalanceHistoryToExcel,
     spendingGrouping,
     setSpendingGrouping,
-    dailyChartCategoryFilter,
-    setDailyChartCategoryFilter,
+    dailyChartCategoryFilters,
+    setDailyChartCategoryFilters,
+    dailyChartTypeFilter,
     categories,
     pieChartMode,
     setPieChartMode,
@@ -52,7 +243,18 @@ const OverviewTab = ({
     setHistoryFilter,
     setDashboardTab,
     formatDateToDDMMYYYY,
+    transactions,
 }) => {
+    const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+    const [historyPage, setHistoryPage] = useState(1);
+    const historyItemsPerPage = 20;
+
+    const totalHistoryPages = Math.ceil(balanceHistoryData.length / historyItemsPerPage);
+    const currentHistoryData = balanceHistoryData.slice(
+        (historyPage - 1) * historyItemsPerPage,
+        historyPage * historyItemsPerPage
+    );
+
     return (
         <>
                      {/* --- ANALYTICS VIEW --- */}
@@ -298,17 +500,17 @@ const OverviewTab = ({
                                                     <YAxis stroke="#666" fontSize={10} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} />
                                                     <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
                                                     <RechartsTooltip content={<CustomTooltip selectedDate={selectedDate} getMonthLabel={getMonthLabel} formatMoney={formatMoney} categories={categories} />} />
-                                                    {incomeCategories.map(c => (
-                                                        <Bar key={c.id} dataKey={`IN_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#10b981'} radius={[4, 4, 0, 0]} />
-                                                    ))}
-                                                    <Bar dataKey="IN_Transfer" name="Перевод (In)" stackId="spending" fill="#a855f7" radius={[4, 4, 0, 0]} />
-                                                    <Bar dataKey="IN_Other" name="Other Income" stackId="spending" fill="#64748b" radius={[4, 4, 0, 0]} />
-                                                    
-                                                    {expenseCategories.map(c => (
-                                                        <Bar key={c.id} dataKey={`OUT_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#ef4444'} radius={[0, 0, 4, 4]} />
-                                                    ))}
-                                                    <Bar dataKey="OUT_Transfer" name="Перевод (Out)" stackId="spending" fill="#a855f7" radius={[0, 0, 4, 4]} />
-                                                    <Bar dataKey="OUT_Other" name="Other Expense" stackId="spending" fill="#475569" radius={[0, 0, 4, 4]} />
+                                                {dailyChartTypeFilter !== 'expense' && incomeCategories.map(c => (
+                                                    <Bar key={`in-${c.id}`} dataKey={`IN_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#10b981'} radius={[4, 4, 0, 0]} />
+                                                ))}
+                                                {dailyChartTypeFilter !== 'expense' && <Bar dataKey="IN_Transfer" name="Transfer (In)" stackId="spending" fill="#a855f7" radius={[4, 4, 0, 0]} />}
+                                                {dailyChartTypeFilter !== 'expense' && <Bar dataKey="IN_Other" name="Other Income" stackId="spending" fill="#64748b" radius={[4, 4, 0, 0]} />}
+                                                
+                                                {dailyChartTypeFilter !== 'income' && expenseCategories.map(c => (
+                                                    <Bar key={`out-${c.id}`} dataKey={`OUT_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#ef4444'} radius={dailyChartTypeFilter === 'expense' ? [4,4,0,0] : [0, 0, 4, 4]} />
+                                                ))}
+                                                {dailyChartTypeFilter !== 'income' && <Bar dataKey="OUT_Transfer" name="Transfer (Out)" stackId="spending" fill="#a855f7" radius={dailyChartTypeFilter === 'expense' ? [4,4,0,0] : [0, 0, 4, 4]} />}
+                                                {dailyChartTypeFilter !== 'income' && <Bar dataKey="OUT_Other" name="Other Expense" stackId="spending" fill="#475569" radius={dailyChartTypeFilter === 'expense' ? [4,4,0,0] : [0, 0, 4, 4]} />}
                                                 </BarChart>
                                             </ResponsiveContainer>
                                     ) : (
@@ -414,46 +616,86 @@ const OverviewTab = ({
                                              <span className="text-xs">No balance history data available</span>
                                          </div>
                                      )}
+                                 </div>
+                             </div>
                                                               {/* Balance History Table */}
                              <div className="bg-white shadow-sm border border-slate-200 p-6 rounded-2xl flex flex-col relative mt-6">
                                  <div className="flex justify-between items-center mb-6">
-                                     <h3 className="text-sm font-bold text-slate-800 tracking-wider">Detailed History</h3>
+                                     <div className="flex items-center gap-3">
+                                         <h3 className="text-sm font-bold text-slate-800 tracking-wider">Detailed History</h3>
+                                         <button 
+                                             onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+                                             className="p-1 hover:bg-slate-100 rounded text-slate-400 transition-colors"
+                                         >
+                                             {isHistoryExpanded ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                         </button>
+                                     </div>
                                      <button onClick={exportBalanceHistoryToExcel} className="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2">
                                          <Download className="w-4 h-4" /> Export (.xlsx)
                                      </button>
                                  </div>
-                                 <div className="overflow-x-auto w-full">
-                                     <table className="w-full text-left border-collapse min-w-[600px]">
-                                         <thead>
-                                             <tr className="border-b-2 border-slate-200 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                                                 <th className="pb-3 px-4 font-bold w-32">Date</th>
-                                                 <th className="pb-3 px-4 text-right w-32">Income</th>
-                                                 <th className="pb-3 px-4 text-right w-32">Expense</th>
-                                                 <th className="pb-3 px-4 text-right w-32">Net Flow</th>
-                                                 <th className="pb-3 px-4 text-right w-32">Balance</th>
-                                             </tr>
-                                         </thead>
-                                         <tbody>
-                                             {balanceHistoryData.map((d, i) => (
-                                                 <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                                     <td className="py-3 px-4 text-xs font-bold text-slate-700">{formatDateToDDMMYYYY(d.fullDate)}</td>
-                                                     <td className="py-3 px-4 text-xs font-mono text-emerald-600 text-right">+{formatMoney(d.income || 0)}</td>
-                                                     <td className="py-3 px-4 text-xs font-mono text-rose-600 text-right">-{formatMoney(d.expense || 0)}</td>
-                                                     <td className="py-3 px-4 text-xs font-mono text-slate-700 text-right">{d.netFlow >= 0 ? '+' : ''}{formatMoney(d.netFlow)}</td>
-                                                     <td className="py-3 px-4 text-xs font-mono font-bold text-slate-800 text-right">{formatMoney(d.balance)}</td>
+                                 {isHistoryExpanded && (
+                                 <>
+                                     <div className="overflow-x-auto w-full">
+                                         <table className="w-full text-left border-collapse min-w-[600px]">
+                                             <thead>
+                                                 <tr className="border-b-2 border-slate-200 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                                                     <th className="pb-3 px-4 font-bold w-32">Date</th>
+                                                     <th className="pb-3 px-4 text-right w-32">Income</th>
+                                                     <th className="pb-3 px-4 text-right w-32">Expense</th>
+                                                     <th className="pb-3 px-4 text-right w-32">Net Flow</th>
+                                                     <th className="pb-3 px-4 text-right w-32">Balance</th>
                                                  </tr>
-                                             ))}
-                                             {balanceHistoryData.length === 0 && (
-                                                 <tr>
-                                                     <td colSpan="5" className="py-8 text-center text-xs text-slate-400">No data available</td>
-                                                 </tr>
-                                             )}
-                                         </tbody>
-                                     </table>
-                                 </div>
+                                             </thead>
+                                             <tbody>
+                                                 {currentHistoryData.map((d, i) => (
+                                                     <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                                         <td className="py-3 px-4 text-xs font-bold text-slate-700">{formatDateToDDMMYYYY(d.fullDate)}</td>
+                                                         <td className="py-3 px-4 text-xs font-mono text-emerald-600 text-right">+{formatMoney(d.income || 0)}</td>
+                                                         <td className="py-3 px-4 text-xs font-mono text-rose-600 text-right">-{formatMoney(d.expense || 0)}</td>
+                                                         <td className="py-3 px-4 text-xs font-mono text-slate-700 text-right">{d.netFlow >= 0 ? '+' : ''}{formatMoney(d.netFlow)}</td>
+                                                         <td className="py-3 px-4 text-xs font-mono font-bold text-slate-800 text-right">{formatMoney(d.balance)}</td>
+                                                     </tr>
+                                                 ))}
+                                                 {currentHistoryData.length === 0 && (
+                                                     <tr>
+                                                         <td colSpan="5" className="py-8 text-center text-xs text-slate-400">No data available</td>
+                                                     </tr>
+                                                 )}
+                                             </tbody>
+                                         </table>
+                                     </div>
+                                     {totalHistoryPages > 1 && (
+                                         <div className="flex justify-between items-center mt-4">
+                                             <span className="text-xs text-slate-400 font-bold">Page {historyPage} of {totalHistoryPages}</span>
+                                             <div className="flex gap-2">
+                                                 <button 
+                                                     disabled={historyPage === 1}
+                                                     onClick={() => setHistoryPage(p => p - 1)} 
+                                                     className="p-1 rounded-md bg-slate-50 hover:bg-slate-100 disabled:opacity-50 text-slate-600 transition-colors"
+                                                 >
+                                                     <ChevronLeft className="w-4 h-4" />
+                                                 </button>
+                                                 <button 
+                                                     disabled={historyPage === totalHistoryPages}
+                                                     onClick={() => setHistoryPage(p => p + 1)} 
+                                                     className="p-1 rounded-md bg-slate-50 hover:bg-slate-100 disabled:opacity-50 text-slate-600 transition-colors"
+                                                 >
+                                                     <ChevronRight className="w-4 h-4" />
+                                                 </button>
+                                             </div>
+                                         </div>
+                                     )}
+                                 </>
+                                 )}
                              </div>
-</div>
-                             </div>
+                             
+                             <CategoryDynamicsSection 
+                                transactions={transactions}
+                                categories={categories}
+                                formatMoney={formatMoney}
+                                currencySymbol={currencySymbol}
+                             />
                          </div>
                      </>
     );

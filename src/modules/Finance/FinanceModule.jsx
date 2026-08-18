@@ -3,7 +3,8 @@ import {
     LayoutDashboard, DollarSign, PieChart, TrendingUp, TrendingDown,
     CreditCard, Wallet, Plus, ArrowUpRight, ArrowDownRight, Filter,
     Download, Settings, CheckSquare, Eye, EyeOff, Trash2, X, ChevronDown,
-    Calendar, Calculator, Edit3, Save as SaveIcon, Maximize2, Target, ChevronRight, CheckCircle2
+    Calendar, Calculator, Edit3, Save as SaveIcon, Maximize2, Target, ChevronRight, CheckCircle2,
+    ArrowLeft, BarChart2, List
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -13,7 +14,8 @@ import {
     exportTransactionsToExcel, 
     exportAnalyticsToExcel, 
     exportBudgetToExcel, 
-    exportProjectsToExcel 
+    exportProjectsToExcel,
+    exportCategoryAnalysisToExcel
 } from './utils/financeExport';
 import HistoryTab from './tabs/HistoryTab';
 import OverviewTab from './tabs/OverviewTab';
@@ -39,6 +41,272 @@ import { CURRENCIES, getLocalYYYYMMDD, formatDateToDDMMYYYY } from './utils/fina
 
 
 
+
+const CategoryDrillDownView = ({ category, type, monthTransactions, allTransactions, accounts, dateLabel, onBack, exportCategoryAnalysisToExcel, formatMoney }) => {
+    const [groupingMode, setGroupingMode] = useState('week'); // 'day', 'week', 'month'
+    const [selectedPeriod, setSelectedPeriod] = useState(null);
+    const [expandedTxId, setExpandedTxId] = useState(null);
+
+    const getLocalYYYYMMDD = (dateOrStr) => {
+        const d = dateOrStr ? new Date(dateOrStr) : new Date();
+        if (isNaN(d.getTime())) return '';
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    };
+
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(today.getDate() - 60);
+    
+    let earliestDate = new Date();
+    if (allTransactions && allTransactions.length > 0) {
+        let earliestTime = new Date(allTransactions[0].createdAt).getTime();
+        allTransactions.forEach(t => {
+            const tTime = new Date(t.createdAt).getTime();
+            if (tTime < earliestTime) earliestTime = tTime;
+        });
+        earliestDate = new Date(earliestTime);
+    }
+    
+    const [p1Start, setP1Start] = useState(getLocalYYYYMMDD(thirtyDaysAgo));
+    const [p1End, setP1End] = useState(getLocalYYYYMMDD(today));
+    const [p2Start, setP2Start] = useState(getLocalYYYYMMDD(earliestDate));
+    const [p2End, setP2End] = useState(getLocalYYYYMMDD(today));
+
+    const txs = useMemo(() => {
+        return monthTransactions.filter(t => t.categoryId === category.id && t.type === type).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }, [monthTransactions, category.id, type]);
+
+    const dynamics = useMemo(() => {
+        if (!allTransactions || allTransactions.length === 0) return { diff: 0, avgA: 0, avgB: 0 };
+        const catTxs = allTransactions.filter(t => t.categoryId === category.id && t.type === type);
+        
+        const calcAvg = (startStr, endStr) => {
+            if (!startStr || !endStr) return 0;
+            const start = new Date(startStr);
+            const end = new Date(endStr);
+            end.setHours(23, 59, 59, 999);
+            const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+            let sum = 0;
+            catTxs.forEach(t => {
+                const d = new Date(t.createdAt);
+                if (d >= start && d <= end) sum += Number(t.amount);
+            });
+            return sum / days;
+        };
+
+        const avgA = calcAvg(p1Start, p1End);
+        const avgB = calcAvg(p2Start, p2End);
+        
+        let diff = 0;
+        if (avgB > 0) diff = ((avgA - avgB) / avgB) * 100;
+        else if (avgA > 0) diff = 100;
+        
+        return { diff, avgA, avgB };
+    }, [allTransactions, category.id, type, p1Start, p1End, p2Start, p2End]);
+
+    const trendData = useMemo(() => {
+        const trendGroups = {};
+        txs.forEach(t => {
+            const d = new Date(t.createdAt);
+            let label = '';
+            let rawDate = null;
+            if (groupingMode === 'day') {
+                label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                rawDate = new Date(d.setHours(0,0,0,0));
+            } else if (groupingMode === 'week') {
+                const firstDay = new Date(d);
+                firstDay.setDate(d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1));
+                label = firstDay.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                rawDate = new Date(firstDay.setHours(0,0,0,0));
+            } else {
+                label = d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+                rawDate = new Date(d.getFullYear(), d.getMonth(), 1);
+            }
+            if (!trendGroups[label]) trendGroups[label] = { label, value: 0, raw: rawDate };
+            trendGroups[label].value += Number(t.amount);
+        });
+        return Object.values(trendGroups).sort((a,b) => a.raw - b.raw);
+    }, [txs, groupingMode]);
+
+    const displayTxs = useMemo(() => {
+        if (!selectedPeriod) return [];
+        return txs.filter(t => {
+            const d = new Date(t.createdAt);
+            let label = '';
+            if (groupingMode === 'day') {
+                label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            } else if (groupingMode === 'week') {
+                const firstDay = new Date(d);
+                firstDay.setDate(d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1));
+                label = firstDay.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            } else {
+                label = d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+            }
+            return label === selectedPeriod;
+        });
+    }, [txs, selectedPeriod, groupingMode]);
+
+    return (
+        <div className="w-full h-full flex flex-col p-4 md:p-8 bg-slate-50 overflow-y-auto relative animate-in slide-in-from-right-4 fade-in duration-300">
+            {/* Compact Header & Dynamics */}
+            <div className="flex flex-wrap md:flex-nowrap items-center justify-between gap-4 mb-6 sticky top-0 bg-slate-50/90 backdrop-blur pb-4 z-20 border-b border-slate-200">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="p-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-full transition-colors shadow-sm">
+                        <ArrowLeft className="w-4 h-4 text-slate-600" />
+                    </button>
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center shadow-inner" style={{ backgroundColor: `${category.color}20`, color: category.color }}>
+                        <PieChart className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h2 className="text-base font-black text-slate-800 tracking-tight leading-tight">{category.name}</h2>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{formatMoney(category.value)} Total</p>
+                    </div>
+                </div>
+                
+                <div className="flex items-center gap-4 bg-white p-2 px-4 rounded-xl border border-slate-200 shadow-sm flex-1 md:flex-none">
+                    <div className="flex items-center gap-2 border-r border-slate-100 pr-4">
+                        {dynamics.diff > 0 ? (
+                            type === 'expense' ? <TrendingUp className="w-5 h-5 text-red-500" /> : <TrendingUp className="w-5 h-5 text-green-500" />
+                        ) : dynamics.diff < 0 ? (
+                            type === 'expense' ? <TrendingDown className="w-5 h-5 text-green-500" /> : <TrendingDown className="w-5 h-5 text-red-500" />
+                        ) : (
+                            <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center"><div className="w-2 h-0.5 bg-slate-400 rounded" /></div>
+                        )}
+                        <span className={`text-xl font-black ${dynamics.diff > 0 ? (type === 'expense' ? 'text-red-500' : 'text-green-500') : dynamics.diff < 0 ? (type === 'expense' ? 'text-green-500' : 'text-red-500') : 'text-slate-500'}`}>
+                            {dynamics.diff > 0 ? '+' : ''}{dynamics.diff.toFixed(1)}%
+                        </span>
+                    </div>
+                    
+                    <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase w-4">P1:</span>
+                            <input type="date" value={p1Start} onChange={e => setP1Start(e.target.value)} className="text-[10px] w-24 outline-none bg-slate-50 border border-slate-200 rounded px-1" />
+                            <span className="text-slate-300 text-xs">-</span>
+                            <input type="date" value={p1End} onChange={e => setP1End(e.target.value)} className="text-[10px] w-24 outline-none bg-slate-50 border border-slate-200 rounded px-1" />
+                            <span className="font-mono text-[10px] font-bold ml-1 text-slate-700 w-16 text-right">{formatMoney(dynamics.avgA)}/d</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase w-4">P2:</span>
+                            <input type="date" value={p2Start} onChange={e => setP2Start(e.target.value)} className="text-[10px] w-24 outline-none bg-slate-50 border border-slate-200 rounded px-1" />
+                            <span className="text-slate-300 text-xs">-</span>
+                            <input type="date" value={p2End} onChange={e => setP2End(e.target.value)} className="text-[10px] w-24 outline-none bg-slate-50 border border-slate-200 rounded px-1" />
+                            <span className="font-mono text-[10px] font-bold ml-1 text-slate-700 w-16 text-right">{formatMoney(dynamics.avgB)}/d</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <button 
+                    onClick={() => exportCategoryAnalysisToExcel(category.name, trendData, txs, accounts, dateLabel)}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm whitespace-nowrap"
+                >
+                    <Download className="w-3.5 h-3.5" /> Export
+                </button>
+            </div>
+
+            {/* Content Layout (Chart + Optional Right Panel) */}
+            <div className="flex-1 flex gap-6 min-h-0">
+                <div className={`flex-1 bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col transition-all duration-300`}>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><BarChart2 className="w-3.5 h-3.5"/> Trend</h3>
+                        
+                        <div className="flex bg-slate-100 rounded-lg p-1">
+                            {['day', 'week', 'month'].map(mode => (
+                                <button
+                                    key={mode}
+                                    onClick={() => { setGroupingMode(mode); setSelectedPeriod(null); }}
+                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${groupingMode === mode ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    {mode}s
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex-1 w-full min-h-[200px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={trendData}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} dy={10} />
+                                <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(val) => formatMoney(val)} />
+                                <Bar 
+                                    dataKey="value" 
+                                    fill={category.color} 
+                                    radius={[6,6,0,0]} 
+                                    maxBarSize={40}
+                                    onClick={(data) => {
+                                        if (data && data.payload && data.payload.label) {
+                                            setSelectedPeriod(prev => prev === data.payload.label ? null : data.payload.label);
+                                        }
+                                    }}
+                                >
+                                    {
+                                        trendData.map((entry, index) => (
+                                            <Cell cursor="pointer" fill={entry.label === selectedPeriod ? category.color : `${category.color}80`} key={`cell-${index}`} />
+                                        ))
+                                    }
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Right Panel: Transactions */}
+                {selectedPeriod && (
+                    <div className="w-80 lg:w-96 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col shrink-0 animate-in slide-in-from-right-8 fade-in duration-300">
+                        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                <List className="w-3.5 h-3.5"/> 
+                                {selectedPeriod}
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{displayTxs.length} txs</span>
+                                <button onClick={() => setSelectedPeriod(null)} className="p-1 hover:bg-slate-200 rounded-full transition-colors text-slate-500">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {displayTxs.length === 0 ? (
+                                <div className="text-center text-slate-400 text-sm py-8 italic flex flex-col items-center justify-center h-full">
+                                    <List className="w-8 h-8 text-slate-200 mb-2" />
+                                    No transactions
+                                </div>
+                            ) : displayTxs.map(t => {
+                                const fromAcc = accounts.find(a => a.id === t.accountId);
+                                const isExpanded = expandedTxId === t.id;
+                                return (
+                                    <div key={t.id} onClick={() => setExpandedTxId(isExpanded ? null : t.id)} className={`group flex flex-col p-3 rounded-xl border transition-colors cursor-pointer ${isExpanded ? 'border-blue-200 bg-blue-50/30' : 'border-slate-100 hover:bg-slate-50'}`}>
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex flex-col">
+                                                <span className={`font-bold text-xs transition-colors ${isExpanded ? 'text-blue-700' : 'text-slate-700 group-hover:text-blue-600'}`}>{t.description || category.name}</span>
+                                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                                                    {new Date(t.createdAt).toLocaleDateString()} &bull; {fromAcc?.label || 'Cash'}
+                                                </span>
+                                            </div>
+                                            <span className={`font-mono font-black text-xs ${isExpanded ? 'text-blue-700' : 'text-slate-800'}`}>
+                                                {formatMoney(Math.abs(t.amount))}
+                                            </span>
+                                        </div>
+                                        {isExpanded && (
+                                            <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-1.5 text-xs text-slate-600">
+                                                <div className="flex justify-between"><span className="text-slate-400">Date</span><span>{new Date(t.createdAt).toLocaleString()}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-400">Account</span><span>{fromAcc?.label || 'Unknown'}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-400">Amount</span><span className="font-mono">{t.amount}</span></div>
+                                                <div className="flex justify-between"><span className="text-slate-400">Desc</span><span className="text-right truncate max-w-[120px]" title={t.description || ''}>{t.description || 'None'}</span></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const FinanceModule = ({
     userData,
@@ -121,12 +389,14 @@ const FinanceModule = ({
 
     // Analytics Chart Expansion
     const [expandedChart, setExpandedChart] = useState(null);
+    const [selectedDrillDownCategory, setSelectedDrillDownCategory] = useState(null);
 
     // History Filters
     const [historyFilter, setHistoryFilter] = useState({ categoryIds: [], type: 'all', accountIds: [], minAmount: '', maxAmount: '', date: '', search: '', showTransfers: true });
 
     // Daily Spending Chart Filters
-    const [dailyChartCategoryFilter, setDailyChartCategoryFilter] = useState('all');
+    const [dailyChartCategoryFilters, setDailyChartCategoryFilters] = useState([]);
+    const [dailyChartTypeFilter, setDailyChartTypeFilter] = useState('all');
 
     // New state for Analytics improvements
     const [showDailyAvgBreakdown, setShowDailyAvgBreakdown] = useState(false);
@@ -743,7 +1013,8 @@ const FinanceModule = ({
                 // Filter transactions for this day
                 const dayTransactions = filteredMonthTransactions.filter(t => 
                     getLocalYYYYMMDD(t.createdAt) === dayStr && 
-                    (dailyChartCategoryFilter === 'all' || t.categoryId === dailyChartCategoryFilter)
+                    (dailyChartCategoryFilters.length === 0 || dailyChartCategoryFilters.includes(t.categoryId)) &&
+                    (dailyChartTypeFilter === 'all' || t.type === dailyChartTypeFilter)
                 );
                 
                 dayTransactions.forEach(t => {
@@ -761,7 +1032,8 @@ const FinanceModule = ({
                         dayData[`IN_${categoryLabel}`] = (dayData[`IN_${categoryLabel}`] || 0) + amount;
                     } else if (t.type === 'expense') {
                         dayData.expense += amount;
-                        dayData[`OUT_${categoryLabel}`] = (dayData[`OUT_${categoryLabel}`] || 0) - amount; // Negative!
+                        const multiplier = dailyChartTypeFilter === 'expense' ? 1 : -1;
+                        dayData[`OUT_${categoryLabel}`] = (dayData[`OUT_${categoryLabel}`] || 0) + (amount * multiplier); 
                     }
                 });
                 
@@ -789,7 +1061,8 @@ const FinanceModule = ({
                 const weekTransactions = filteredMonthTransactions.filter(t => {
                     const tDate = new Date(t.createdAt);
                     return tDate >= weekStart && tDate <= weekEnd &&
-                           (dailyChartCategoryFilter === 'all' || t.categoryId === dailyChartCategoryFilter);
+                           (dailyChartCategoryFilters.length === 0 || dailyChartCategoryFilters.includes(t.categoryId)) &&
+                           (dailyChartTypeFilter === 'all' || t.type === dailyChartTypeFilter);
                 });
 
                 weekTransactions.forEach(t => {
@@ -835,7 +1108,8 @@ const FinanceModule = ({
                 const monthTransactionsList = filteredMonthTransactions.filter(t => {
                     const tDate = new Date(t.createdAt);
                     return tDate >= monthStart && tDate <= monthEnd &&
-                           (dailyChartCategoryFilter === 'all' || t.categoryId === dailyChartCategoryFilter);
+                           (dailyChartCategoryFilters.length === 0 || dailyChartCategoryFilters.includes(t.categoryId)) &&
+                           (dailyChartTypeFilter === 'all' || t.type === dailyChartTypeFilter);
                 });
 
                 monthTransactionsList.forEach(t => {
@@ -859,7 +1133,7 @@ const FinanceModule = ({
         }
         
         return days;
-    }, [analyticsSource, filteredMonthTransactions, resolvedDateRange, dailyChartCategoryFilter, categories, spendingGrouping]);
+    }, [analyticsSource, filteredMonthTransactions, resolvedDateRange, dailyChartCategoryFilters, dailyChartTypeFilter, categories, spendingGrouping]);
 
 
     // --- Export Actions ---
@@ -1171,7 +1445,7 @@ const FinanceModule = ({
 
                     <div className="w-px h-6 bg-slate-200 shrink-0 mx-1"></div>
 
-                    {accounts.map(acc => {
+                    {[...accounts].sort((a,b) => getAccountBalance(b.id) - getAccountBalance(a.id)).map(acc => {
                         const isSelected = activeAnalyticAccountIds.includes(acc.id);
                         return (
                             <div 
@@ -2233,8 +2507,9 @@ const FinanceModule = ({
                          exportBalanceHistoryToExcel={exportBalanceHistoryToExcel}
                          spendingGrouping={spendingGrouping}
                          setSpendingGrouping={setSpendingGrouping}
-                         dailyChartCategoryFilter={dailyChartCategoryFilter}
-                         setDailyChartCategoryFilter={setDailyChartCategoryFilter}
+                         dailyChartCategoryFilters={dailyChartCategoryFilters}
+                         setDailyChartCategoryFilters={setDailyChartCategoryFilters}
+                         dailyChartTypeFilter={dailyChartTypeFilter}
                          categories={categories}
                          pieChartMode={pieChartMode}
                          setPieChartMode={setPieChartMode}
@@ -2249,6 +2524,7 @@ const FinanceModule = ({
                          setHistoryFilter={setHistoryFilter}
                          setDashboardTab={setDashboardTab}
                          formatDateToDDMMYYYY={formatDateToDDMMYYYY}
+                         transactions={transactions}
                      />
                      )}
             
@@ -2306,18 +2582,36 @@ const FinanceModule = ({
                             )}
                             {expandedChart === 'bar' && (
                                 <>
-                                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm ml-2">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Category:</span>
-                                        <select
-                                            value={dailyChartCategoryFilter}
-                                            onChange={e => setDailyChartCategoryFilter(e.target.value)}
-                                            className="bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 rounded-lg px-3 py-1 outline-none focus:border-blue-500 max-w-[180px] truncate"
-                                        >
-                                            <option value="all">All Categories</option>
-                                            {categories.map(c => (
-                                                <option key={c.id} value={c.id}>{c.label}</option>
-                                            ))}
-                                        </select>
+                                    <div className="flex bg-slate-200/50 p-1 rounded-xl border border-slate-300 ml-2 shadow-inner">
+                                        <button onClick={() => setDailyChartTypeFilter('all')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${dailyChartTypeFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>All</button>
+                                        <button onClick={() => setDailyChartTypeFilter('income')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${dailyChartTypeFilter === 'income' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Income</button>
+                                        <button onClick={() => setDailyChartTypeFilter('expense')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${dailyChartTypeFilter === 'expense' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Expense</button>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm ml-2 group relative z-50">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Categories:</span>
+                                        <div className="relative">
+                                            <div className="text-xs font-bold text-slate-600 cursor-pointer min-w-[100px]">
+                                                {dailyChartCategoryFilters.length === 0 ? 'All Categories' : `${dailyChartCategoryFilters.length} Selected`}
+                                            </div>
+                                            <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 shadow-lg rounded-xl p-2 hidden group-hover:block w-64 max-h-64 overflow-y-auto">
+                                                <label className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded cursor-pointer">
+                                                    <input type="checkbox" checked={dailyChartCategoryFilters.length === 0} onChange={() => setDailyChartCategoryFilters([])} />
+                                                    <span className="text-xs font-bold">All Categories</span>
+                                                </label>
+                                                {categories.map(c => (
+                                                    <label key={c.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded cursor-pointer">
+                                                        <input type="checkbox" checked={dailyChartCategoryFilters.includes(c.id)} onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setDailyChartCategoryFilters(prev => [...prev, c.id]);
+                                                            } else {
+                                                                setDailyChartCategoryFilters(prev => prev.filter(id => id !== c.id));
+                                                            }
+                                                        }} />
+                                                        <span className="text-xs">{c.label}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
                                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Grouping:</span>
@@ -2348,7 +2642,7 @@ const FinanceModule = ({
                                 </>
                             )}
                         </div>
-                        <button onClick={() => setExpandedChart(null)} className="p-3 bg-white shadow-sm border border-slate-200 hover:bg-slate-100 rounded-full transition-colors flex items-center justify-center shrink-0">
+                        <button onClick={() => { setExpandedChart(null); setSelectedDrillDownCategory(null); }} className="p-3 bg-white shadow-sm border border-slate-200 hover:bg-slate-100 rounded-full transition-colors flex items-center justify-center shrink-0">
                             <X className="w-6 h-6 text-slate-800" />
                         </button>
                     </div>
@@ -2357,69 +2651,83 @@ const FinanceModule = ({
                         
                         {expandedChart === 'pie' && categoryBreakdown.length > 0 && (
                             <>
-                                {/* Chart Section */}
-                                <div className="w-full md:w-1/2 p-6 md:p-12 flex flex-col justify-center items-center border-b md:border-b-0 md:border-r border-slate-200 shrink-0 h-[40vh] md:h-auto">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <RePieChart>
-                                            <Pie
-                                                data={categoryBreakdown}
-                                                cx="50%" cy="50%"
-                                                innerRadius="50%" outerRadius="80%"
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                            >
-                                                {categoryBreakdown.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color || '#555'} stroke="none" />
-                                                ))}
-                                            </Pie>
-                                            <RechartsTooltip contentStyle={{ backgroundColor: '#000', border: 'none', borderRadius: '12px', padding: '12px', fontSize: '14px' }} itemStyle={{ color: '#fff' }} formatter={(val) => formatMoney(val)} />
-                                        </RePieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                                {/* Details List Section */}
-                                <div className="w-full md:w-1/2 p-6 md:p-8 overflow-y-auto bg-slate-50/50">
-                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 sticky top-0 bg-slate-50/90 backdrop-blur pb-2 z-10">Detailed Breakdown</h3>
-                                    <div className="space-y-3">
-                                        {categoryBreakdown.slice().sort((a,b) => b.value - a.value).map((item, idx) => {
-                                            const total = categoryBreakdown.reduce((sum, i) => sum + i.value, 0);
-                                            const percent = total > 0 ? ((item.value / total) * 100).toFixed(1) : 0;
-                                            const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
-                                            const daysForAvg = analyticsSource === 'actual' ? activeDays : daysInMonth;
-                                            const dailyAvg = item.value / daysForAvg;
+                                {!selectedDrillDownCategory ? (
+                                    <>
+                                        {/* Chart Section */}
+                                        <div className="w-full md:w-1/2 p-6 md:p-12 flex flex-col justify-center items-center border-b md:border-b-0 md:border-r border-slate-200 shrink-0 h-[40vh] md:h-auto">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <RePieChart>
+                                                    <Pie
+                                                        data={categoryBreakdown}
+                                                        cx="50%" cy="50%"
+                                                        innerRadius="50%" outerRadius="80%"
+                                                        paddingAngle={5}
+                                                        dataKey="value"
+                                                    >
+                                                        {categoryBreakdown.map((entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={entry.color || '#555'} stroke="none" />
+                                                        ))}
+                                                    </Pie>
+                                                    <RechartsTooltip contentStyle={{ backgroundColor: '#000', border: 'none', borderRadius: '12px', padding: '12px', fontSize: '14px' }} itemStyle={{ color: '#fff' }} formatter={(val) => formatMoney(val)} />
+                                                </RePieChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                        {/* Details List Section */}
+                                        <div className="w-full md:w-1/2 p-6 md:p-8 overflow-y-auto bg-slate-50/50">
+                                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 sticky top-0 bg-slate-50/90 backdrop-blur pb-2 z-10">Detailed Breakdown</h3>
+                                            <div className="space-y-3">
+                                                {categoryBreakdown.slice().sort((a,b) => b.value - a.value).map((item, idx) => {
+                                                    const total = categoryBreakdown.reduce((sum, i) => sum + i.value, 0);
+                                                    const percent = total > 0 ? ((item.value / total) * 100).toFixed(1) : 0;
+                                                    const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
+                                                    const daysForAvg = analyticsSource === 'actual' ? activeDays : daysInMonth;
+                                                    const dailyAvg = item.value / daysForAvg;
 
-                                            return (
-                                                <div 
-                                                    key={idx} 
-                                                    onClick={() => {
-                                                        if (item.id) {
-                                                            setHistoryFilter({ type: analyticsSource === 'budget' ? 'expense' : pieChartMode, categoryId: item.id, accountId: 'all', minAmount: '', maxAmount: '', date: '', search: '', showTransfers: true });
-                                                            setDashboardTab('history');
-                                                            setExpandedChart(null);
-                                                        }
-                                                    }}
-                                                    className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-purple-300 hover:bg-slate-50 transition-colors group ${item.id ? 'cursor-pointer' : ''}`}
-                                                >
-                                                    <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform" style={{ backgroundColor: `${item.color}20`, color: item.color }}>
-                                                        <PieChart className="w-6 h-6" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex justify-between items-start mb-1">
-                                                            <div className="font-bold text-slate-800 truncate pr-2">{item.name}</div>
-                                                            <div className="font-black text-slate-800 whitespace-nowrap">{formatMoney(item.value)}</div>
+                                                    return (
+                                                        <div 
+                                                            key={idx} 
+                                                            onClick={() => {
+                                                                if (item.id) {
+                                                                    setSelectedDrillDownCategory(item);
+                                                                }
+                                                            }}
+                                                            className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-purple-300 hover:bg-slate-50 transition-colors group ${item.id ? 'cursor-pointer' : ''}`}
+                                                        >
+                                                            <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform" style={{ backgroundColor: `${item.color}20`, color: item.color }}>
+                                                                <PieChart className="w-6 h-6" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start mb-1">
+                                                                    <div className="font-bold text-slate-800 truncate pr-2">{item.name}</div>
+                                                                    <div className="font-black text-slate-800 whitespace-nowrap">{formatMoney(item.value)}</div>
+                                                                </div>
+                                                                <div className="flex justify-between items-center text-[10px] uppercase font-bold text-slate-500 mb-2">
+                                                                    <span>{percent}% of total</span>
+                                                                    <span>~{formatMoney(dailyAvg)} / day</span>
+                                                                </div>
+                                                                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                                    <div className="h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: item.color }} />
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex justify-between items-center text-[10px] uppercase font-bold text-slate-500 mb-2">
-                                                            <span>{percent}% of total</span>
-                                                            <span>~{formatMoney(dailyAvg)} / day</span>
-                                                        </div>
-                                                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                                            <div className="h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: item.color }} />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                <CategoryDrillDownView 
+                                    category={selectedDrillDownCategory} 
+                                    type={analyticsSource === 'budget' ? 'expense' : pieChartMode} 
+                                    monthTransactions={monthTransactions}
+                                    allTransactions={transactions}
+                                    accounts={accounts} 
+                                    dateLabel={getDateRangeLabel()} 
+                                    onBack={() => setSelectedDrillDownCategory(null)} 
+                                    exportCategoryAnalysisToExcel={exportCategoryAnalysisToExcel} 
+                                    formatMoney={formatMoney}
+                                />
+                                )}
                             </>
                         )}
 
@@ -2480,15 +2788,17 @@ const FinanceModule = ({
                                                 <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={val => `${currencySymbol}${val}`} tickMargin={8} />
                                                 <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
                                                 <RechartsTooltip content={<CustomTooltip selectedDate={selectedDate} getMonthLabel={getMonthLabel} formatMoney={formatMoney} categories={categories} />} />
-                                                {incomeCategories.map(c => (
-                                                    <Bar key={c.id} dataKey={`IN_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#10b981'} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                                {dailyChartTypeFilter !== 'expense' && incomeCategories.map(c => (
+                                                    <Bar key={`in-${c.id}`} dataKey={`IN_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#10b981'} radius={[4, 4, 0, 0]} />
                                                 ))}
-                                                <Bar dataKey="IN_Other" name="Other Income" stackId="spending" fill="#64748b" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                                {dailyChartTypeFilter !== 'expense' && <Bar dataKey="IN_Transfer" name="Transfer (In)" stackId="spending" fill="#a855f7" radius={[4, 4, 0, 0]} />}
+                                                {dailyChartTypeFilter !== 'expense' && <Bar dataKey="IN_Other" name="Other Income" stackId="spending" fill="#64748b" radius={[4, 4, 0, 0]} />}
                                                 
-                                                {expenseCategories.map(c => (
-                                                    <Bar key={c.id} dataKey={`OUT_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#ef4444'} radius={[0, 0, 4, 4]} maxBarSize={40} />
+                                                {dailyChartTypeFilter !== 'income' && expenseCategories.map(c => (
+                                                    <Bar key={`out-${c.id}`} dataKey={`OUT_${c.label}`} name={c.label} stackId="spending" fill={c.color || '#ef4444'} radius={dailyChartTypeFilter === 'expense' ? [4,4,0,0] : [0, 0, 4, 4]} />
                                                 ))}
-                                                <Bar dataKey="OUT_Other" name="Other Expense" stackId="spending" fill="#475569" radius={[0, 0, 4, 4]} maxBarSize={40} />
+                                                {dailyChartTypeFilter !== 'income' && <Bar dataKey="OUT_Transfer" name="Transfer (Out)" stackId="spending" fill="#a855f7" radius={dailyChartTypeFilter === 'expense' ? [4,4,0,0] : [0, 0, 4, 4]} />}
+                                                {dailyChartTypeFilter !== 'income' && <Bar dataKey="OUT_Other" name="Other Expense" stackId="spending" fill="#475569" radius={dailyChartTypeFilter === 'expense' ? [4,4,0,0] : [0, 0, 4, 4]} />}
                                             </BarChart>
                                         </ResponsiveContainer>
                                 </div>
